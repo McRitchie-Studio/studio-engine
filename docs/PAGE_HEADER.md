@@ -32,11 +32,15 @@ from the pinned stack ([`NAVBAR_SETUP.md`](NAVBAR_SETUP.md#reading-the-pinned-st
 | Local | What it does |
 |-------|--------------|
 | `title` | The page's one `h1`. Required. |
+| `crumbs` | The trail above the title: the page's ancestors, root first, as `[{ label:, href: }]`. Build it with `studio_crumbs` (below). |
+| `crumb_label` | The page's own name at the end of the trail, when the title is too long for it. The default is the title. |
 | `meta`, `meta_title` | Short text beside the title, such as the version, and its `title` attribute. Hidden below 640px. |
 | `label` | The nav's accessible name. A row with tabs needs it. |
 | `tabs` | `[{ label:, href:, current:, data: }]`. `current` is the `aria-current` value (`"page"`, or `"true"` for a tab that follows the scroll). Leave it blank on the others. |
 | `tabs_data` | Data attributes for the tabs' scroller. |
-| `actions_html` | A control on the right, for a row with no tabs. |
+| `actions_html` | A control on the right, such as the page's one primary action. With tabs, it comes after them. |
+| `links` | The page's other links, `[{ label:, href:, current: }]`, on a line of their own at the foot of the row. They stick with it. |
+| `links_label` | That line's accessible name. The default is "More links". |
 | `data` | Data attributes for the row, such as the page's own `studio_controller`. |
 | `row_class` | The bleed. The default, `-mx-4 px-4`, fits a container with `px-4`. Pass another value in a container with no gutter of its own. |
 
@@ -45,6 +49,75 @@ a sticky row can travel only as far as its parent.
 
 Put the space above the row on the container, as `pt-6` is above. The row carries no
 top margin, because a stuck row is measured from its place in the flow.
+
+## Crumbs
+
+Alex McRitchie's ruling of 2026-11-05: every admin page has a standard crumb trail above an
+h2-size title, left-aligned. The page's sub-sections and its most important links go on the
+right, as tabs, with at most one primary action. Its other links go on the line under the
+title, to be organized later.
+
+**One parent map.** An app names each page that has children once, in an initializer. Each
+entry names its label, its address and its parent. The trail builds itself up the chain:
+
+```ruby
+# config/initializers/studio_crumbs.rb
+Rails.application.config.to_prepare do
+  Studio.crumbs.clear.draw do
+    page :admin,       "Admin",       :admin_dashboard_path
+    page :deployments, "Deployments", :deployments_path, parent: :admin
+    page :release,     ->(release:) { release.slug }, ->(release:) { release_path(release) },
+         parent: :deployments
+  end
+end
+```
+
+A label or an address is a String, a Symbol (a route helper, read in the view and then on
+`main_app`) or a lambda. The view runs a lambda with the keywords it names, taken from the
+call. An unknown page raises `Studio::Crumbs::UnknownPage`, and a loop raises
+`Studio::Crumbs::Cycle`.
+
+```erb
+<%# A page in the map: its ancestors. %>
+<%= render "studio/page_header", title: "Deployments", crumbs: studio_crumbs(:deployments) %>
+<%# A page not in the map names only its parent. %>
+<%= render "studio/page_header", title: @release.slug, crumbs: studio_crumbs(parent: :deployments) %>
+<%# A lambda's keywords. %>
+<%= render "studio/page_header", title: "Checks", crumbs: studio_crumbs(parent: :release, release: @release) %>
+```
+
+**What it draws.**
+
+- From 40rem, the trail is on a line of its own above the title. Each ancestor is a muted
+  link, the page itself is bold with `aria-current="page"`, and a chevron (CSS, with empty alt
+  text) sits between. It is an `<ol>` in a `<nav aria-label="Breadcrumb">`.
+- Below 40rem, the trail gives way to one link to the parent: "‹ Deployments", with the
+  accessible name "Back to Deployments".
+- Every ancestor link and the parent link carry `data-page-transition-back`, so the page
+  transition plays the app's move the other way
+  ([`PAGE_TRANSITIONS.md`](PAGE_TRANSITIONS.md#back)).
+- The trail is part of the row, so it sticks with the title. The row's box does not change
+  between rest and stuck.
+
+**The title.** From 40rem it is the type scale's h2: 30px, at the display weight. On a phone
+it is 1.5 times the base, so a long title leaves the tabs room. It stays the page's one `h1`.
+
+## The gliding pill
+
+Alex McRitchie, 2026-11-05: the open tab's pill glides from tab to tab. The row draws one
+pill, `.page-header-glide`, with the lit primary button's classes, so it keeps that look in
+light, dark and glass. CSS anchor positioning puts it on the tab with `aria-current`, and its
+insets transition. So when the scroll spy (`style-section-nav`) or a page moves
+`aria-current`, the pill slides. No script measures anything; `aria-current` stays the one
+source of truth.
+
+- The tab with `aria-current` gives up its own fill, and each label sits above the pill.
+- With reduced motion, the pill jumps.
+- With no tab current, there is no pill.
+- **Support.** The block is inside `@supports (anchor-name: --a) and (position-anchor: --a)
+  and selector(:has(a))`. Where that fails, the block does nothing, and each tab keeps its
+  own fill, as before. Measured: Chromium (the e2e lane) supports it and plays the glide.
+  Safari and Firefox were not measured here.
 
 ## How it behaves
 
