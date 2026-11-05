@@ -78,6 +78,7 @@ var autoShown = false
 var shownAt = null
 var deferredHide = null
 var releaseHold = null
+var visitSignal = null
 
 // The host's own overlay, else the one layouts/studio/_head carries. Added once:
 // querySelector cannot see into a <template>.
@@ -103,6 +104,10 @@ export function answersWithFullLoad(html) {
   return /<meta[^>]*(turbo-visit-control[^>]*reload|reload[^>]*turbo-visit-control)/i.test(html || '')
 }
 
+export function noteVisitRequest(event, doc) {
+  if (event.target === doc.documentElement) visitSignal = event.detail.fetchOptions.signal
+}
+
 function endHold() {
   if (releaseHold) releaseHold()
 }
@@ -112,7 +117,8 @@ function endHold() {
 // with the response in hand. The rest of the minimum runs here and the overlay goes,
 // so the old picture has no overlay in it. It always ends: at the timer, at hide(),
 // or at the next visit. A later hold (the transition's wait for images) comes after
-// this one has ended, inside the render, so neither can cut the other short.
+// this one has ended, inside the render, so neither can cut the other short. Turbo
+// renders even a cancelled visit's response, so that HTML never goes: a Back must win.
 //
 // Only a visit's own good HTML waits. A frame, a form and a prefetch have another
 // target. A failure and a download pass straight through.
@@ -125,11 +131,13 @@ export function holdVisitResponse(event, doc) {
   if (!response || !response.succeeded || !response.isHTML) return false
   var overlay = findOverlay(doc)
   if (minShowLeft(overlay, Date.now()) <= 0) return false
+  var signal = visitSignal
   var held = Promise.resolve(response.responseHTML).then(function (html) {
     if (answersWithFullLoad(html)) return html
     var left = minShowLeft(overlay, Date.now())
     if (left <= 0) return html
-    return new Promise(function (done) {
+    return new Promise(function (resolve) {
+      var done = function (value) { if (!signal || !signal.aborted) resolve(value) }
       var timer = setTimeout(function () {
         releaseHold = null
         hide(doc)
@@ -282,6 +290,7 @@ export function installStudioLoader(doc) {
     endHold()
     if (userVisit(event)) showSoon('', doc)
   })
+  doc.addEventListener('turbo:before-fetch-request', function (event) { noteVisitRequest(event, doc) })
   doc.addEventListener('turbo:before-fetch-response', function (event) { holdVisitResponse(event, doc) })
   // turbo:reload: the response was not HTML (a download), or the visit failed,
   // and Turbo hands the URL to the browser; no page may ever replace this one.

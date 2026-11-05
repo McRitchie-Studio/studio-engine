@@ -292,6 +292,18 @@ test("StudioLoader.hide ends a wait at once", async (t) => {
   assert.equal(visit.overlay.hidden, true)
 })
 
+test("a visit Turbo cancelled during its wait never reaches Turbo: the page it left must not render", async (t) => {
+  const note = (signal) => pace.noteVisitRequest({ target: "root", detail: { fetchOptions: { signal } } }, { documentElement: "root" })
+  const controller = new AbortController()
+  note(controller.signal)
+  const visit = await visitAt(t, 360)
+  controller.abort()
+  await visit.tick(740)
+  assert.equal(visit.turboAt(), null)
+  assert.equal(visit.overlay.hidden, true, "the timer still clears the overlay when no next visit does")
+  note(null)
+})
+
 test("a caller's show has no minimum", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 0 })
   const overlay = fakeOverlay("350")
