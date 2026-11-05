@@ -1359,7 +1359,7 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
        oklch (the gradient would drop out and leave white text on nothing), it stays solid. */
     @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) and (color: oklch(from red l c h)) {
       html.dark[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(.btn-sm, :disabled, [aria-disabled="true"]) {
-        --lit-fill-alpha: 0.88;
+        --lit-fill-alpha: 0.94;
         background-color: transparent;
         -webkit-backdrop-filter: blur(6px);
         backdrop-filter: blur(6px);
