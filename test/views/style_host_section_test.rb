@@ -186,7 +186,7 @@ class StyleHostSectionTest < ActiveSupport::TestCase
   # return those too.
   def top_section_ids(html)
     Nokogiri::HTML.fragment(html)
-                  .css("div[class~='space-y-16'] > section[id]")
+                  .css("section.section-target[id]")
                   .map { |n| n["id"] }
   end
 
