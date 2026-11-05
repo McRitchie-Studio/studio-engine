@@ -1,0 +1,23 @@
+<%# The type ladder, on trial on this page: each named role, its pixel size at this page's
+    density, and what it is for. A role sets size, not the tag. Body and fine print follow the
+    page's base, so they read 14 and 10.5 on a dense admin page and 16 and 12 on a public one. %>
+<% dense = respond_to?(:type_dense_page?) && type_dense_page? %>
+<%
+  ladder = [
+    ["type-h1", "48px", "Marketing headline"],
+    ["type-h2", "30px", "Page title on a tool page"],
+    ["type-h3", "20px", "Section"],
+    ["type-h4", "16px", "Subsection"],
+    ["type-body", dense ? "14px" : "16px", "Body text"],
+    ["type-fine", dense ? "10.5px" : "12px", "Fine print"]
+  ]
+%>
+<div class="card p-4 space-y-2" data-test="style-type-ladder">
+  <h3 class="type-h4 text-heading">Type</h3>
+  <% ladder.each do |role, size, use| %>
+    <div class="flex items-baseline gap-3 min-w-0" data-type-role="<%= role %>">
+      <code class="text-xs text-muted shrink-0 w-28"><%= role %> · <%= size %></code>
+      <span class="<%= role %> text-heading min-w-0 truncate"><%= use %></span>
+    </div>
+  <% end %>
+</div>

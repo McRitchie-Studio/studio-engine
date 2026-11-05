@@ -223,6 +223,36 @@ body.modal-open .studio-app-banner {
   line-height: 1.4;
 }
 
+/* THE TYPE LADDER, on trial on /admin/style (Alex McRitchie, 2026-11-04: "standardize font
+   sizes across pages"). A role sets size, weight and line height; the tag stays whatever the
+   document outline needs, so a page's one <h1> may wear type-h2. These sizes are fixed px, so
+   type-dense does not move them. On Studio::TypeScale: h1 (3x of 16) and h4 (1x of 16). Off it,
+   on purpose: h2 and h3, the two steps the scale lacks between 3x and 1.5x and below 1.5x.
+   Body and fine print are the scale's own type-body and type-fine. */
+@utility type-h1 {
+  font-size: 48px;
+  font-weight: var(--type-display-weight, 800);
+  line-height: 1.1;
+}
+
+@utility type-h2 {
+  font-size: 30px;
+  font-weight: var(--type-display-weight, 800);
+  line-height: 1.2;
+}
+
+@utility type-h3 {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+@utility type-h4 {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 /* -- The page header (studio/_page_header, docs/PAGE_HEADER.md) ---------
    A normal page header at rest and a bar once stuck. The border is there in
    both states, in transparent at rest, so the row's height never changes and
@@ -280,6 +310,13 @@ body.modal-open .studio-app-banner {
   /* Up and down only. A hidden x would shave a glyph's overhang off a short title. */
   overflow-x: visible;
   overflow-y: clip;
+}
+
+/* The trial's one reach into the page header: the shared title keeps its own size everywhere
+   but under this attribute. Same numbers as type-h2. */
+[data-type-ladder] .page-header-title {
+  font-size: 30px;
+  line-height: 1.2;
 }
 
 @utility page-header-meta {
