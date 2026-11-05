@@ -156,15 +156,7 @@
          @age-verified.window="$store.dsModals.open('entry-confirmed', { txSignature: null, lobbyUrl: null, seedsEarned: 0 })">
   <div class="space-y-1">
     <h2 class="type-h3 text-heading">Modals</h2>
-    <p class="text-muted text-sm">
-      The shared modal host and the reusable modal partials, ported from Turf
-      Monster into the engine. Each tile is a <strong>visual representation, not
-      to scale</strong> &mdash; <strong>click a whole card</strong> to open the real
-      modal (Enter/Space work too). The header <strong>Copy</strong> yields an
-      agent-ready reference you can paste into a chat; option <strong>toggles</strong>
-      configure the modal before you open it; and the card that matches the open
-      modal <strong>glows</strong>.
-    </p>
+    <p class="text-muted text-sm">Click a card to open the real modal.</p>
   </div>
 
   <%# ---- The section's own modal host (dsModals) --------------------------
@@ -462,22 +454,7 @@
   <section id="modals-auth" class="space-y-5">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Auth</h3>
-      <p class="text-muted text-sm">
-        <strong>The engine ships no sign-in card.</strong> A sign-in modal is a
-        product decision &mdash; which methods, what terms, whose legal copy
-        &mdash; so each app owns its own and cards it on <em>its</em> section of
-        this guide, against the partial that actually renders in production.
-        What the engine owns is the <strong>pieces</strong> that card is built
-        from, and they are below.
-      </p>
-      <p class="text-muted text-sm">
-        Until 2026-09-09 this section held a full auth modal
-        (<code class="font-mono text-2xs">style/modals/_auth</code>). It was a
-        <strong>mirror</strong> of turf-monster&rsquo;s card, and it drifted:
-        reviewing it told you about a copy nobody shipped. It is gone, and these
-        two fragments &mdash; which it happened to be the only renderer of &mdash;
-        now stand on their own.
-      </p>
+      <p class="text-muted text-sm">The engine ships no sign-in card, only these pieces.</p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <%# email field — the one piece every app's auth card renders. %>
@@ -524,31 +501,7 @@
   <section id="modals-profile" class="space-y-5">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Profile</h3>
-      <p class="text-muted text-sm">
-        Who the account IS &mdash; the name it goes by, the birthday that decides
-        eligibility, and the picture. The first three cards are asked at signup
-        (a host walks them post-auth), the last three are reachable forever from
-        the profile page; all six are engine primitives.
-      </p>
-      <p class="text-muted text-sm">
-        <strong>Birthday and Age gate are one flow, deliberately split into two
-        cards.</strong> The birthday card ASKS; when the answer is too young the
-        age-gate card ANSWERS, carrying a countdown to the day they qualify, a way
-        to watch instead, and a way back to fix a mistyped year. Until 2026-08-24
-        that refusal lived inside the birthday card as red text beside a disabled
-        button &mdash; a state with nothing to press. Open <strong>Birthday</strong>
-        with <strong>Age validation</strong> on and submit any date to walk the
-        handoff; switch the toggle off for the other mode, an app with no age bar
-        that just wants the date.
-      </p>
-      <p class="text-muted text-sm">
-        The avatar modals
-        (<code class="font-mono text-2xs">studio/modals/_crop_photo</code>,
-        <code class="font-mono text-2xs">studio/modals/_image_upload</code>)
-        open live here &mdash;
-        <code class="font-mono text-2xs">studio/cropper_assets</code> is rendered
-        above, so cropper.js loads and the modals mount on this page's host.
-      </p>
+      <p class="text-muted text-sm">The name, birthday and picture cards.</p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <%= render layout: "style/modal_specimen", locals: {
@@ -568,11 +521,6 @@
           <%# the skip link that sits under the button, and is also a skip %>
           <span class="block h-1.5 w-14 mx-auto rounded" style="background: var(--color-text); opacity: .25"></span>
         </div>
-        <p class="text-muted text-2xs mt-3">
-          Saving or skipping dispatches
-          <code class="font-mono">ds-onboarding-step-done</code> here rather than
-          the app-level event, so the specimen cannot drive a real chain.
-        </p>
       <% end %>
 
       <%# BIRTHDAY — the ask. ONE card, two modes, because the difference between
@@ -718,28 +666,7 @@
           <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">leveling off</span>
         <% end %>
       </div>
-      <p class="text-muted text-sm">
-        The profile leveling flow, ported from Turf Monster as ONE primitive
-        (<code class="font-mono text-2xs">studio/modals/blocks/_leveling_activity</code>,
-        with <code class="font-mono text-2xs">_change_username</code> as its username
-        specialization). Walk all four states — <strong>Change Username &rarr; Great
-        Username</strong>, then <strong>Join the Newsletter &rarr; Subscribed!</strong>
-        — each "updated" card opens its modal straight at the success state, just like
-        the Auth cards open a given step. Each card carries its <strong>own Leveling
-        toggle</strong> (like the Auth card's method checkboxes): <strong>checked</strong>
-        is the Turf Monster shape (the seeds bar + Free Entry Token progress),
-        <strong>unchecked</strong> is the McRitchie Studio shape (plain input + Save,
-        then a simple confirmation). Flip a card's toggle, then open it — so you can
-        preview Change Username leveling-on beside Great Username leveling-off. Same
-        modal id either way — the primitive reads
-        <code class="font-mono text-2xs">leveling</code> at runtime, so there is no
-        with/without fork and <strong>no "Quest N of N" counter</strong>. The save is an
-        <strong>app-supplied callback</strong>
-        (<code class="font-mono text-2xs">submit_url</code> + an opaque
-        <code class="font-mono text-2xs">finalize_hook</code> for a wallet step) —
-        <strong>no wallet, signing, or on-chain write lives in the engine</strong>.
-        (These demos resolve locally.)
-      </p>
+      <p class="text-muted text-sm">Each card&rsquo;s toggle switches leveling on or off before you open it.</p>
     </div>
     <%# The walk, left to right: Change Username -> Great Username -> Join Newsletter
         -> Subscribed. The two "updated" cards open the same id at props.celebrate. %>
@@ -872,35 +799,10 @@
           <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">disabled on this app</span>
         <% end %>
       </div>
-      <p class="text-muted text-sm">
-        The wallet + on-chain modals, ported into the engine and gated by
-        <code class="font-mono text-2xs">Studio.feature?(:web3)</code>. Web3 is
-        <strong><%= web3_on ? "on" : "off" %></strong> here, so these render
-        <%= web3_on ? "live." : "greyed and badged — but STILL openable as a preview." %>
-        <% unless web3_gem %>
-          <strong>This app bundles no solana-studio</strong>, so the three cards it
-          backs &mdash; Connect wallet and the two Sign Wallet states &mdash; are
-          listed for reference but <strong>cannot be opened here</strong>. Nothing
-          registers them, so a trigger would open an empty panel.
-        <% end %>
-        The cards run in the order a player meets them &mdash; <strong>connect a
-        wallet, prove it, spend from it</strong>: Connect wallet &rarr; the two
-        Sign Wallet states &rarr; Entry confirmed. The
-        Connect-wallet picker ships its <strong>Phantom / Solflare / Backpack brand
-        marks inline from the engine</strong>
-        (<code class="font-mono text-2xs">studio/modals/blocks/_wallet_brand_sprite</code>),
-        so every app inherits them with no per-app icon files.
-        The two <strong>Sign Wallet</strong> cards are a different kind of thing
-        from the rest of this section: they render solana-studio's
-        <code class="font-mono text-2xs">solana_studio/modals/_web3_step_up</code>
-        &mdash; the <strong>REAL shared partial a host renders in production</strong>,
-        not a style-guide copy of it &mdash; so what you review here is the
-        shipped card, and it cannot drift from what users see. They also carry the
-        <strong>standard web3 auth button</strong>: a wallet row (brand mark, the
-        wallet&rsquo;s own name, Installed badge, chevron) rather than a filled
-        CTA, glowing via <code class="font-mono text-2xs">pulse-cta</code> because
-        it is the one thing to press.
-      </p>
+      <p class="text-muted text-sm">The wallet and on-chain modals, in the order a player meets them.</p>
+      <% unless web3_gem %>
+        <p class="text-muted text-sm">This app bundles no solana-studio, so the three cards it backs cannot be opened here.</p>
+      <% end %>
     </div>
     <%# ONE ordered run, read left to right as a player meets it: get a wallet,
         prove it, spend from it. This carried three labelled h4 runs for a day
@@ -1042,28 +944,7 @@
           <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">age gate off</span>
         <% end %>
       </div>
-      <p class="text-muted text-sm">
-        The pre-entry gate and the full entry flow. The age bar is enforced HERE,
-        but its two cards &mdash;
-        <code class="font-mono text-2xs">studio/modals/blocks/_birthday</code> (the
-        ask) and <code class="font-mono text-2xs">_age_gate</code> (the refusal)
-        &mdash; are shown in the <strong>Profile</strong> section, because they are
-        about who the account is. Both are engine primitives gated by
-        <code class="font-mono text-2xs">Studio.feature?(:age_gate)</code>, and their
-        minimum age, jurisdiction label, endpoint, and legal copy are all
-        <strong>app-supplied</strong> (the engine hardcodes no policy).
-      </p>
-      <p class="text-muted text-sm">
-        <strong>The entry flow itself has no specimen here, on purpose.</strong>
-        Packs, pricing, payment rails and every on-chain write are the app&rsquo;s
-        &mdash; the engine owns none of them, and the walked purchase sequence that
-        used to sit in this section was a <strong>mirror</strong> of turf-monster&rsquo;s
-        cards. It drifted, and it demonstrated a payment face that had stopped
-        rendering in production. It was retired on 2026-09-09; turf-monster cards
-        the live flow on its own section of this guide.
-        <strong>What stays is the map below</strong>, because the shape of the flow
-        is the part an app should not have to rediscover.
-      </p>
+      <p class="text-muted text-sm">The app owns the entry flow, so only its map lives here.</p>
       <%# The web2/web3 finding — a real divergence, stated honestly, not invented.
           THIS BOX IS THE SURVIVING HALF of style/modals/_entry_tokens, whose header
           carried the same model in a comment. When that mirror was deleted the
@@ -1071,28 +952,12 @@
           nobody opens — the two sentences about what a token IS, and about who
           signs the mint, came across in that move. %>
       <div class="mt-2 rounded-lg border border-subtle bg-surface p-3 text-xs text-secondary leading-snug">
-        <p class="text-heading font-semibold mb-1">Web2 vs web3 — the honest map</p>
-        <p class="mb-1">
-          The two funding paths <strong>diverge at the front-end and the entry-submit
-          endpoint, then converge</strong>. <strong>Web2</strong> (card / Stripe /
-          Coinflow / PayPal) mints one prepaid entry token per credit on-chain after
-          payment clears, then <strong>consumes</strong> one token to enter.
-          <strong>Web3</strong> (wallet / USDC on-chain) funds USDC directly and
-          <strong>mints no token</strong> &mdash; the mint&nbsp;&rarr;&nbsp;consume prelude
-          is web2-only.
-        </p>
-        <p class="mb-1">
-          An entry token is a <strong>program-owned prepaid entry credit</strong>
-          recorded on-chain as its own account &mdash; <strong>not</strong> a fungible
-          SPL token sitting in the player&rsquo;s wallet, which is the wrong mental
-          model to carry into the code. And the mint is <strong>server-signed once
-          the payment clears</strong>, never on the buyer&rsquo;s click: the two
-          on-chain moments a web2 entry has are that mint and the later consume.
-        </p>
-        <p>
-          Both create the <strong>same on-chain Entry PDA</strong> and resolve to the
-          <strong>same “Entry Confirmed” card</strong>.
-        </p>
+        <p class="text-heading font-semibold mb-1">Web2 vs web3</p>
+        <p class="mb-1">Web2 (card, Stripe, Coinflow, PayPal) mints one prepaid entry token per credit after payment clears, then consumes one to enter.</p>
+        <p class="mb-1">Web3 (wallet, USDC) funds USDC directly and mints no token, so the mint and consume steps are web2-only.</p>
+        <p class="mb-1">An entry token is a program-owned prepaid credit on-chain, not a wallet SPL token.</p>
+        <p class="mb-1">The mint is server-signed once payment clears, never on the buyer&rsquo;s click.</p>
+        <p>Both paths create the same on-chain Entry PDA and end on the same Entry Confirmed card.</p>
       </div>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -1134,10 +999,6 @@
   <section id="modals-system-status" class="space-y-5">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">System &amp; status</h3>
-      <p class="text-muted text-sm">
-        The reusable card blocks under <code class="font-mono text-2xs">studio/modals/blocks/</code> &mdash;
-        the studio-canonical processing, success, error, and countdown states.
-      </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <%= render layout: "style/modal_specimen", locals: {
@@ -1284,11 +1145,7 @@
   <section id="modals-templates" class="space-y-5">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Templates</h3>
-      <p class="text-muted text-sm">
-        Reusable archetypes under <code class="font-mono text-2xs">studio/modals/templates/</code> &mdash;
-        the copy-from reference cards for a new modal (wizard, form, action,
-        status, success).
-      </p>
+      <p class="text-muted text-sm">Copy from these when you build a new modal.</p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
       <% [
@@ -1325,18 +1182,7 @@
           <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">disabled on this app</span>
         <% end %>
       </div>
-      <p class="text-muted text-sm">
-        The seeds bar + level-up celebrations, gated by
-        <code class="font-mono text-2xs">Studio.feature?(:leveling)</code> — an
-        app-level setting <strong>independent of :web3</strong> (some apps have
-        Solana but no leveling). Leveling is <strong><%= leveling_on ? "on" : "off" %></strong>
-        here, so these render
-        <%= leveling_on ? "live." : "greyed and badged — but STILL openable as a preview." %>
-        The seed counts, level, and free entry are <strong>app-supplied props</strong>
-        (<code class="font-mono text-2xs">seedsEarned</code>,
-        <code class="font-mono text-2xs">seedsTotal</code>, …) — the engine renders
-        the bar, the app feeds the numbers.
-      </p>
+      <p class="text-muted text-sm">The seeds bar and level-up celebrations.</p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <%= render layout: "style/modal_specimen", locals: {
@@ -1396,27 +1242,16 @@
   <section id="modals-motion-registry" class="space-y-5">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Enter &amp; leave animations</h3>
-      <p class="text-muted text-sm">
-        The per-modal entrance/exit registry &mdash;
-        <code class="font-mono text-2xs">window.ModalAnimations</code>, published by
-        <code class="font-mono text-2xs">studio/modals/_host</code>. Any modal opens with
-        <code class="font-mono text-2xs">open(id, { enterAnim, exitAnim })</code>; omit either
-        and it uses <code class="font-mono text-2xs">pop</code>. Every control below is
-        <strong class="text-heading font-semibold">generated from the live registry</strong>,
-        so registering a new animation surfaces it here with no edit to this page. Demo card:
-        <code class="font-mono text-2xs">email-change-pending</code>.
-      </p>
+      <p class="text-muted text-sm">Every control comes from the live animation registry.</p>
     </div>
 
     <div class="grid gap-4 sm:grid-cols-2">
       <%# One control per registered ENTER key, built by the script below. %>
       <div class="card p-5 space-y-3">
         <h4 class="text-heading font-semibold text-sm">
-          Enter <span class="text-muted text-xs font-normal">&mdash; watch it arrive</span>
+          Enter
         </h4>
-        <p class="text-secondary text-xs">
-          Opens the demo card with that entrance. Dismiss with Escape, click-outside, or Close.
-        </p>
+        <p class="text-secondary text-xs">Opens the demo card.</p>
         <div id="modal-anim-enter-buttons" class="flex flex-wrap gap-2"></div>
       </div>
 
@@ -1424,18 +1259,15 @@
           auto-closes a beat later so the exit keyframe is what you watch. %>
       <div class="card p-5 space-y-3">
         <h4 class="text-heading font-semibold text-sm">
-          Leave <span class="text-muted text-xs font-normal">&mdash; watch it dismiss</span>
+          Leave
         </h4>
-        <p class="text-secondary text-xs">
-          Opens with a plain entrance, then closes itself so the exit keyframe is the star.
-        </p>
+        <p class="text-secondary text-xs">Opens, then closes itself.</p>
         <div id="modal-anim-exit-buttons" class="flex flex-wrap gap-2"></div>
       </div>
 
       <%# The full matrix: any entrance crossed with any exit. %>
       <div class="card p-5 space-y-3 sm:col-span-2">
         <h4 class="text-heading font-semibold text-sm">Combine</h4>
-        <p class="text-secondary text-xs">Pick any entrance and exit, then run the round trip.</p>
         <div class="flex flex-wrap items-end gap-3">
           <label class="text-xs text-secondary">Enter
             <select id="modal-anim-enter-select"
@@ -1462,18 +1294,7 @@
   <section id="modals-stack-mechanics" class="space-y-5">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Stack behaviour</h3>
-      <p class="text-muted text-sm">
-        The engine modal-stack mechanics, poked at directly on
-        <code class="font-mono text-2xs">$store.dsModals</code>:
-        <code class="font-mono text-2xs">advance()</code>, dismissibility, the
-        minimum-visible-duration floor, and LIFO stacking. They all run on one
-        throwaway vehicle
-        (<code class="font-mono text-2xs">style/modals/_ds_stack_demo</code>) built
-        from engine blocks &mdash; <strong>the mechanics are the subject, the card
-        is not</strong>. Until 2026-09-09 they ran on a copy of turf-monster&rsquo;s
-        on-chain card, which is how six unrelated demos came to depend on one
-        consumer&rsquo;s markup.
-      </p>
+      <p class="text-muted text-sm">The modal stack&rsquo;s rules, shown on a throwaway card.</p>
     </div>
 
     <div class="grid gap-4 sm:grid-cols-2">
@@ -1485,12 +1306,7 @@
           vehicle carries three faces on one. %>
       <div class="card p-5 space-y-3">
         <h4 class="text-heading font-semibold text-sm">In-flow advance()</h4>
-        <p class="text-secondary text-xs">
-          <code class="font-mono text-2xs">advance(patch)</code> patches the OPEN
-          entry rather than pushing a new one, so the card&rsquo;s Alpine scope
-          survives the transition. Watch the timed pair change a card that never
-          left the stack.
-        </p>
+        <p class="text-secondary text-xs">Patches the open card, so its state survives.</p>
         <div class="flex flex-wrap gap-2">
           <button type="button" class="btn btn-outline btn-sm"
                   data-studio-action="click->style-modals#demo" data-style-modals-name-param="processing">Processing</button>
@@ -1509,10 +1325,7 @@
           cannot orphan an in-flight signature. %>
       <div class="card p-5 space-y-3">
         <h4 class="text-heading font-semibold text-sm">Dismissibility</h4>
-        <p class="text-secondary text-xs">
-          A processing card passes <code class="font-mono text-2xs">dismissible: false</code>, so
-          Escape and click-outside are both suppressed until it resolves.
-        </p>
+        <p class="text-secondary text-xs">A card with <code class="font-mono text-2xs">dismissible: false</code> ignores Escape and click-outside.</p>
         <div class="flex flex-wrap gap-2">
           <button type="button" class="btn btn-outline btn-sm"
                   data-studio-action="click->style-modals#demo" data-style-modals-name-param="processing">Try Escape (locked)</button>
@@ -1524,10 +1337,7 @@
       <%# The anti-flicker floor from studio/modal_host (window.StudioModals.holdAtLeast). %>
       <div class="card p-5 space-y-3">
         <h4 class="text-heading font-semibold text-sm">Hold at least</h4>
-        <p class="text-secondary text-xs">
-          <code class="font-mono text-2xs">StudioModals.holdAtLeast(ms)</code> keeps a fast
-          operation from flashing the spinner. Run both and watch the difference.
-        </p>
+        <p class="text-secondary text-xs">Keeps a fast operation from flashing the spinner.</p>
         <div class="flex flex-wrap gap-2">
           <button type="button" class="btn btn-primary btn-sm"
                   data-studio-action="click->style-modals#demo" data-style-modals-name-param="fastWithHold">Fast op, hold 1500ms</button>
@@ -1539,10 +1349,7 @@
       <%# LIFO: open pushes, close pops back to what was underneath. %>
       <div class="card p-5 space-y-3">
         <h4 class="text-heading font-semibold text-sm">Stacking</h4>
-        <p class="text-secondary text-xs">
-          LIFO &mdash; a second <code class="font-mono text-2xs">open()</code> pushes the first
-          card behind it, and <code class="font-mono text-2xs">close()</code> pops back to it.
-        </p>
+        <p class="text-secondary text-xs">A second <code class="font-mono text-2xs">open()</code> stacks on top, and <code class="font-mono text-2xs">close()</code> pops back.</p>
         <div class="flex flex-wrap gap-2">
           <button type="button" class="btn btn-primary btn-sm"
                   data-studio-action="click->style-modals#demo" data-style-modals-name-param="stackTwo">Open two</button>

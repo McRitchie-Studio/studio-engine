@@ -700,7 +700,7 @@ class StylePageTest < ActiveSupport::TestCase
     # WHY THE ASSERTION IS POSITIVE AND NOT A REFUTE. The version this replaces
     # was `refute_includes html, "SPL token"`, guarding against framing the token
     # as a wallet-held SPL token. The rendered prose states the fact by NEGATING
-    # it — "not a fungible SPL token" — so the refute would fail on the correct
+    # it — "not a wallet SPL token" — so the refute would fail on the correct
     # copy. A substring refute cannot tell a claim from its denial; assert the
     # claim you want instead.
     assert_includes html, "program-owned",
