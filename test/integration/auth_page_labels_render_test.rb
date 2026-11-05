@@ -137,6 +137,31 @@ class AuthPageLabelsRenderTest < ActiveSupport::TestCase
     end
   end
 
+  # The divider once hid a line behind the word with a bg-surface patch. A glass card
+  # is translucent, so the patch showed as a lighter rectangle. Now the row has a hairline on
+  # each side of the word and no background, so it works on any surface.
+  test "the or divider paints nothing behind the word" do
+    {
+      login: render_login(auth: %i[password google]),
+      magic_link_login: render_login(auth: %i[magic_link google], password_user: false),
+      signup: render_signup(auth: %i[password google])
+    }.each do |page, html|
+      word = Nokogiri::HTML(html).css("span").find { |span| span.text.strip == "or" }
+      assert word, "#{page} lost its or divider"
+      row = word.parent
+
+      assert_equal "text-secondary", word["class"], "#{page}: the word carries only its ink"
+      assert_equal %w[div span div], row.element_children.map(&:name), "#{page}: a line on each side of the word"
+      [row.element_children.first, row.element_children.last].each do |line|
+        assert_equal "flex-1 border-t border-subtle", line["class"], "#{page}: the hairline"
+      end
+      %w[flex items-center gap-3 text-sm my-6].each do |klass|
+        assert_includes row["class"].split, klass, "#{page}: the row"
+      end
+      refute_match(/\bbg-|\babsolute\b/, row.to_html, "#{page}: no knockout and no absolute line")
+    end
+  end
+
   private
 
   def pages
@@ -156,6 +181,12 @@ class AuthPageLabelsRenderTest < ActiveSupport::TestCase
     render_page(template: "sessions/new")
   ensure
     AuthPageLabelsHostController.sso = false
+  end
+
+  def render_signup(auth:)
+    Studio.auth_methods = auth
+    define_user(authenticate: true)
+    render_page(template: "registrations/new", assigns: { user: AuthPageLabelsHostController::SignupUser.new })
   end
 
   def render_page(**options)
