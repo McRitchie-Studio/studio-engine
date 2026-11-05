@@ -769,5 +769,7 @@ export function startPinnedStack() {
   // there: publish now rather than wait for DOMContentLoaded, which also
   // covers a host that imports this after that event has fired.
   invalidate();
-  if (window.location && window.location.hash) landAgain();
+  // Not on a reload or a Back: there the browser restores the reader's own place.
+  var entry = window.location && window.location.hash && performance.getEntriesByType('navigation')[0];
+  if (entry && entry.type === 'navigate') landAgain();
 }

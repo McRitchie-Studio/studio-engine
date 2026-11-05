@@ -101,6 +101,8 @@ test("a tab's jump lands the section's title on the bar under the row, at both w
       }
       await expect(page.locator("[data-pin-section][data-stuck]"), `${label}: only its own bar`).toHaveText(label);
       await expectUnder(bar, row);
+      // The section's top is at the line, so its intro is in view and not jumped past.
+      await expect.poll(async () => Math.abs((await topOf(page.locator(`#${id}`))) - (await bottomOf(row))), `${label}: the section's top`).toBeLessThanOrEqual(2);
     }
   }
 });
@@ -123,6 +125,22 @@ test("a load with a hash lands the title on the bar too", async ({ page }) => {
   await page.goto(`${STYLE}#modals`);
   await expect(page.locator("[data-pin-section][data-stuck]")).toHaveText("Modals");
   await expectUnder(header(page, "modals"), styleRow(page));
+});
+
+test("a reload with a hash keeps the reader's own place", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.setViewportSize(DESKTOP);
+  await page.goto(`${STYLE}#modals`);
+  await expect(page.locator("[data-pin-section][data-stuck]")).toHaveText("Modals");
+  await page.evaluate(() => {
+    const top = document.getElementById("modals").getBoundingClientRect().top;
+    window.scrollBy({ top: top - 500, behavior: "instant" });
+  });
+  await page.waitForTimeout(300);
+  await page.reload();
+  await page.waitForTimeout(800);
+  const line = await page.evaluate(() => window.studioPinnedStack.read().layers.section.top);
+  expect(await page.locator("#modals").evaluate((el) => el.getBoundingClientRect().top), "not hauled down to the section").toBeGreaterThan(line + 100);
 });
 
 test("a jump to a target inside a section lands below the section's bar", async ({ page }) => {
