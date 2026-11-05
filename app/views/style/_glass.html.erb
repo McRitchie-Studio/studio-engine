@@ -16,7 +16,7 @@
   <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
     <%= render layout: "style/specimen",
           locals: { klass: "Studio.surface_style = :glass",
-                    usage: %(<html data-surface-style="<%= Studio.surface_style %>">),
+                    usage: %(config.surface_style = :glass, and <html data-surface-style="glass">),
                     disabled: !surface_on, disabled_label: "surface style is off on this app" } do %>
       <div class="<%= glass_backing %> w-full space-y-2" data-test="style-glass-surfaces">
         <div class="card p-3 text-sm text-heading">.card, the dense tier: no blur</div>
@@ -43,7 +43,7 @@
     <% end %>
     <%= render layout: "style/specimen",
           locals: { klass: "studio_icon(name, size: 18)",
-                    usage: %(<%= studio_icon("rocket", size: 22) %>) } do %>
+                    usage: %(studio_icon("rocket", size: 22)) } do %>
       <ul class="grid grid-cols-4 gap-3 w-full text-heading" data-test="style-glass-icons">
         <% Studio::Icons.names.each do |name| %>
           <li class="flex flex-col items-center gap-1 min-w-0" title="<%= name %>">
