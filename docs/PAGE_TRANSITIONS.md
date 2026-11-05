@@ -1,12 +1,13 @@
 # App-to-app page transitions
 
-Each app moves its pages one way. One app moves left, another moves up. Inside an app
-every page change moves the same way, on every route, in both directions of travel. Alex
-McRitchie's ruling, 2026-11-03: "There should be consistency with each app but a
-difference between each app." Code: `Studio.page_transition_direction` (`lib/studio.rb`),
-`app/javascript/studio/page_transitions.js`, and the "App-to-app page transitions" block
-in `engine.css`. The effects are from the Codrops Page Transitions demo, at its values
-(700ms, ease, opacity 0.3 and 0, perspective 1200px). The keyframes were written fresh.
+Each app moves its pages one way, in one style. Inside an app every page change plays the
+same move, on every route, in both directions of travel. Nothing is drawn at random. Alex
+McRitchie's rulings: 2026-11-03, "There should be consistency with each app but a difference
+between each app." 2026-11-04, replacing the random draw of the day before: "The random should
+be standard across the app." Code: `Studio.page_transition_direction` and
+`Studio.page_transition_style` (`lib/studio.rb`), `app/javascript/studio/page_transitions.js`,
+and the "App-to-app page transitions" block in `engine.css`. The effects are from the Codrops
+Page Transitions demo (700ms, ease, perspective 1200px). The keyframes were written fresh.
 
 ## Turn it on
 
@@ -14,14 +15,19 @@ In `config/initializers/studio.rb`:
 
 ```ruby
 config.page_transition_direction = :left   # :left, :right, :top or :bottom. Default nil.
+config.page_transition_style = :slide      # :slide or :unfold. Default :slide.
 ```
 
-This is the one switch. A set direction also turns smooth-load on, whatever
+The direction is the one switch. A set direction also turns smooth-load on, whatever
 `Studio.smooth_load` says: the view-transition and no-preview metas render, and the
-engine navbar pins itself. An unknown direction raises at boot.
+engine navbar pins itself. An unknown direction or style raises at boot.
 
-With no direction, an app renders as before and keeps the engine's fade. The HTML is the
-same bytes, with one exception every new engine module shares: the import map lists
+**The default style is `:slide`.** It is the plainer of the two, so an app that sets only a
+direction gets one steady move. A missing setting never means a draw. The style does nothing
+without a direction.
+
+With no direction, an app keeps the engine's fade. Apart from the loader's template in the head
+(docs/LOADER.md), the HTML is the same bytes, with one exception every new engine module shares: the import map lists
 `studio/page_transitions`. The browser never fetches it, since no tag imports it and it
 is not preloaded. The CSS bundle grows by rules that no page can match. The full-load sheet
 and script (below) are two more files in a host's assets. No page links them, so no browser
@@ -33,15 +39,17 @@ arrives. An app with multi-second pages should fix those first. See
 
 ## What plays
 
-| Direction | The page leaves | The two styles |
-|---|---|---|
-| `:left` | to the left | `fade-left`, `unfold-right` |
-| `:right` | to the right | `fade-right`, `unfold-left` |
-| `:top` | upward | `fade-top`, `unfold-bottom` |
-| `:bottom` | downward | `fade-bottom`, `unfold-top` |
+| Direction | The page leaves | `:slide` plays | `:unfold` plays |
+|---|---|---|---|
+| `:left` | to the left | `slide-left` | `unfold-right` |
+| `:right` | to the right | `slide-right` | `unfold-left` |
+| `:top` | upward | `slide-top` | `unfold-bottom` |
+| `:bottom` | downward | `slide-bottom` | `unfold-top` |
 
-Each page change draws one of the app's two styles at random. Nothing remembers the
-route. Back and Forward play the same direction, and Turbo restores the scroll position.
+The last two columns are the `data-page-transition` values on `<html>`. An unfold is named for
+the way the new page turns, so `:unfold` with `:right` plays `unfold-left`. Set the two
+settings, never the value. Nothing remembers the route. Back and Forward play the same move,
+and Turbo restores the scroll position.
 
 | The visit | What plays |
 |---|---|
@@ -50,23 +58,27 @@ route. Back and Forward play the same direction, and Turbo restores the scroll p
 | The same path, an advance visit, with a morph name on both sides | The engine's fade and the morph |
 | A GET that redirects | The direction once, for the first render. The follow-up visit draws nothing |
 | Two pages that share a morph name | The engine's fade and the morph |
-| Reduced motion, or a browser without view transitions | The plain swap, with no pause |
+| Reduced motion, or a browser without view transitions | The plain swap, with no image pause. A loader that showed still keeps its minimum (docs/LOADER.md) |
 | Arriving at a page whose layout has no metas | The plain swap, with no pause. By a full load, the plain load |
 | Leaving a page whose layout has no metas | The plain swap. An image on the new page can pause it, up to the cap. By a full load, the plain load |
 | A full load to another path: a link with `data-turbo="false"`, `location.assign`, a form that posts natively, a redirect, a Turbo visit answered by `turbo-visit-control: reload` | The direction, once. See [Full page loads](#full-page-loads) |
 | A full load to the same path | Nothing |
 | Reload, or a URL typed in the address bar | Nothing. The browser offers no transition |
 
-**A black backdrop gives the shading:** a page at opacity 0.3 darkens as it moves. In a
-light theme the page goes grey as it moves, and an unfold shows black wedges at its edges.
-That is a stronger contrast than in a dark theme, and it is the ruled look.
+**The app's page color sits behind the move** (`--color-page`, so it follows the theme). Each
+page stays opaque as it slides, so a blank area reads as the page, in light and in dark. Any
+gap shows the page color: the corners an unfold opens, a seam between the two pages, a scrollbar
+gutter. In the 1280px frames of the hub and Turf, in both themes, no pixel of the page area at
+the right edge was black. The black backdrop and the 0.3 opacity of 2026-11-03 are gone: they
+darkened blank areas, and left a dark strip beside a full-width hero. Only the new page in an
+unfold still fades, from 0 while it is edge-on.
 
 ## Full page loads
 
 A page under a strict Content-Security-Policy must stay its own document, because a browser
 applies a new policy only on a real load. So a Turbo view transition cannot reach it. These
-loads play the same look through the browser's cross-document view transition. They use the
-same pair of styles, the same keyframes and the same 700ms. The switch is the same one.
+loads play the same move through the browser's cross-document view transition. They use the
+same settings, the same keyframes and the same 700ms.
 
 **The new document draws the motion, so the old one only plans it.**
 
@@ -74,7 +86,7 @@ same pair of styles, the same keyframes and the same 700ms. The switch is the sa
    inside `@media (prefers-reduced-motion: no-preference)`. This at-rule takes no selector, so
    it cannot sit in `engine.css`: there it would act on every host. Only a page with a
    direction links the file. Both documents must have it.
-2. `pageswap`, on the old page: `studio/page_transitions` draws the style with `planVisit`, the
+2. `pageswap`, on the old page: `studio/page_transitions` reads the style with `planVisit`, the
    rule a Turbo visit uses. It writes the style to `sessionStorage`, names the held stack and
    hides the page-load overlay, and the browser then takes the old picture.
 3. `pagereveal`, on the new page: `studio/page_transition_reveal` reads the style, sets
@@ -205,31 +217,37 @@ so the same names on the same path play nothing.
 
 ## What each host changes on adoption
 
-Each sets `config.page_transition_direction`. Beyond that:
+Each sets `config.page_transition_direction`, and `config.page_transition_style` if it wants
+the unfold. A host whose app PR lands before its engine bump guards the style:
+`config.page_transition_style = :unfold if config.respond_to?(:page_transition_style=)`. The gem
+ships later, so the app keeps booting, and the setting takes effect on the relock. Beyond that:
 
 | Host | Also |
 |---|---|
 | McRitchie Studio (hub) | Mark `agent_chats/_header` (2), `_shell`, `_form`, `build/_launch` (2) and `build/_first_form` with `data-vt-morph` |
 | Turf Monster | No inline names to mark. Run `e2e/cart_survives_turbo_restore.spec.js` with motion on: the pause widens the window for a Back press inside a render. Its signing pages play by a full load with nothing further: `style-src` has `'self'`, and the script takes the nonce. Run its signing specs with `signing_csp_enforced` on |
 | moms-app | Its forked navbar has no pin. Add `vt-pinned-header`, once per page |
+| McRitchie Industries | It is on engine 0.122.0, below 0.124.0, where the setter first exists. So it needs the engine bump first (its pin is `~> 0.118`). Then `config.page_transition_direction = :top` and no style line. `smooth_load` is on, its navbar is the engine's, its body is `bg-page`, and it has no inline names to mark |
 | Commercial Welding | Its wrapper has `data-studio-bar-stack` and no `.studio-bar-stack`, so its utility bar moves with the page. Add the class to the wrapper. Its forked navbar is pinned already |
-| alex-build, Voicebox, Rantly, Cyvasse, Industries | Nothing further. Check that pages answer fast, because of `no-preview` |
+| alex-build, Voicebox, Cyvasse | Nothing further. Check that pages answer fast, because of `no-preview` |
+| Rantly | Its layout has its own head, not `layouts/studio/_head`, so a direction does nothing there |
 
 ## Proposed assignment
 
-A proposal, not a ruling. No host changes in the engine task; each app sets its direction
-after the gem ships.
+A proposal for Alex McRitchie to change, not a ruling.
 
-| Direction | Apps |
-|---|---|
-| `:left` | McRitchie Studio (hub), McRitchie Industries |
-| `:right` | Turf Monster, alex-build |
-| `:top` | Cyvasse, moms-app |
-| `:bottom` | Commercial Welding, Voicebox |
+| App | Direction | Style | State |
+|---|---|---|---|
+| McRitchie Studio (hub) | `:left` | `:slide` | Set by task `hub-sets-transition-style` |
+| Turf Monster | `:right` | `:unfold` | Set by task `turf-sets-transition-flip`. The flip suits a game |
+| McRitchie Industries | `:top` | `:slide` | Not adopted. See the table above |
+| alex-build | `:right` | `:slide` | Not adopted |
+| Cyvasse, moms-app | `:top` | `:slide` | Not adopted |
+| Commercial Welding, Voicebox | `:bottom` | `:slide` | Not adopted |
 
 ## Tests
 
-`test/javascript/page_transitions.test.mjs` (the pure half),
+`test/javascript/page_transitions.test.mjs` (the pure half, and that neither script draws at random),
 `test/views/smooth_load_convention_test.rb` and
 `test/integration/page_transition_direction_test.rb` (the setting and its bytes),
 `e2e/page_transitions.spec.js` on `/lab/page_transitions` (what a browser plays), and

@@ -5,7 +5,7 @@
 // CLASSIC AND SYNCHRONOUS ON PURPOSE. pagereveal fires before the first render, and a listener
 // bound after that misses it for good. A module is deferred, so it can be too late.
 //
-// It holds no table of styles. The leaving page drew the style with studio/page_transitions
+// It holds no table of styles. The leaving page read the style with studio/page_transitions
 // at pageswap and left it here. No style means the leaving page did not plan this one (its
 // module had not run, or it was the same path), so the load is plain, not the browser's fade.
 (function () {

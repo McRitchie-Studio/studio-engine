@@ -21,4 +21,5 @@
 <% end %>
 <% if page_transition_direction %>
   <meta name="page-transition-direction" content="<%= page_transition_direction %>">
+  <meta name="page-transition-style" content="<%= @studio_page_transition_style || Studio.page_transition_style %>">
 <% end %>

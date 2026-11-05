@@ -8,26 +8,17 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 const LAB = "/lab/page_transitions";
 const STRICT = "direction=left&strict=1";
 
-function installRecorder(context, randomValue = 0) {
-  return context.addInitScript((value) => {
+function installRecorder(context) {
+  return context.addInitScript(() => {
     const log = (line) => {
       const lines = JSON.parse(sessionStorage.getItem("pt-log") || "[]");
       lines.push(line);
       sessionStorage.setItem("pt-log", JSON.stringify(lines));
     };
     window.ptLog = log;
-    window.__random = value;
-    // Only for the pick: Turbo draws its history ids from Math.random too.
-    const fixPick = () => {
-      const real = Math.random;
-      Math.random = () => window.__random;
-      setTimeout(() => { Math.random = real; }, 0);
-    };
     window.addEventListener("pageswap", (event) => {
-      fixPick();
       log(`pageswap ${event.viewTransition ? "transition" : "plain"}`);
     }, { capture: true });
-    document.addEventListener("turbo:before-render", fixPick, { capture: true });
     window.addEventListener("pagereveal", (event) => log(`pagereveal ${event.viewTransition ? "transition" : "plain"}`));
     window.addEventListener("pageshow", (event) => { if (event.persisted) log("restored"); });
     document.addEventListener("securitypolicyviolation", (event) => log(`violation ${event.violatedDirective}`));
@@ -56,12 +47,12 @@ function installRecorder(context, randomValue = 0) {
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
-  }, randomValue);
+  });
 }
 
-async function open(page, query, randomValue) {
+async function open(page, query) {
   await blockOffsiteRequests(page);
-  await installRecorder(page, randomValue);
+  await installRecorder(page);
   await page.route("**/e2e/img/pt-hung.png", () => {});
   await page.goto(`${LAB}?${query}`);
   await page.waitForFunction((on) => window.Turbo && (!on || document.documentElement.dataset.pageTransitionDirection), query.includes("direction"));
@@ -89,9 +80,9 @@ async function fullLoad(page, testId = "other-full") {
   await page.locator(`[data-test="${testId}"]`).first().click();
 }
 
-test("a full load under the enforced strict policy plays the fade, with no violation", async ({ page }) => {
+test("a full load under the enforced strict policy plays the slide, with no violation", async ({ page }) => {
   const errors = watchPageErrors(page);
-  await open(page, STRICT, 0);
+  await open(page, STRICT);
   await fullLoad(page);
   await settled(page, "b");
   const lines = await logged(page);
@@ -110,15 +101,15 @@ test("a full load under the enforced strict policy plays the fade, with no viola
   await expect.poll(async () => (await logged(page)).filter((line) => line.startsWith("violation"))).toEqual(["violation script-src-elem"]);
 });
 
-test("a full load can draw the unfold too", async ({ page }) => {
-  await open(page, STRICT, 0.99);
+test("a full load plays the unfold when the app sets it", async ({ page }) => {
+  await open(page, `${STRICT}&style=unfold`);
   await fullLoad(page);
   await settled(page, "b");
   expectOneMotion(await logged(page), "pt-out-left", "pt-unfold-right");
 });
 
 test("each direction plays its own move across a full load", async ({ page }) => {
-  await open(page, "direction=bottom&strict=1", 0);
+  await open(page, "direction=bottom&strict=1");
   await fullLoad(page);
   await settled(page, "b");
   expectOneMotion(await logged(page), "pt-out-bottom", "pt-in-from-top");
@@ -126,7 +117,7 @@ test("each direction plays its own move across a full load", async ({ page }) =>
 
 test("the motion outlives the new page's own turbo:load, then its marks go", async ({ page }) => {
   await blockOffsiteRequests(page);
-  await installRecorder(page, 0);
+  await installRecorder(page);
   await page.addInitScript(() => document.addEventListener("turbo:load", () => {
     setTimeout(() => window.ptLog(`after load ${document.documentElement.dataset.pageTransition}`), 0);
   }));
@@ -135,14 +126,14 @@ test("the motion outlives the new page's own turbo:load, then its marks go", asy
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
   await fullLoad(page);
   await settled(page, "b");
-  expect(await logged(page)).toContain("after load fade-left");
+  expect(await logged(page)).toContain("after load slide-left");
   const frames = await page.evaluate(() => window.__frames);
   expect(new Set(frames.map((frame) => frame.root)).size).toBeGreaterThan(3);
   expect(await page.evaluate(() => document.documentElement.dataset.pageTransitionVisit)).toBeUndefined();
 });
 
 test("a strict page that leaves by location.assign, as Turf's does, plays once", async ({ page }) => {
-  await open(page, STRICT, 0);
+  await open(page, STRICT);
   await page.evaluate(() => document.addEventListener("turbo:before-visit", (event) => {
     event.preventDefault();
     window.location.assign(event.detail.url);
@@ -155,7 +146,7 @@ test("a strict page that leaves by location.assign, as Turf's does, plays once",
 });
 
 test("a Turbo visit answered by turbo-visit-control reload plays once", async ({ page }) => {
-  await open(page, "direction=left&control=reload&strict=1", 0);
+  await open(page, "direction=left&control=reload&strict=1");
   await page.locator('[data-test="other"]').click();
   await settled(page, "b");
   const lines = await logged(page);
@@ -165,7 +156,7 @@ test("a Turbo visit answered by turbo-visit-control reload plays once", async ({
 });
 
 test("a plain Turbo visit plays once, by Turbo, with no full load", async ({ page }) => {
-  await open(page, "direction=left", 0);
+  await open(page, "direction=left");
   const load = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
   await page.locator('[data-test="other"]').click();
   await load;
@@ -176,7 +167,7 @@ test("a plain Turbo visit plays once, by Turbo, with no full load", async ({ pag
 });
 
 test("a page that arrived by a full load then plays a Turbo visit once", async ({ page }) => {
-  await open(page, "direction=left", 0);
+  await open(page, "direction=left");
   await fullLoad(page);
   await settled(page, "b");
   await page.evaluate(() => { window.__seen.clear(); sessionStorage.removeItem("pt-log"); });
@@ -190,7 +181,7 @@ test("a page that arrived by a full load then plays a Turbo visit once", async (
 });
 
 test("a reload plays nothing and leaves no name", async ({ page }) => {
-  await open(page, STRICT, 0);
+  await open(page, STRICT);
   await page.reload();
   await page.waitForFunction(() => window.Turbo && document.documentElement.dataset.pageTransitionDirection);
   await page.waitForTimeout(200);
@@ -202,7 +193,7 @@ test("a reload plays nothing and leaves no name", async ({ page }) => {
 });
 
 test("a full load of the same path plays nothing", async ({ page }) => {
-  await open(page, STRICT, 0);
+  await open(page, STRICT);
   await fullLoad(page, "same-full");
   await page.waitForFunction(() => window.Turbo && document.documentElement.dataset.pageTransitionDirection);
   await page.waitForTimeout(200);
@@ -213,7 +204,7 @@ test("a full load of the same path plays nothing", async ({ page }) => {
 });
 
 test("a redirect plays once, and a redirect back to this path plays nothing", async ({ page }) => {
-  await open(page, STRICT, 0);
+  await open(page, STRICT);
   const bounce = (query) => page.evaluate((url) => window.location.assign(url), `/lab/page_transitions_redirect?${query}`);
   await bounce(STRICT);
   await settled(page, "b");
@@ -228,7 +219,7 @@ test("a redirect plays once, and a redirect back to this path plays nothing", as
 });
 
 test("a native form's page-load overlay is not frozen into the old page's picture", async ({ page }) => {
-  await open(page, `${STRICT}&overlay=1&slow=400`, 0);
+  await open(page, `${STRICT}&overlay=1&slow=400`);
   await page.evaluate(() => window.addEventListener("pageswap", () => {
     window.ptLog(`overlay hidden ${document.querySelector("[data-studio-loader-overlay]").hidden}`);
   }));
@@ -257,7 +248,7 @@ test("a native form's page-load overlay is not frozen into the old page's pictur
 
 test("a click before the old page's module has run gets the plain load, not the browser's fade", async ({ page }) => {
   await blockOffsiteRequests(page);
-  await installRecorder(page, 0);
+  await installRecorder(page);
   await page.route("**/e2e/modules/studio/page_transitions*", (route) => route.abort());
   await page.goto(`${LAB}?${STRICT}`);
   await page.waitForFunction(() => window.Turbo);
@@ -272,7 +263,7 @@ test("a click before the old page's module has run gets the plain load, not the 
 });
 
 test("the stack carries its name for the motion alone, on both pages", async ({ page }) => {
-  await open(page, STRICT, 0);
+  await open(page, STRICT);
   const stackName = () => page.locator("[data-vt-held]").evaluate((el) => getComputedStyle(el).viewTransitionName);
   expect(await stackName()).toBe("none");
   // Bound after the module's own listener, so this reads what the old page's picture reads.
@@ -291,7 +282,7 @@ test("the stack carries its name for the motion alone, on both pages", async ({ 
 });
 
 test("the navbar and the banner stack hold still across a full load", async ({ page }) => {
-  await open(page, STRICT, 0);
+  await open(page, STRICT);
   const stackBox = await page.locator("[data-vt-held]").boundingBox();
   const headerBox = await page.locator(".vt-pinned-header").boundingBox();
   await page.evaluate(() => { document.documentElement.dataset.pageTransitionVisit = ""; });
@@ -331,7 +322,7 @@ test("the navbar and the banner stack hold still across a full load", async ({ p
     }
     return changed / (left.length / 4);
   }, [a.toString("base64"), b.toString("base64")]);
-  // By name too: the lab's navbar is dark on a black backdrop, so its pixels hide a move.
+  // By name too: the lab's navbar is dark on a dark page, so its pixels hide a move.
   expect((await logged(page)).some((line) => line.startsWith("::view-transition-group(studio-header)"))).toBe(true);
   // The ceiling and why it is not 0: expectChromeHoldsStill in page_transitions.spec.js.
   expect(await share(before.stack, during.stack), "the banner stack moved").toBeLessThan(0.1);
@@ -339,7 +330,7 @@ test("the navbar and the banner stack hold still across a full load", async ({ p
 });
 
 test("leaving a page scrolled, the stack does not slide in", async ({ page }) => {
-  await open(page, STRICT, 0);
+  await open(page, STRICT);
   await page.evaluate(() => window.scrollTo(0, 800));
   await page.waitForTimeout(100);
   await page.evaluate(() => document.querySelector('[data-test="other-full"]').click());
@@ -351,7 +342,7 @@ test("leaving a page scrolled, the stack does not slide in", async ({ page }) =>
 });
 
 test("arriving scrolled by a full load, the taller old navbar does not draw under the new one", async ({ page }) => {
-  await open(page, STRICT, 0);
+  await open(page, STRICT);
   await page.evaluate(() => window.scrollTo(0, 800));
   await page.waitForTimeout(200);
   const shorter = await page.locator(".vt-pinned-header").evaluate((el) => el.offsetHeight);
@@ -370,7 +361,7 @@ test("arriving scrolled by a full load, the taller old navbar does not draw unde
 });
 
 test("the same arrival by a Turbo visit, Back from a scrolled page, draws one navbar", async ({ page }) => {
-  await open(page, "direction=left", 0.99);
+  await open(page, "direction=left&style=unfold");
   await page.evaluate(() => window.scrollTo(0, 800));
   await page.waitForTimeout(200);
   const leave = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
@@ -388,7 +379,7 @@ test("the same arrival by a Turbo visit, Back from a scrolled page, draws one na
 });
 
 test("two stacks and a chat head on both pages: one name each, so the direction still plays", async ({ page }) => {
-  await open(page, `${STRICT}&twice=1&morph=both`, 0);
+  await open(page, `${STRICT}&twice=1&morph=both`);
   await expect(page.locator(".studio-bar-stack")).toHaveCount(2);
   await fullLoad(page);
   await settled(page, "b");
@@ -399,7 +390,7 @@ test("two stacks and a chat head on both pages: one name each, so the direction 
 });
 
 test("Back and Forward across a full load, as fresh documents, each play the direction", async ({ page }) => {
-  await open(page, STRICT, 0);
+  await open(page, STRICT);
   await fullLoad(page);
   await settled(page, "b");
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
@@ -413,7 +404,7 @@ test("Back and Forward across a full load, as fresh documents, each play the dir
 });
 
 test("an image the new page is still loading does not hold the motion", async ({ page }) => {
-  await open(page, `${STRICT}&img=hung`, 0);
+  await open(page, `${STRICT}&img=hung`);
   await fullLoad(page);
   await settled(page, "b");
   expectOneMotion(await logged(page), "pt-out-left", "pt-in-from-right");
@@ -421,7 +412,7 @@ test("an image the new page is still loading does not hold the motion", async ({
 });
 
 test("a slow response keeps the old page live until it answers", async ({ page }) => {
-  await open(page, `${STRICT}&slow=700`, 0);
+  await open(page, `${STRICT}&slow=700`);
   // Not locator.click: Playwright would wait for the commit, and this reads the time before it.
   await page.evaluate(() => {
     setInterval(() => window.ptLog("old page ran"), 50);
@@ -434,7 +425,7 @@ test("a slow response keeps the old page live until it answers", async ({ page }
 });
 
 test("a body that arrives in two chunks is whole before the new page's picture", async ({ page }) => {
-  await open(page, `${STRICT}&split=500`, 0);
+  await open(page, `${STRICT}&split=500`);
   await page.addInitScript(() => window.addEventListener("pagereveal", () => {
     window.ptLog(`revealed ${!!document.querySelector(".studio-bar-stack")} ${!!document.querySelector('[data-test="page-b"]')}`);
   }));
@@ -447,7 +438,7 @@ test("a body that arrives in two chunks is whole before the new page's picture",
 });
 
 test("a body slower than the cap paints at the cap, and the motion still plays", async ({ page }) => {
-  await open(page, `${STRICT}&split=5000`, 0);
+  await open(page, `${STRICT}&split=5000`);
   await page.addInitScript(() => window.addEventListener("pagereveal", () => {
     window.ptLog(`revealed ${!!document.querySelector('[data-test="page-b"]')}`);
   }));
@@ -465,7 +456,7 @@ test("a body slower than the cap paints at the cap, and the motion still plays",
 test("with no direction, a full load has no sheet, no script, no at-rule and nothing acting", async ({ page }) => {
   const requests = [];
   page.on("request", (request) => requests.push(request.url()));
-  await open(page, "", 0);
+  await open(page, "");
   await fullLoad(page);
   await expect(page.locator('[data-test="page-b"]')).toBeVisible();
   const lines = await logged(page);
@@ -489,7 +480,7 @@ test("a browser without cross-document view transitions loads plainly and throws
   const browser = await chromium.launch({ args: ["--disable-blink-features=PageRevealEvent"] });
   const page = await (await browser.newContext({ baseURL })).newPage();
   const errors = watchPageErrors(page);
-  await installRecorder(page, 0);
+  await installRecorder(page);
   await page.goto(`${LAB}?${STRICT}`);
   await page.waitForFunction(() => window.Turbo && document.documentElement.dataset.pageTransitionDirection);
   const supported = await page.evaluate(() => "onpagereveal" in window);
@@ -511,7 +502,7 @@ test.describe("with reduced motion", () => {
 
   test("a full load is plain on both sides, and leaves no style behind", async ({ page }) => {
     const errors = watchPageErrors(page);
-    await open(page, STRICT, 0);
+    await open(page, STRICT);
     await fullLoad(page);
     await expect(page.locator('[data-test="page-b"]')).toBeVisible();
     await page.waitForTimeout(200);

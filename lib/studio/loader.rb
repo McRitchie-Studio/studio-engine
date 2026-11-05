@@ -27,6 +27,13 @@ module Studio
   module Loader
     class InvalidConfig < ArgumentError; end
 
+    # The one pace of a page load, for every app (docs/LOADER.md). A visit under the delay
+    # shows no overlay and waits for nothing. An overlay that shows stays the minimum.
+    # studio/loader falls back to the same two numbers; test/views/loader_render_test.rb
+    # holds them level.
+    OVERLAY_DELAY_MS = 350
+    OVERLAY_MIN_SHOW_MS = 750
+
     SETTING = "Studio.loader"
     GENERIC_STYLES = %i[breathe liquid orbit steel].freeze
     ART_STYLES = { weld_bead: "outline", sparkle: "spark" }.freeze
