@@ -13,7 +13,7 @@
     <h3 class="type-h4 text-heading">Glass</h3>
     <p class="text-sm text-secondary mt-1">Translucent surfaces and the floating sidebar. Each is opt-in, so an app moves only when it asks.</p>
   </div>
-  <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+  <div class="grid gap-4 md:grid-cols-2">
     <%= render layout: "style/specimen",
           locals: { klass: "Studio.surface_style = :glass",
                     usage: %(config.surface_style = :glass, and <html data-surface-style="glass">),
@@ -40,6 +40,32 @@
       <% if respond_to?(:studio_sidebar?) && studio_sidebar? %>
         <button type="button" class="btn btn-sm btn-outline mt-3" @click="$store.sidebars.linkTreeOpen = true" data-test="style-glass-open">Open the real sidebar</button>
       <% end %>
+    <% end %>
+    <%= render layout: "style/specimen",
+          locals: { klass: "Lit from above, under surface_style = :glass",
+                    usage: %(.btn-primary, .btn-danger, .btn-neutral, .badge, .input-field),
+                    disabled: !surface_on, disabled_label: "surface style is off on this app" } do %>
+      <div class="w-full overflow-x-auto" data-test="style-lit-states">
+        <table class="text-xs text-muted border-separate border-spacing-2">
+          <thead><tr><th></th><% %w[rest hover pressed focus disabled].each do |state| %><th class="font-medium text-left"><%= state %></th><% end %></tr></thead>
+          <tbody>
+            <% [["btn-primary", "Primary"], ["btn-primary btn-sm", "Small"], ["btn-danger btn-sm", "Danger"], ["btn-secondary btn-sm", "Success"], ["btn-neutral btn-sm", "Neutral"], ["btn-outline btn-sm", "Outline"]].each do |classes, label| %>
+              <tr>
+                <th class="font-medium text-left"><%= label %></th>
+                <% [nil, "hover", "pressed", "focus"].each do |state| %>
+                  <td><button type="button" class="btn <%= classes %>" tabindex="-1" <%= %(data-lit-state="#{state}").html_safe if state %>>Go</button></td>
+                <% end %>
+                <td><button type="button" class="btn <%= classes %>" disabled>Go</button></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+        <div class="flex flex-wrap items-center gap-2 mt-3">
+          <span class="badge text-heading border-subtle">Badge</span>
+          <span class="badge" style="color: var(--color-success-ink); border-color: var(--color-success)">Live</span>
+          <input class="input-field max-w-[12rem]" type="text" value="Input, pressed in" aria-label="Input specimen" readonly>
+        </div>
+      </div>
     <% end %>
     <%= render layout: "style/specimen",
           locals: { klass: "studio_icon(name, size: 18)",
