@@ -4,6 +4,20 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **Talk to an agent in a modal: `studio/agent_chat/_talk_modal`.** Render it once on a page,
+  then mark any link with `studio_talk_to_agent_link(label, href:, soul:, topic:, opener:)`. A
+  click opens the shared agent chat in a card on the page-scoped modal host and sends the
+  opener as the visitor's first message once the thread loads, so the agent is already
+  answering while the card opens. A new answer types itself in. It is the same chat and the
+  same hub thread as `studio/agent_chat/chat`, not a second one. The opener goes once per soul
+  and topic per tab. A modified click, a page with no modal, or a viewer
+  `agent_chat_allowed` refuses follows the link's `href`. The chat takes two new section
+  attributes, `data-agent-chat-opener` (with `-opener-key`) and `data-agent-chat-reveal`, and
+  the partial takes `compact: true`. Detail: `docs/AGENT_CHAT.md`, "Talk to an agent in a
+  modal".
+
 ## 0.130.0 — 2026-11-05
 
 ### Added
