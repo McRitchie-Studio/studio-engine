@@ -618,7 +618,7 @@ class LinkSidebarTest < Minitest::Test
   end
 
   def test_glass_marks_the_geo_row_on_its_own_page
-    html = with_glass { render_sidebar(sections: GLASS_SECTIONS, admin: true, geo_flag: true, geo_routes: true, path: "/admin/geo") }
+    html = with_glass { render_sidebar(sections: GLASS_SECTIONS + [{ title: "Ops", admin: true, links: [{ label: "Admin", href: "/admin", emoji: "🛠" }] }], admin: true, geo_flag: true, geo_routes: true, path: "/admin/geo") }
     rows = Nokogiri::HTML5.fragment(html).css('#studio-link-sidebar a[aria-current="page"]')
 
     assert_equal ["/admin/geo"], rows.map { |row| row["href"] }

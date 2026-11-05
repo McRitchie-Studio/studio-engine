@@ -11,7 +11,9 @@
     sidebar_style: for one render; the engine lab does, since the setting is process-wide. %>
 <% glass = (local_assigns[:sidebar_style] || Studio.sidebar_style) == :glass %>
 <% sidebar_request = glass && respond_to?(:request) ? request : nil %>
-<% current_href = sidebar_request && Studio::SidebarSections.current_href(sections, sidebar_request.path, host: sidebar_request.host) %>
+<%# The engine's Geo row counts too, so no section row above it claims /admin/geo as its own. %>
+<% current_rows = respond_to?(:admin_geo_path) ? sections + [{ links: [{ href: admin_geo_path }] }] : sections %>
+<% current_href = sidebar_request && Studio::SidebarSections.current_href(current_rows, sidebar_request.path, host: sidebar_request.host) %>
 <% sidebar_admin = respond_to?(:admin?) && admin? %>
 <%# THE PANEL'S TITLE. Signed in, admin included: the name the navbar shows, from the
     same call. Signed out: a greeting by the browser's local time, which the server
