@@ -4,15 +4,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
-### Changed
-
-- **The browser lane counts its own specs.** `bin/lib/e2e_spec_census.rb` computes the spec count
-  from `e2e/`, as the hub does, and `bin/e2e-executed-set-check` reads it. `config/e2e_lane.yml`
-  loses `total_specs` and `executed`, so adding a spec moves no number and two PRs no longer
-  conflict on them. `bin/e2e-census-check` compares Playwright's `--list` with the census.
-- **`CHANGELOG.md` merges with `merge=union`,** so parallel PRs stop conflicting on it. A branch
-  forked before a roll can land an entry under the rolled heading: `docs/RELEASE.md`, *Rolling
-  `Unreleased` into a version*, says how to read and fix that.
 ### Added
 
 - **Link sidebar: a section may show its header.** A section in `Studio.sidebar_sections` with
@@ -28,6 +19,13 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Changed
 
+- **The browser lane counts its own specs.** `bin/lib/e2e_spec_census.rb` computes the spec count
+  from `e2e/`, as the hub does, and `bin/e2e-executed-set-check` reads it. `config/e2e_lane.yml`
+  loses `total_specs` and `executed`, so adding a spec moves no number and two PRs no longer
+  conflict on them. `bin/e2e-census-check` compares Playwright's `--list` with the census.
+- **`CHANGELOG.md` merges with `merge=union`,** so parallel PRs stop conflicting on it. A branch
+  forked before a roll can land an entry under the rolled heading: `docs/RELEASE.md`, *Rolling
+  `Unreleased` into a version*, says how to read and fix that.
 - **Link sidebar: the blurred edge reaches further and fades with no visible end.** The band is
   100px wide, up from 40px, with the same 6px blur. Its mask is now an eased multi-stop gradient:
   whole at the panel, half at 60px, clear at 100px, flat at both ends. The old hold and straight
