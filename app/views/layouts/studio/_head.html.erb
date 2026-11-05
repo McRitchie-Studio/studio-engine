@@ -201,7 +201,7 @@
 <%# THE PAGE-LOAD OVERLAY, FOR EVERY APP. The body is the host's, so the overlay waits
     here, inert, and studio/loader adds it to the body when a visit starts. A host's own
     studio_loader_overlay wins. Studio.loader_overlay = false opts out. docs/LOADER.md. %>
-<% if Studio.loader_overlay %>
+<% if Studio.loader_overlay && respond_to?(:studio_loader_overlay) %>
   <template data-studio-loader-overlay-template><%= studio_loader_overlay %></template>
 <% end %>
 <%= javascript_importmap_tags %>
