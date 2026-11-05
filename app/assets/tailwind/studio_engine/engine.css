@@ -1195,6 +1195,13 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
         backdrop-filter: var(--surface-glass-filter);
       }
       html[data-surface-style="glass"] .surface-glass-blur:is(:hover, :focus-within) { position: relative; z-index: 2; }
+      /* The navbar is a blurred bar already. Thinner, the ambient page runs under it and no
+         hard edge marks where the page begins. */
+      html[data-surface-style="glass"] .nav-shell {
+        background-color: color-mix(in srgb, var(--color-page) 62%, transparent);
+        -webkit-backdrop-filter: blur(18px) saturate(140%);
+        backdrop-filter: blur(18px) saturate(140%);
+      }
     }
 
     /* THE GLASS SIDEBAR (Studio.sidebar_style = :glass, components/_sidebar_panel glass: true).
