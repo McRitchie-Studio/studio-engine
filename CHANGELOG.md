@@ -12,6 +12,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   that renders the head. Both tags now pass `preload_links_header: false`. They keep their place in
   the document, their `data-turbo-track` and their CSP treatment. Hosts: keep a module tag of your
   own below the import map, and pass the same option if it loads by URL.
+
 - **Hold to talk, before the phone test.** Studio's shared voice chat, from the review of
   `engine-chat-takes-voice`:
   - A tap under `TAP_MS` (300ms) on a hold button is now the recorder's `tapped` state: the
