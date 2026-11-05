@@ -36,7 +36,10 @@
   .studio-agent-voice-row .studio-recorder { flex: 1 1 10rem; min-width: 0; flex-flow: row wrap; justify-content: flex-end; gap: .5rem; }
   .studio-agent-voice-row .studio-recorder-button { flex: 1 1 10rem; min-width: 0; padding: .625rem 1rem; }
   .studio-agent-voice-row .studio-recorder-timer { display: none; }
-  .studio-agent-voice-row [data-voice-recorder-state="recording"] .studio-recorder-timer { display: inline; }
+  /* On the button, not beside it: beside it, it took 40px off a held button. */
+  .studio-agent-voice-row .studio-recorder { position: relative; }
+  .studio-agent-voice-row [data-voice-recorder-state="recording"] .studio-recorder-timer { display: inline; position: absolute; top: 50%; right: 1rem; transform: translateY(-50%);
+    pointer-events: none; color: var(--btn-primary-fg, #fff); }
   .studio-agent-voice-row .studio-recorder-status { flex: 1 0 100%; min-height: 0; max-width: none; font-size: .875rem; }
   /* The chat's status line speaks for these; a second live line would say them
      twice, and its coming and going would move a held button. */

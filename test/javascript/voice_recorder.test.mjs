@@ -323,6 +323,7 @@ test("hold mode: a key held when focus leaves stops the take; focus moving durin
   r.root.fire("keydown", r.button, { key: " ", repeat: false })
   await flush()
   assert.equal(r.root.dataset.voiceRecorderState, "recording")
+  win.tick(TAP_MS)
   r.root.fire("focusout", r.button)
   await flush()
   assert.equal(r.root.dataset.voiceRecorderState, "captured")
