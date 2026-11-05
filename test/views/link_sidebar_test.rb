@@ -619,9 +619,55 @@ class LinkSidebarTest < Minitest::Test
 
   def test_glass_marks_the_geo_row_on_its_own_page
     html = with_glass { render_sidebar(sections: GLASS_SECTIONS + [{ title: "Ops", admin: true, links: [{ label: "Admin", href: "/admin", emoji: "🛠" }] }], admin: true, geo_flag: true, geo_routes: true, path: "/admin/geo") }
-    rows = Nokogiri::HTML5.fragment(html).css('#studio-link-sidebar a[aria-current="page"]')
+    doc = Nokogiri::HTML5.fragment(html)
+    rows = doc.css('#studio-link-sidebar a[aria-current="page"]')
 
     assert_equal ["/admin/geo"], rows.map { |row| row["href"] }
+    # The fill and the focus ring reach it through this selector, and the lab cannot light it.
+    assert_equal rows.to_a, doc.css('#studio-link-sidebar [data-sidebar-glass-shell] nav > [role="group"] > a[aria-current="page"]').to_a
+  end
+
+  # The partial's walk runs on every page of a glass app, so this raise would be a 500 everywhere.
+  def test_glass_renders_past_an_href_uri_refuses
+    sections = [{ title: "Help", links: [{ label: "Odd mail", href: "mailto:foo?bar", emoji: "✉️" }, { label: "Books", href: "/books", emoji: "📚" }] }]
+    doc = Nokogiri::HTML5.fragment(with_glass { render_sidebar(sections: sections, admin: false, path: "/books") })
+
+    assert_equal ["/books"], doc.css("#studio-link-sidebar a[aria-current]").map { |row| row["href"] }
+    refute_empty doc.css('#studio-link-sidebar a[href="mailto:foo?bar"]')
+  end
+
+  # Safari and Firefox do not know prefers-reduced-transparency, so a not query is false there
+  # too and the blur never reaches them. The browser lane runs Chromium only, which knows the
+  # feature, so it cannot see this. This is the guard.
+  def test_the_blur_answers_to_supports_alone_and_the_setting_undoes_it
+    css = glass_stylesheet
+
+    refute_match(/@media\s+not\s*\(prefers-reduced-transparency/, css)
+    block = css[/@supports \(\(backdrop-filter: blur\(1px\)\).*?\n    \}\n/m]
+    refute_nil block
+    blur, undo = block.split("@media (prefers-reduced-transparency: reduce)")
+    %w[-webkit-backdrop-filter backdrop-filter].each do |property|
+      assert_match(/^\s*#{property}: var\(--glass-filter\);/, blur)
+      assert_match(/^\s*#{property}: none;/, undo)
+    end
+    assert_includes undo, "background-color: var(--glass-fill);"
+  end
+
+  # A headless WebKit paints the thin fill with no visible blur. If a real browser does too, the
+  # fill alone has to carry the text, over the page that is worst for each theme.
+  def test_the_thin_fill_alone_keeps_resting_text_at_4_5_to_1
+    css = glass_stylesheet
+    light = css[/^\s*\[data-sidebar-glass-shell\] \{\s*--glass-row-height.*?\n    \}/m]
+    dark = css[/^\s*\.dark \[data-sidebar-glass-shell\] \{.*?\n    \}/m]
+
+    { dark => [255, 255, 255], light => [0, 0, 0] }.each do |tokens, page|
+      fill, alpha = thin_fill(tokens)
+      seen = fill.zip(page).map { |ink, under| (alpha * ink) + ((1 - alpha) * under) }
+      %w[--glass-ink --glass-soft-ink].each do |token|
+        ink = tokens[/#{token}: #(\h{6})/, 1].scan(/../).map { |pair| pair.to_i(16) }
+        assert_operator contrast(ink, seen), :>=, 4.5, "#{token} over #{page.inspect}"
+      end
+    end
   end
 
   def test_the_panel_without_glass_is_untouched_for_other_callers
@@ -635,6 +681,28 @@ class LinkSidebarTest < Minitest::Test
   end
 
   private
+
+  def glass_stylesheet
+    File.read(File.expand_path("../../app/assets/tailwind/studio_engine/engine.css", __dir__))
+  end
+
+  def thin_fill(tokens)
+    red, green, blue, alpha = tokens.match(%r{--glass-thin-fill: rgb\((\d+) (\d+) (\d+) / ([\d.]+)\)}).captures
+    [[red, green, blue].map(&:to_f), alpha.to_f]
+  end
+
+  def contrast(one, other)
+    lighter, darker = [one, other].map { |rgb| luminance(rgb) }.minmax.reverse
+    (lighter + 0.05) / (darker + 0.05)
+  end
+
+  def luminance(rgb)
+    red, green, blue = rgb.map do |channel|
+      value = channel / 255.0
+      value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055)**2.4
+    end
+    (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
+  end
 
   def with_glass
     prior = Studio.sidebar_style

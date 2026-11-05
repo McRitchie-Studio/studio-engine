@@ -1144,12 +1144,12 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
 
        THE FILL IS THE FALLBACK. Here it is nearly solid, so a browser with no backdrop-filter,
        or a reader who asks for less transparency, still gets readable text. The @supports rule
-       thins it only where the blur is real.
+       thins it where the browser says it has the blur.
 
        CONTRAST. The worst page behind the panel is the opposite of its theme: a white image
-       under dark glass, a black one under light. The fill and the brightness() are set so the
-       soft ink holds 4.5:1 over both, with the blur at its least help. A thinner fill looks
-       more like glass and risks failing over a white page.
+       under dark glass, a black one under light. A browser can claim the blur and not paint it, so
+       the thin fill alone holds resting soft ink at 4.5:1 over both, and brightness() only adds
+       to that. A thinner fill looks more like glass and fails over a white page.
 
        IT HANGS FROM THE NAVBAR. The frame has no top padding, so no page shows between the
        navbar and the panel, and the shell's top is square with no top border: the navbar is
@@ -1202,17 +1202,25 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       --glass-thin-fill: rgb(36 30 62 / 0.72);
       --glass-filter: blur(24px) saturate(150%) brightness(0.8);
       --glass-ink: #f1effa;
-      --glass-soft-ink: #cdc8e2;
+      --glass-soft-ink: #dedaed; /* 4.5:1 on the thin fill alone over white, if a blur never paints */
       --glass-hover: rgb(255 255 255 / 0.1);
       --glass-line: rgb(255 255 255 / 0.14);
       --glass-shadow: 0 24px 60px rgb(0 0 0 / 0.5);
     }
+    /* The less-transparency rule turns the blur off, rather than this rule asking for that
+       setting's absence: a browser that does not know the media feature answers false to a
+       not query as well, which left Safari and Firefox on the solid fill. */
     @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-      @media not (prefers-reduced-transparency: reduce) {
+      [data-sidebar-glass-shell] {
+        background-color: var(--glass-thin-fill);
+        -webkit-backdrop-filter: var(--glass-filter);
+        backdrop-filter: var(--glass-filter);
+      }
+      @media (prefers-reduced-transparency: reduce) {
         [data-sidebar-glass-shell] {
-          background-color: var(--glass-thin-fill);
-          -webkit-backdrop-filter: var(--glass-filter);
-          backdrop-filter: var(--glass-filter);
+          background-color: var(--glass-fill);
+          -webkit-backdrop-filter: none;
+          backdrop-filter: none;
         }
       }
     }
@@ -1277,6 +1285,13 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       background-color: color-mix(in srgb, var(--color-primary-600) 65%, var(--color-primary-700));
       box-shadow: 0 4px 14px rgb(var(--color-primary-rgb) / 0.4);
       color: #fff;
+    }
+    /* The glow above outranks the row's focus ring, which is a box-shadow. This ring is an
+       outline set inside the edge, so the row's own fill shows on both sides of it: at the
+       edge, white would melt into the light theme's panel. */
+    [data-sidebar-glass-shell] nav > [role="group"] > a[aria-current="page"]:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: -4px;
     }
     [data-sidebar-glass-shell] a[aria-current="page"] [data-sidebar-row-desc] { color: rgb(255 255 255 / 0.9); }
     [data-sidebar-glass-shell] nav > [role="group"] > a + a { margin-top: var(--glass-row-gap); }
