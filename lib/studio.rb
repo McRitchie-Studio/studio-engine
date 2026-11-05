@@ -1818,8 +1818,8 @@ module Studio
   #   config.site_footer_chat_label = "Chat"       # the default
   #   config.site_footer_chat_allowed = ->(user) { user&.admin? }  # default: Studio.agent_chat_allowed
   #
-  # site_footer_chat_allowed takes the viewer, nil when signed out; a hook that
-  # raises hides the entry and logs (SiteFooter.chat_row). Unset, the link follows
+  # site_footer_chat_allowed takes the viewer, nil when signed out; a path or a hook
+  # that raises hides the entry and logs (SiteFooter.chat_row). Unset, the link follows
   # Studio.agent_chat_allowed, so the link shows to whom the chat answers.
   mattr_accessor :site_footer_chat_path, default: nil
   mattr_accessor :site_footer_chat_label, default: "Chat"

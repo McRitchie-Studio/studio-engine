@@ -33,8 +33,15 @@ silence with nothing on the page saying which microphone was used. So:
 - A take whose loudest frame stays under **-40 dBFS** (`SILENCE_RMS = 0.01`) is
   refused before it goes anywhere: a speech model handed silence makes a word up.
   Two silent takes in a row on one microphone open the help.
+- In hold mode, a press let go in under **300ms** (`TAP_MS`), or before the microphone
+  opened, is the `tapped` state: the line says to hold the button (`tapped.status`). A tap
+  records too little to judge a microphone by, so it is not a silent take. It does end a run:
+  the two silent takes must be in a row. A refused microphone is still `denied`, and opens
+  the help.
+- A key held on the button when a refusal opens the help does not press its Close: only a
+  key pressed since the dialog opened counts.
 - A microphone another app holds (`NotReadableError`, Chrome's older
-  `TrackStartError`) gets its own line, "Your microphone is busy in another
+  `TrackStartError`, Firefox's `AbortError`) gets its own line, "Your microphone is busy in another
   app. Close it there, then try again." (`failed.busy`, overridable with the
   recorder's `copy:`), never "I couldn't find a microphone".
 
@@ -126,7 +133,7 @@ the chip, `studio:microphone:chosen` (`{ deviceId }`).
 | Element | Attributes |
 |---|---|
 | Chip root | `data-microphone-state` (`prompt`, `ready`, `denied`, `unsupported`), `data-microphone-label`, `data-microphone-live`, `data-microphone-heard`, `data-microphone-help` (while the dialog is open: `switched`, `denied`, `silent`, `help`), `data-microphone-ready`, `--studio-mic-level` |
-| Recorder root | `data-voice-recorder-state` (`idle`, `starting`, `recording`, `captured`, `silent`, `failed`, `denied`, `unsupported`), `data-voice-recorder-mode`, `data-voice-recorder-heard`, `data-voice-recorder-peak`, `data-voice-recorder-level`, `data-voice-recorder-ready`, `--studio-recorder-level` |
+| Recorder root | `data-voice-recorder-state` (`idle`, `starting`, `recording`, `captured`, `silent`, `failed`, `denied`, `tapped`, `unsupported`), `data-voice-recorder-mode`, `data-voice-recorder-heard`, `data-voice-recorder-peak`, `data-voice-recorder-level`, `data-voice-recorder-ready`, `--studio-recorder-level` |
 
 ### Storage
 
@@ -157,7 +164,7 @@ device gives are inserted as text, never markup.
 
 Keyboard and screen readers: the chip, every option and the help link wear the
 same 3px primary focus ring. Esc in the open list closes it and puts focus back
-on the chip. The option in use carries `aria-current="true"`; options carry no
+on the chip, and stops there, so a modal around the chip keeps its own Esc. The option in use carries `aria-current="true"`; options carry no
 `aria-pressed` (picking is not a toggle). The help's drawing of Chrome's address
 bar shows a drawn bar, not the app's host.
 

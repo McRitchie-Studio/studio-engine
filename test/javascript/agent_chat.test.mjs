@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs"
 const source = readFileSync(new URL("../../app/javascript/studio/agent_chat.js", import.meta.url), "utf8")
 const {
   settled, mergeTurns, turnKey, afterCursor, pollDelay, typingPhase, isFollowing, csrfToken, turnsUrl, mountAgentChat,
-  POLL_MS, SLOW_MS, SLOW_AFTER_MS, IDLE_MS, OFFLINE_MS, LIMIT, REFRESH_EVENT
+  POLL_MS, SLOW_MS, SLOW_AFTER_MS, IDLE_MS, OFFLINE_MS, LIMIT, REFRESH_EVENT, SENT_EVENT
 } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 const turn = (id, status = "answered", role = "user") => ({ id, role, status, text: `t${id}` })
@@ -207,4 +207,88 @@ test("after destroy the hook is gone and a refresh does nothing", async () => {
   assert.equal(page.listeners[REFRESH_EVENT], undefined)
   chat.refresh()
   assert.equal(asks.length, 1)
+})
+
+// A chat section with one real turn node, enough to read what render() shows.
+function withTurnNode() {
+  const page = standIn()
+  const lines = { "[data-agent-chat-text]": { textContent: "" }, "[data-agent-chat-failed]": { hidden: true }, "[data-agent-chat-held]": { hidden: true } }
+  const node = { dataset: {}, querySelector: (s) => lines[s] || null, after() {} }
+  const log = page.root.querySelector("[data-agent-chat-log]")
+  log.querySelectorAll = () => (node.dataset.turnKey ? [node] : [])
+  log.appendChild = () => {}
+  const template = { content: { firstElementChild: { cloneNode: () => node } } }
+  const query = page.root.querySelector
+  page.root.querySelector = (s) => (s.startsWith("template") ? template : query(s))
+  return { page, node, lines }
+}
+
+// CONTROL: restore `turn.status !== "failed"` alone, with no held line, and the
+// first assert fails: a held turn shows nothing, or tells the person to resend.
+test("a held turn says it was received and never tells the person to send it again", async () => {
+  const { page, lines } = withTurnNode()
+  const { asks, fetcher } = deferredFetch()
+  mountStandIn(page, fetcher)
+  asks[0].answer([turn(1, "held")])
+  await flush()
+  assert.equal(lines["[data-agent-chat-held]"].hidden, false)
+  assert.equal(lines["[data-agent-chat-failed]"].hidden, true, "no failed line")
+  assert.equal(page.typing.hidden, true, "a held turn is settled: no answer is pending")
+})
+
+test("a hub still sending failed keeps the failed line and no held line", async () => {
+  const { page, lines } = withTurnNode()
+  const { asks, fetcher } = deferredFetch()
+  mountStandIn(page, fetcher)
+  asks[0].answer([turn(1, "failed")])
+  await flush()
+  assert.equal(lines["[data-agent-chat-failed]"].hidden, false)
+  assert.equal(lines["[data-agent-chat-held]"].hidden, true)
+})
+
+test("held is settled, and a poll's cursor moves past it", () => {
+  assert.equal(settled(turn(1, "held")), true)
+  assert.equal(afterCursor([turn(1, "held")]), "1")
+})
+
+test("a refresh with a held turn shows no typing line", async () => {
+  const { page } = withTurnNode()
+  const { asks, fetcher } = deferredFetch()
+  const { chat } = mountStandIn(page, fetcher)
+  asks[0].answer()
+  await flush()
+  chat.refresh({ turn: turn(1, "held") })
+  assert.equal(page.typing.hidden, true)
+})
+
+function composerFor(page, answerWith) {
+  const input = { value: "typed words", addEventListener() {}, removeEventListener() {} }
+  const form = { getAttribute: () => "/agent_chat/messages", querySelector: () => null, addEventListener() {}, removeEventListener() {} }
+  const query = page.root.querySelector
+  page.root.querySelector = (s) => (s === "[data-agent-chat-form]" ? form : s === "[data-agent-chat-input]" ? input : query(s))
+  const events = []
+  page.root.dispatchEvent = (event) => events.push(event)
+  const fetcher = async (url, init) => (init && init.method === "POST" ? answerWith : { ok: true, json: async () => ({ turns: [], pending: false }) })
+  return { events, fetcher, input }
+}
+
+class SentEvent { constructor(type, init = {}) { this.type = type; this.detail = init.detail } }
+
+test("a typed send the app took tells the page; a refused one does not", async () => {
+  assert.equal(SENT_EVENT, "studio:agent-chat:sent")
+  const page = standIn()
+  const sent = composerFor(page, { status: 201, json: async () => ({ turn: turn(9, "pending") }) })
+  const { chat } = (() => {
+    const timers = []
+    return { chat: mountAgentChat(page.root, { fetch: sent.fetcher, doc: null, CustomEventClass: SentEvent, setTimer: (fn, ms) => { timers.push({ fn, ms }); return timers.length }, clearTimer: () => {} }) }
+  })()
+  await chat.submit()
+  assert.deepEqual(sent.events.map((event) => event.type), [SENT_EVENT])
+  assert.equal(sent.events[0].detail.turn.id, 9)
+
+  const other = standIn()
+  const refused = composerFor(other, { status: 429, json: async () => ({ error: "Slow down." }) })
+  const second = mountAgentChat(other.root, { fetch: refused.fetcher, doc: null, CustomEventClass: SentEvent, setTimer: () => 0, clearTimer: () => {} })
+  await second.submit()
+  assert.deepEqual(refused.events, [], "the voice line may still be the one that explains the box")
 })

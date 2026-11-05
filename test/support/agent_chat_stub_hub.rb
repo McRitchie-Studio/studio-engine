@@ -40,7 +40,8 @@ class AgentChatStubHub
   # "pending", "typing" after half of `answer_after` seconds, then "answered"
   # with "You said: <text>". A post with `voice` is answered with what the hub
   # kept of it, the speaker named here. A message containing "[hub-down]" is answered 503,
-  # as a hub that is down; it is not stored. A post naming BOTH an email and an
+  # as a hub that is down; it is not stored. One containing "[hub-held]" is stored and
+  # stays "held": no answer is coming, as the hub answers a message it holds. A post naming BOTH an email and an
   # anon_token folds that anonymous thread into the email's, as the hub does.
   def converse!(answer_after: 1.5)
     threads = Hash.new { |hash, key| hash[key] = [] }
@@ -68,7 +69,10 @@ class AgentChatStubHub
           seq += 1
           { id: seq, text: body["text"], at: Time.now.utc.iso8601, status: "pending", reply: nil }.tap { |r| threads[key] << r }
         end
+        lock.synchronize { row[:status] = "held" } if body["text"].to_s.include?("[hub-held]")
         Thread.new do
+          next if row[:status] == "held"
+
           sleep answer_after / 2.0
           lock.synchronize { row[:status] = "typing" }
           sleep answer_after / 2.0

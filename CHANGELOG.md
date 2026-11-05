@@ -4,6 +4,29 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **Hold to talk, before the phone test.** Studio's shared voice chat, from the review of
+  `engine-chat-takes-voice`:
+  - A tap under `TAP_MS` (300ms) on a hold button is now the recorder's `tapped` state: the
+    line says to hold the button, and it does not count as a silent take, so the help no longer
+    opens by itself. A refused microphone and two real silent takes in a row still open it; a
+    tap between two silent takes ends the run.
+  - A held button keeps its whole box through a hold at phone width, stuck or not. The status
+    line reserves two lines (one in a composer 36rem wide) and fixes its height for the hold,
+    the chip stays one line, the timer sits on the button, and the recorder's own failed and
+    refused lines moved to the chat's one line. The chat's chip prompt is now "Microphone: hold
+    to allow".
+  - A `site_footer_chat_path` callable that raises hides the Chat link and reports it
+    (`SiteFooter.reporter` on each render, `ErrorLog.capture!` once per error class).
+  - A turn with status `held` says it was received and won't get an automatic answer, and
+    never asks for a resend. The hub still reports these as `failed` until
+    `chat-caps-count-held-messages` ships; they keep the failed line until then.
+  - A later typed send clears "Sent. Spoken by ..." (`studio:agent-chat:sent`).
+  - A key held on the talk button no longer dismisses the refused-microphone help.
+  - The composer's picker scrolls within a short window, so the chip stays on screen.
+  - Firefox's `AbortError` reads as a busy microphone, and Esc in the open picker stops there.
+
 ### Added
 
 - **`Studio.sidebar_style = :glass`: an opt-in floating panel for the link sidebar.** The panel

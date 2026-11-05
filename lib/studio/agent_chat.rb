@@ -25,7 +25,8 @@ module Studio
   # POST that still holds the visitor's anon token sends {email:, anon_token:},
   # and the hub folds the anonymous thread into the person's. A turn is
   # {id, role: "user"|"agent", text, created_at, status} with status
-  # pending|typing|answered|failed.
+  # pending|typing|answered|failed|held. held: stored, and no automatic answer is
+  # coming (a hub that predates it says failed for the same message).
   #
   # `voice` marks a spoken message: {check, score, duration_ms}, what POST
   # /voice/takes answered for the take (voice_param). NEVER A NAME: the hub
@@ -104,12 +105,13 @@ module Studio
       "silent" => { "button" => "Hold to talk" },
       "failed" => { "button" => "Hold to try again" },
       "denied" => { "button" => "Hold to talk" },
+      "tapped" => { "button" => "Hold to talk" },
       "unsupported" => { "button" => "Hold to talk" }
     }.freeze
 
     # The microphone chip's first words (the engine's say "tap Record").
     VOICE_CHIP_COPY = {
-      "prompt" => { "chip" => "Microphone: hold to talk to allow",
+      "prompt" => { "chip" => "Microphone: hold to allow",
                     "note" => "Hold the talk button once and allow the microphone. Then you can pick one here." }
     }.freeze
 

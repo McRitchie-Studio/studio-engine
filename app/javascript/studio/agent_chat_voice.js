@@ -18,8 +18,14 @@
 //      says who it kept.
 //
 // Every refusal is a line in [data-agent-chat-voice-status] (set as text) and a
-// state on data-agent-chat-voice-state: listening, transcribing, queued, sending,
-// sent, silent, no_speech, not_configured, rate_limited, refused, failed.
+// state on data-agent-chat-voice-state: listening, tapped, transcribing, queued,
+// sending, sent, silent, no_speech, not_configured, rate_limited, refused, failed.
+//
+// THE HELD BUTTON DOES NOT MOVE. The line sits above the button and the recorder's
+// own line is hidden here, so this one line says everything. _voice reserves its
+// quiet-hint height, and holdLine fixes its height for the length of a hold: an old
+// line clearing under the finger cannot pull the button down, and a take landing
+// during a hold cannot push it up.
 //
 // NO WORDS ARE LOST. A transcript that could not be sent goes in the chat's box,
 // after anything already typed there. A take that lands while another is still
@@ -33,6 +39,7 @@ export const EMBED_WAIT_MS = 8000
 
 export const MESSAGES = {
   listening: "Listening...",
+  tapped: "Hold the button while you talk, then let go.",
   transcribing: "Turning that into words...",
   queued: "Got that one too. It's next.",
   sending: (name) => `Sending to ${name}...`,
@@ -157,6 +164,19 @@ export function mountAgentChatVoice(root, {
     if (status) status.textContent = message || ""
   }
 
+  // Takes the line's height before it changes, and hands it back with no argument.
+  function holdLine(holding) {
+    if (!status || !status.style) return
+    status.style.height = holding && status.offsetHeight ? `${status.offsetHeight}px` : ""
+    status.style.overflow = holding && status.offsetHeight ? "hidden" : ""
+  }
+
+  // What the recorder just said on its own line, which _voice hides here.
+  function recorderLine(fallback) {
+    const line = root.querySelector("[data-voice-recorder-status]")
+    return (line && line.textContent) || fallback
+  }
+
   function embedder() {
     const config = parseEmbedder(root.getAttribute("data-agent-chat-voice-embedder"))
     if (!config) return Promise.resolve(null)
@@ -278,13 +298,29 @@ export function mountAgentChatVoice(root, {
   function onState(event) {
     const next = event.detail && event.detail.state
     if (next === "starting") {
+      holdLine(true)
       say("idle", "")
-    } else if (next === "recording") {
+      return
+    }
+    if (next === "recording") {
       say("listening", MESSAGES.listening)
       embedder().then((loaded) => loaded && loaded.warm && loaded.warm()).catch(() => {})
-    } else if (root.dataset.agentChatVoiceState === "listening") {
+      return
+    }
+    holdLine(false)
+    if (next === "tapped") say("tapped", recorderLine(MESSAGES.tapped))
+    else if (next === "failed") say("failed", recorderLine(MESSAGES.failed))
+    else if (next === "denied") say("refused", recorderLine(MESSAGES.failed))
+    else if (root.dataset.agentChatVoiceState === "listening") {
       say(working ? "transcribing" : "idle", working ? MESSAGES.transcribing : "")
     }
+  }
+
+  // A later typed send (studio/agent_chat): "Sent. Spoken by ..." is about a take
+  // the thread has moved past. A take still in hand, or a hold, keeps its own line.
+  function onTypedSend() {
+    if (working || root.dataset.agentChatVoiceState === "listening") return
+    say("idle", "")
   }
 
   // "I can't hear anything yet" on the one line: the recorder's own line is hidden
@@ -304,6 +340,7 @@ export function mountAgentChatVoice(root, {
   root.addEventListener("studio:voice-recorder:silent", onSilent)
   root.addEventListener("studio:voice-recorder:state", onState)
   root.addEventListener("studio:voice-recorder:hint", onHint)
+  if (chat && chat.addEventListener) chat.addEventListener("studio:agent-chat:sent", onTypedSend)
 
   return {
     takeArrived,
@@ -313,6 +350,7 @@ export function mountAgentChatVoice(root, {
       root.removeEventListener("studio:voice-recorder:silent", onSilent)
       root.removeEventListener("studio:voice-recorder:state", onState)
       root.removeEventListener("studio:voice-recorder:hint", onHint)
+      if (chat && chat.removeEventListener) chat.removeEventListener("studio:agent-chat:sent", onTypedSend)
     }
   }
 }

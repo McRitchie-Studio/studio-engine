@@ -107,7 +107,7 @@ class StudioAgentChatTest < Minitest::Test
     assert_equal "When you speak to an agent, your recording is sent to OpenAI to turn it into text, then deleted. " \
                  "We never keep the audio.", default["privacy"]
     assert_equal "Hold to talk", default["recorder"].dig("idle", "button")
-    assert_equal "Microphone: hold to talk to allow", default["chip"].dig("prompt", "chip")
+    assert_equal "Microphone: hold to allow", default["chip"].dig("prompt", "chip")
 
     copied = Chat.voice_copy(privacy: "Ours.", recorder: { idle: { button: "Talk" } }, chip: { "prompt" => { "chip" => "Mic" } })
     assert_equal "Ours.", copied["privacy"]

@@ -170,15 +170,22 @@ answers no `voice`. On the hub the same two paths are answered in-process
 
 | State | When |
 |-------|------|
-| `idle`, `listening` | Between takes, and while the button is held. A new hold clears the last take's line. |
+| `idle`, `listening` | Between takes, and while the button is held. A new hold clears the last take's line, and so does a later typed send the app took. |
+| `tapped` | Let go in under 300ms: the line says to hold the button. Nothing is sent, and the microphone is not blamed. |
 | `transcribing`, `sending`, `sent` | The take's journey. `sent` names the speaker the server kept. |
 | `queued` | A take landed while another is being transcribed. It waits its turn, in order; none is dropped. |
 | `silent` | The recorder heard nothing. Nothing is sent. |
 | `no_speech` | `/voice/takes` heard no words (422). |
 | `not_configured` | No voice key on this app (503). |
 | `rate_limited` | 429 on the take or the send, with the wait when the server gives one. |
-| `refused` | 401 ("Sign in again to talk."), 403, 413, 415, or another 422. |
-| `failed` | The transcriber failed, the network failed, or the send failed. |
+| `refused` | 401 ("Sign in again to talk."), 403, 413, 415, another 422, or the browser refused the microphone (the help opens too). |
+| `failed` | The microphone would not open, the transcriber failed, the network failed, or the send failed. |
+
+**The held button does not move.** At phone width, stuck or not, its whole box stays
+through a hold: the line reserves the two lines the quiet hint wraps to (one once the
+composer is 36rem wide) and fixes its height for the hold, the chip is always one line,
+and the timer sits on the button. A reply landing above a composer that is NOT stuck
+still moves it, as any new content in the page does.
 
 **The token.** The script sends the page's `csrf_meta_tags` token and falls back to
 the form's only without one: the form's is per-form under `load_defaults` 8.1, bound
@@ -275,7 +282,12 @@ machine (a developer's local hub).
   follows it, and the chat polls now; a poll already in flight is followed by one
   more, so a refresh is never swallowed. Use this, never a click on Try again;
 - shows "<name> is thinking", then "<name> is typing" once a turn's status is
-  `typing`, and "<name> could not answer this one" on a `failed` turn.
+  `typing`, "<name> could not answer this one. Send it again." on a `failed` turn, and
+  "Your message was received, but it won't get an automatic answer." on a `held` turn
+  (stored by the hub, no agent will answer it), which never asks for a resend. A hub
+  that still reports a held message as `failed` gets the failed line;
+- dispatches `studio:agent-chat:sent` on the chat's section, `{ detail: { turn } }`,
+  after a typed send the app took.
 
 Turn text is set as text, never HTML. The look is the partials under
 `app/views/studio/agent_chat/` and `.studio-agent-typing` in `engine-motion.css`,
@@ -294,6 +306,9 @@ that imports only `engine.css` sees both of its labels.
 - `e2e/agent_chat.spec.js`: the chat in a browser against the stand-in hub
   `e2e/boot.rb` runs (`AgentChatStubHub#converse!`, the hub's shared-id shape).
 - `test/javascript/agent_chat_voice.test.mjs`: every refusal line, the take's body,
-  `voice` carrying no name, a queued take, a failed send keeping the words.
+  `voice` carrying no name, a queued take, a failed send keeping the words, a tap's
+  line, a typed send clearing the old line, the line's height through a hold.
 - `e2e/agent_chat_voice.spec.js`: a real hold at 390px, light and dark, through the
-  mock transcriber and the proxy to the stand-in hub, and the footer's Chat link.
+  mock transcriber and the proxy to the stand-in hub, and the footer's Chat link. It
+  measures the held button's box stuck and not, and drives a tap, a held key on the
+  refused-microphone help, a held turn, a typed send and the picker in a short window.

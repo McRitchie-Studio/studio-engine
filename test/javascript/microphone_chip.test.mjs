@@ -8,6 +8,7 @@
 //
 // CONTROLS, run against this file:
 //   - drop `if (chip) chip.focus()` from onKey: "Esc in the open list" fails.
+//   - delete onDialogKey's listeners: "a key already down" fails.
 //   - put `button.setAttribute("aria-pressed", ...)` back in renderList: "no
 //     aria-pressed" fails.
 import { test } from "node:test"
@@ -100,8 +101,10 @@ test("Esc in the open list closes it and returns focus to the chip", async () =>
   const option = page.list.all().find((el) => el.dataset.microphoneOption === "arctis")
   option.focus()
 
-  page.root.fire("keydown", option, { key: "Escape" })
+  let stopped = 0
+  page.root.fire("keydown", option, { key: "Escape", stopPropagation() { stopped += 1 } })
 
+  assert.equal(stopped, 1, "a modal around the chip keeps its own Esc")
   assert.equal(page.panel.hidden, true)
   assert.equal(page.chip.getAttribute("aria-expanded"), "false")
   assert.equal(page.doc.activeElement, page.chip, "focus is back on the chip")
@@ -128,6 +131,34 @@ test("options mark the one in use with aria-current and carry no aria-pressed", 
   assert.deepEqual(options.map((el) => el.dataset.microphoneOption), ["mbp", "arctis"])
   options.forEach((el) => assert.equal(el.hasAttribute("aria-pressed"), false, `${el.dataset.microphoneOption} has aria-pressed`))
   assert.deepEqual(options.map((el) => el.getAttribute("aria-current")), ["true", null])
+})
+
+test("a key already down when the help opens does not press Close; a new press does", async () => {
+  const page = build()
+  const close = new El(page.doc, "button", { "data-microphone-help-close": "" })
+  const dialog = new El(page.doc, "dialog", { "data-microphone-dialog": "" }, [close])
+  dialog.showModal = () => { dialog.open = true }
+  dialog.close = () => { dialog.open = false }
+  page.root.append(dialog)
+  const handlers = {}
+  page.win.addEventListener = (name, fn) => { handlers[name] = fn }
+  mountMicrophoneChip(page.root, { win: page.win })
+  await flush()
+  handlers["studio:microphone:denied"]({})
+  assert.equal(dialog.open, true)
+
+  const fire = (type, key, repeat) => {
+    let stopped = false
+    dialog.fire(type, close, { key, repeat, preventDefault() { stopped = true } })
+    return stopped
+  }
+  for (const key of [" ", "Enter"]) {
+    assert.equal(fire("keydown", key, true), true, "a repeat presses nothing")
+    assert.equal(fire("keyup", key, false), true, "nor does the keyup of the hold")
+    assert.equal(fire("keydown", key, false), false, "a new press is a person answering")
+    assert.equal(fire("keyup", key, false), false)
+  }
+  assert.equal(fire("keydown", "Escape", true), false, "Esc is not one of these keys")
 })
 
 test("the help's Close shuts the dialog itself: it is a plain button, with no form to submit", async () => {

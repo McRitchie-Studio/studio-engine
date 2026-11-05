@@ -228,6 +228,40 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     assert_select CHAT_LINK, 0
   end
 
+  # CONTROL: remove chat_href's rescue and every assert below goes: test re-raises, and
+  # production loses the whole footer to studio_site_footer_report.
+  test "a chat path lambda that raises costs only the link, and logs the error" do
+    Studio.site_footer = CHAT_FACTS
+    Studio.site_footer_chat_path = ->(_view) { raise ArgumentError, "no such route" }
+    said = []
+    before = Studio::SiteFooter.reporter
+    Studio::SiteFooter.reporter = ->(message) { said << message }
+    get "/footer_host/landing"
+
+    assert_response :success
+    assert_select "footer[data-site-footer]", 1
+    assert_select "footer[data-site-footer] a", { text: "Chat", count: 0 }
+    assert_equal 1, said.grep(/site_footer_chat_path raised ArgumentError/).size
+  ensure
+    Studio::SiteFooter.reporter = before
+  end
+
+  test "a chat path lambda that raises reaches ErrorLog once, however many pages it costs" do
+    Studio.site_footer = CHAT_FACTS
+    Studio.site_footer_chat_path = ->(_view) { raise ArgumentError, "no such route" }
+    Studio::SiteFooter.reset_reported!
+    captured = []
+    original = ErrorLog.method(:capture!)
+    ErrorLog.define_singleton_method(:capture!) { |error, *| captured << error }
+    2.times { get "/footer_host/landing" }
+
+    assert_response :success
+    assert_equal [ArgumentError], captured.map(&:class)
+  ensure
+    ErrorLog.define_singleton_method(:capture!, original)
+    Studio::SiteFooter.reset_reported!
+  end
+
   # ---- 1. the footer prints the facts ----------------------------------------
 
   test "a visitor's page ends with one footer carrying every declared fact" do

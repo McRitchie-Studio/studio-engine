@@ -7,16 +7,19 @@
     No audio is kept. Status lines are set as text.
 
     Scoped CSS for the reason studio/voice/_styles gives: it must render in an
-    app whose Tailwind build never saw this file. The status line keeps its one
-    line even when empty, so a one-line status coming or going under a held finger
-    does not move the button. Two things still can at 390px outside a stuck composer,
-    and the pointer stays captured through both: the quiet hint wrapping to two lines,
-    and the chip's prompt shortening on the first hold. %>
+    app whose Tailwind build never saw this file. A held button must not move, stuck
+    or not, so everything above and below it keeps its size through a hold: the
+    status line reserves the two lines the quiet hint wraps to at phone width (one
+    where the composer is wide enough), and holds its height through the hold
+    (holdLine, studio/agent_chat_voice); the chip is always one line, whatever name it
+    shows; the timer sits on the button, not beside it; and the recorder's own line
+    never shows here. e2e/agent_chat_voice.spec.js measures all of it at 390px. %>
 <% words = Studio::AgentChat.voice_copy(copy) %>
 <style>
-  .studio-agent-voice { display: grid; gap: .25rem; padding: 0 .25rem .25rem; min-width: 0; }
-  .studio-agent-voice-status { min-height: 1.25rem; margin: 0; padding: 0 .5rem; font-size: .875rem; line-height: 1.25rem; overflow-wrap: anywhere;
+  .studio-agent-voice { display: grid; gap: .25rem; padding: 0 .25rem .25rem; min-width: 0; container-type: inline-size; }
+  .studio-agent-voice-status { min-height: 2.5rem; margin: 0; padding: 0 .5rem; font-size: .875rem; line-height: 1.25rem; overflow-wrap: anywhere;
     color: var(--color-text-body, inherit); }
+  @container (min-width: 36rem) { .studio-agent-voice-status { min-height: 1.25rem; } }
   .studio-agent-voice-failed { display: none; margin: 0; padding: 0 .5rem; font-size: .8125rem; color: var(--color-text-secondary, inherit); }
   [data-studio-controller-failed~="agent-chat-voice"] > .studio-agent-voice-failed { display: block; }
   /* One row where both fit; on a phone the chip takes the first line and the
@@ -24,18 +27,30 @@
   .studio-agent-voice-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; min-width: 0; }
   .studio-agent-voice-row .studio-mic { display: contents; }
   .studio-agent-voice-row .studio-mic-chip { flex: 1 1 14rem; min-width: 0; }
-  .studio-agent-voice-row .studio-mic-panel { flex: 1 0 100%; max-width: none; order: 3; }
+  .studio-agent-voice-row .studio-mic-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* The composer sticks to the window's bottom, so what doesn't fit is cut off at the
+     top, the chip with it. The picker scrolls inside what the rest leaves it: 20rem is
+     the composer's 15rem at 390px, the privacy line under it, and a margin. */
+  .studio-agent-voice-row .studio-mic-panel { flex: 1 0 100%; max-width: none; order: 3; align-content: start; overflow-y: auto; overscroll-behavior: contain;
+    max-height: max(6rem, calc(100vh - 20rem)); max-height: max(6rem, calc(100dvh - 20rem)); }
   .studio-agent-voice-row .studio-mic-failed { flex: 1 0 100%; order: 4; }
-  .studio-agent-voice-row .studio-recorder { flex: 1 1 10rem; min-width: 0; flex-flow: row wrap; justify-content: flex-end; gap: .5rem; }
+  /* 14rem: the label and, either side of it, the timer's room. Narrower, the two overlap. */
+  .studio-agent-voice-row .studio-recorder { flex: 1 1 14rem; min-width: 0; flex-flow: row wrap; justify-content: flex-end; gap: .5rem; }
   .studio-agent-voice-row .studio-recorder-button { flex: 1 1 10rem; min-width: 0; padding: .625rem 1rem; }
   .studio-agent-voice-row .studio-recorder-timer { display: none; }
-  .studio-agent-voice-row [data-voice-recorder-state="recording"] .studio-recorder-timer { display: inline; }
+  /* On the button, not beside it: beside it, it took 40px off a held button. */
+  .studio-agent-voice-row .studio-recorder { position: relative; }
+  .studio-agent-voice-row [data-voice-recorder-state="recording"] .studio-recorder-timer { display: inline; position: absolute; top: 50%; right: 1rem; transform: translateY(-50%);
+    pointer-events: none; color: var(--btn-primary-fg, #fff); }
   .studio-agent-voice-row .studio-recorder-status { flex: 1 0 100%; min-height: 0; max-width: none; font-size: .875rem; }
-  /* The chat's status line speaks for these three; a second live line would say
-     them twice, and its coming and going would move a held button. */
+  /* The chat's status line speaks for these; a second live line would say them
+     twice, and its coming and going would move a held button. */
   .studio-agent-voice-row .studio-recorder-status:empty,
   .studio-agent-voice-row [data-voice-recorder-state="recording"] .studio-recorder-status,
-  .studio-agent-voice-row [data-voice-recorder-state="silent"] .studio-recorder-status { display: none; }
+  .studio-agent-voice-row [data-voice-recorder-state="silent"] .studio-recorder-status,
+  .studio-agent-voice-row [data-voice-recorder-state="failed"] .studio-recorder-status,
+  .studio-agent-voice-row [data-voice-recorder-state="denied"] .studio-recorder-status,
+  .studio-agent-voice-row [data-voice-recorder-state="tapped"] .studio-recorder-status { display: none; }
   .studio-agent-voice-row .studio-recorder-failed { flex: 1 0 100%; }
 </style>
 <div class="studio-agent-voice" role="group" aria-label="Talk to <%= name %>"
