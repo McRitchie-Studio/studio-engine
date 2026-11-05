@@ -163,16 +163,22 @@ body.modal-open .studio-app-banner {
 
 /* -- Surfaces -------------------------------------------------------------- */
 
+/* --surface-card-fill is unset unless an app opts in to the glass surfaces (THE GLASS SURFACES,
+   below). A token and not a higher-specificity rule, so a card's own tone still wins: a bg-warning/5,
+   a border-danger or a hover:bg-surface-alt on the element beats this as it always did. */
 @utility card {
-  @apply bg-surface rounded-xl border border-subtle;
+  @apply rounded-xl border border-subtle;
+  background-color: var(--surface-card-fill, var(--color-surface));
 }
 
 @utility card-hover {
-  @apply bg-surface rounded-xl border border-subtle hover:border-primary-700/50 hover:shadow-lg hover:shadow-primary-900/10 transition;
+  background-color: var(--surface-card-fill, var(--color-surface));
+  @apply rounded-xl border border-subtle hover:border-primary-700/50 hover:shadow-lg hover:shadow-primary-900/10 transition;
 }
 
 @utility empty-state {
-  @apply bg-surface rounded-xl border border-subtle p-8 text-center;
+  @apply rounded-xl border border-subtle p-8 text-center;
+  background-color: var(--surface-card-fill, var(--color-surface));
 }
 
 @utility json-debug {
@@ -1219,14 +1225,17 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       pointer-events: none;
       background-image: var(--surface-glass-ambient);
     }
+    /* A CARD KEEPS WHAT IT SAYS. Glass sets no border and no tone. The fill of .card, .card-hover and
+       .empty-state is a token its own utility reads, so an authored bg-*, border-* or focus-within:*
+       on the element wins as it always did. A hand-rolled panel has .bg-surface, so it has no tone to
+       lose, and only its fill changes. The shadow list carries the element's own ring and shadow. */
+    html[data-surface-style="glass"] { --surface-card-fill: var(--surface-glass-fill); }
+    html[data-surface-style="glass"] :is(.card, .card-hover, .empty-state):is(.absolute, .fixed, .sticky, .shadow-2xl, .fixed *, [role="dialog"] *) { --surface-card-fill: var(--color-surface); }
+    html[data-surface-style="glass"] :is(.card-hover, a.card):not(.absolute, .fixed, .sticky, .shadow-2xl, .fixed *, [role="dialog"] *):hover { --surface-card-fill: var(--surface-glass-fill-hover); }
+    html[data-surface-style="glass"] .bg-surface.rounded-xl.border:not(.absolute, .fixed, .sticky, .shadow-2xl, .fixed *, [role="dialog"] *) { background-color: var(--surface-glass-fill); }
     html[data-surface-style="glass"] :is(.card, .card-hover, .empty-state, .bg-surface.rounded-xl.border):not(.absolute, .fixed, .sticky, .shadow-2xl, .fixed *, [role="dialog"] *) {
-      background-color: var(--surface-glass-fill);
-      border-color: var(--surface-glass-line);
-      box-shadow: var(--surface-glass-highlight), var(--surface-glass-shadow);
-    }
-    html[data-surface-style="glass"] .card-hover:not(.absolute, .fixed, .sticky, .shadow-2xl, .fixed *, [role="dialog"] *):hover,
-    html[data-surface-style="glass"] a.card:not(.absolute, .fixed, .sticky, .shadow-2xl, .fixed *, [role="dialog"] *):hover {
-      background-color: var(--surface-glass-fill-hover);
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000),
+        var(--surface-glass-highlight), var(--surface-glass-shadow), var(--tw-shadow, 0 0 #0000);
     }
     @media (prefers-reduced-transparency: reduce) {
       html[data-surface-style="glass"] { --surface-glass-fill: var(--color-surface); --surface-glass-fill-hover: var(--color-surface-alt); }
@@ -1286,8 +1295,9 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
        takes no layout, but a toolbar row of small buttons should not jitter, and reduced motion
        never moves.
 
-       FOCUS IS AN OUTLINE on .btn, which no box-shadow here touches. The ring variables stay in
-       each list, for an element a host gave a ring utility, such as a selected summary card.
+       FOCUS IS AN OUTLINE on .btn, which no box-shadow here touches. Each list names the ring
+       variables on the element itself: declared once on the root they would resolve there, to no
+       ring. A button that spells its own bg-* or border-* keeps it.
 
        EDGE TO EDGE. An inset box-shadow paints inside the padding box, so a 1px border leaves a
        strip where the light and the shade stop short. The inset shadows live on ::after, over
@@ -1309,7 +1319,6 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       --lit-soft-pressed: inset 0 2px 3px rgb(29 24 50 / 0.16);
       --lit-badge: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 1px 1px rgb(29 24 50 / 0.12);
       --lit-input: inset 0 1px 2px rgb(29 24 50 / 0.14), inset 0 -1px 0 rgb(255 255 255 / 0.6);
-      --lit-rings: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000);
     }
     html.dark[data-surface-style="glass"] {
       --lit-bottom: inset 0 -2px 0 rgb(0 0 0 / 0.3);
@@ -1336,17 +1345,17 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
     html[data-surface-style="glass"] .btn-danger { --lit-fill: var(--color-danger-fill, var(--color-danger)); }
     html[data-surface-style="glass"] .btn-warning { --lit-fill: var(--color-warning-fill, var(--color-warning)); }
     html[data-surface-style="glass"] .btn-success { --lit-fill: var(--color-success); }
-    html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(:disabled, [aria-disabled="true"]) {
+    html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(:disabled, [aria-disabled="true"], [class*=" bg-"], [class^="bg-"]) {
       border: 1px solid transparent;
       background-origin: border-box;
       background-repeat: no-repeat;
       background-image: linear-gradient(var(--lit-top-stop), var(--lit-low-stop));
       --lit-inset: var(--lit-top), var(--lit-bottom);
       --lit-inset-pressed: var(--lit-pressed);
-      box-shadow: var(--lit-rings), var(--lit-contact);
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--lit-contact);
     }
     html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(.btn-sm, :disabled, [aria-disabled="true"]) {
-      box-shadow: var(--lit-rings), var(--lit-contact),
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--lit-contact),
         var(--lit-glow) oklch(from var(--lit-glow-stop, var(--lit-low-stop)) l c h / var(--lit-glow-alpha));
     }
     /* On a dark page a deep green, red or orange glow disappears, so these glow from the top
@@ -1368,17 +1377,19 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
     html[data-surface-style="glass"] .btn-primary:not(:disabled, [aria-disabled="true"]):is(:hover, [data-lit-state="hover"]) {
       filter: brightness(0.94);
     }
-    html[data-surface-style="glass"] :is(.btn-neutral, .btn-google):not(:disabled, [aria-disabled="true"]) {
+    html[data-surface-style="glass"] :is(.btn-neutral, .btn-google):not(:disabled, [aria-disabled="true"], [class*=" border-"]) {
       border-color: transparent;
+    }
+    html[data-surface-style="glass"] :is(.btn-neutral, .btn-google):not(:disabled, [aria-disabled="true"]) {
       --lit-inset: inset 0 0 0 1px var(--surface-glass-line), var(--lit-soft-top), var(--lit-soft-bottom);
       --lit-inset-pressed: inset 0 0 0 1px var(--surface-glass-line), var(--lit-soft-pressed);
-      box-shadow: var(--lit-rings), var(--lit-contact);
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--lit-contact);
     }
     html[data-surface-style="glass"] .btn-outline:not(:disabled, [aria-disabled="true"]) {
-      box-shadow: var(--lit-rings), var(--lit-soft-top), var(--lit-soft-bottom), var(--lit-contact);
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--lit-soft-top), var(--lit-soft-bottom), var(--lit-contact);
     }
     html[data-surface-style="glass"] .btn-outline:not(:disabled, [aria-disabled="true"]):is(:active, [data-lit-state="pressed"]) {
-      box-shadow: var(--lit-rings), var(--lit-soft-pressed);
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--lit-soft-pressed);
     }
     html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success, .btn-neutral, .btn-google):not(:disabled, [aria-disabled="true"], .absolute, .fixed, .sticky) { position: relative; }
     html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success, .btn-neutral, .btn-google):not(:disabled, [aria-disabled="true"])::after {
@@ -1390,7 +1401,7 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       box-shadow: var(--lit-inset);
     }
     html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success, .btn-neutral, .btn-google):not(:disabled, [aria-disabled="true"]):is(:active, [data-lit-state="pressed"]) {
-      box-shadow: var(--lit-rings);
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000);
     }
     html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success, .btn-neutral, .btn-google):not(:disabled, [aria-disabled="true"]):is(:active, [data-lit-state="pressed"])::after {
       box-shadow: var(--lit-inset-pressed);
@@ -1402,8 +1413,8 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       outline: 2px solid color-mix(in srgb, var(--color-cta) 70%, transparent);
       outline-offset: 2px;
     }
-    html[data-surface-style="glass"] .badge { box-shadow: var(--lit-badge); }
-    html[data-surface-style="glass"] .input-field { box-shadow: var(--lit-rings), var(--lit-input); }
+    html[data-surface-style="glass"] .badge { box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--lit-badge); }
+    html[data-surface-style="glass"] .input-field { box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--lit-input); }
 
     /* THE GLASS SIDEBAR (Studio.sidebar_style = :glass, components/_sidebar_panel glass: true).
        A rounded panel floats off the page's edge with the page blurred through it.

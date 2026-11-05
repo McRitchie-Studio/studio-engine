@@ -22,6 +22,14 @@ const SPECIMENS = `
   <div class="fixed inset-0 -z-10"><div id="modal" class="card p-4">Modal</div></div>
   <div id="menu" class="card absolute">Menu</div>
   <div class="page-header" id="bar" data-stuck>Bar</div>
+  <div id="tone" class="card p-4 border-warning/50 bg-warning/5">Warning</div>
+  <div id="gate" class="card p-5 border-2 border-danger">Paused</div>
+  <div id="plain" class="card p-5 border-2">Plain</div>
+  <div id="ringed" class="card ring-2 ring-primary">Selected</div>
+  <div id="panel" class="bg-surface rounded-xl border border-subtle border-primary/60 ring-1 ring-primary/30">Panel</div>
+  <div id="field" class="card focus-within:border-primary"><input id="fieldInput"></div>
+  <button id="ringbtn" class="btn btn-neutral ring-2 ring-primary">Go</button>
+  <input id="ringinput" class="input-field ring-2 ring-primary">
 `;
 
 const open = async (page) => {
@@ -167,6 +175,50 @@ test("cards turn translucent, while a modal and a menu stay solid", async ({ pag
   expect(alpha(await css(page, "card", "backgroundColor"))).toBeLessThan(1);
   expect(alpha(await css(page, "modal", "backgroundColor"))).toBe(1);
   expect(alpha(await css(page, "menu", "backgroundColor"))).toBe(1);
+});
+
+// The glass must not overwrite meaning: a tone, a tone border or a ring reads the same with it on.
+const ownLook = (page) => page.evaluate(() => Object.fromEntries(["tone", "gate", "panel"].map((id) => {
+  const css = getComputedStyle(document.getElementById(id));
+  return [id, { border: css.borderTopColor, width: css.borderTopWidth }];
+})));
+
+test("a toned card keeps its tint and its border, and a tone stays apart from a plain card", async ({ page }) => {
+  await open(page);
+  const before = await ownLook(page);
+  const tint = await css(page, "tone", "backgroundColor");
+  expect(before.gate.border, "the classes compile, or this test proves nothing").not.toBe(await css(page, "plain", "borderTopColor"));
+
+  await optIn(page);
+
+  expect(await ownLook(page)).toEqual(before);
+  expect(await css(page, "tone", "backgroundColor")).toBe(tint);
+  expect(alpha(await css(page, "plain", "backgroundColor")), "control: a plain card did turn to glass").toBeLessThan(1);
+});
+
+test("a ring survives on a card, a panel, a button and an input", async ({ page }) => {
+  await open(page);
+  const ringOf = (id) => css(page, id, "boxShadow");
+  const before = {};
+  for (const id of ["ringed", "panel", "ringbtn", "ringinput"]) before[id] = await ringOf(id);
+  await optIn(page);
+
+  for (const id of ["ringed", "panel", "ringbtn", "ringinput"]) {
+    const after = await ringOf(id);
+    // The ring is the first list member with a spread and no blur: "<color> 0px 0px 0px Npx".
+    const ring = /(?:rgba?\([^)]*\)|oklab\([^)]*\)|oklch\([^)]*\)|color\([^)]*\)) 0px 0px 0px [12]px/.exec(before[id]);
+    expect(ring, `${id} has a ring before the opt-in`).not.toBeNull();
+    expect(after, `${id} keeps it`).toContain(ring[0]);
+  }
+});
+
+test("a card's focus-within border still shows", async ({ page }) => {
+  await open(page);
+  await optIn(page);
+  const rest = await css(page, "field", "borderTopColor");
+  await page.locator("#fieldInput").focus();
+
+  expect(await css(page, "field", "borderTopColor")).not.toBe(rest);
 });
 
 test("badges and inputs take their own light, and a stuck header is a glass bar", async ({ page }) => {
