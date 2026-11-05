@@ -1,6 +1,6 @@
 <%#  Theme section of the living style guide (admin/style) — the LANDING section.
-     Theme owns "the colors": it leads with the 7 role tokens/swatches, then the
-     editor with a live dark/light preview, then the logos, the semantic tokens and
+     Theme owns "the colors": it leads with the role editor, which names each role's CSS
+     variable and the derived tokens, with a live dark/light preview, then the logos, the semantic tokens and
      the type. GET /admin/theme redirects here.
      
      Save-in-place: this section intercepts Save + Regenerate and submits them via
@@ -42,17 +42,14 @@
   # Seed the live-preview editor with role -> hex, resolved from saved values.
   seed_colors = roles.index_with { |role| current_hex.call(role) }
 
-  # The 7 role tokens read live off the resolved theme (cta/text/border-strong
-  # are the semantic names — there is no --color-heading var).
-  token_swatches = [
-    ["--color-cta",           "CTA / primary"],
-    ["--color-surface",       "Surface"],
-    ["--color-success",       "Success"],
-    ["--color-danger",        "Danger"],
-    ["--color-warning",       "Warning"],
-    ["--color-text",          "Heading / text"],
-    ["--color-border-strong", "Border (strong)"]
-  ]
+  # Each role's CSS variable (there is no --color-heading or --color-primary var for a page to
+  # paint with: cta and text are the semantic names). Dark and light are each theme's page.
+  role_vars = { primary: "--color-cta", dark: "--color-page (dark)", light: "--color-page (light)", success: "--color-success",
+                warning: "--color-warning", danger: "--color-danger", accent: "--color-accent" }
+
+  # Not roles: Studio::ThemeResolver works these out from the roles, so they read here and
+  # no one edits them.
+  derived_tokens = [["Surface", "--color-surface"], ["Text", "--color-text"], ["Border (strong)", "--color-border-strong"]]
 
   csrf_ok = respond_to?(:protect_against_forgery?) && protect_against_forgery?
 %>
@@ -77,26 +74,6 @@
 
   <%= render "style/type_ladder" %>
 
-  <%# ---- The colors — the role tokens/swatches (Theme owns these) ---------- %>
-  <div class="space-y-3">
-    <p class="label-upper">The colors — 7 role tokens</p>
-    <p class="text-muted text-sm max-w-2xl">
-      Read live off this app's theme via <code class="font-mono text-2xs">var(--color-*)</code>. Change
-      the app or its light/dark mode and every swatch (and every specimen on this page) follows.
-    </p>
-    <div class="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-      <% token_swatches.each do |var, label| %>
-        <div class="card overflow-hidden">
-          <div class="h-16 border-b border-subtle" style="background: var(<%= var %>)"></div>
-          <div class="p-3 space-y-0.5">
-            <p class="text-sm text-heading font-medium"><%= label %></p>
-            <code class="font-mono text-2xs text-muted break-all"><%= var %></code>
-          </div>
-        </div>
-      <% end %>
-    </div>
-  </div>
-
   <div class="grid gap-6 lg:grid-cols-2">
     <%# ---- Role-color editor (posts to /admin/theme, intercepted in place) - %>
     <form action="/admin/theme" method="post" accept-charset="UTF-8" class="card p-6 space-y-4"
@@ -106,6 +83,7 @@
         <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>" autocomplete="off">
       <% end %>
       <h3 class="type-h4 text-heading">Role colors</h3>
+      <p class="text-muted text-sm">Every specimen on this page reads these through its CSS variable, so it follows the app and its light or dark mode.</p>
 
       <% roles.each do |role| %>
         <% db_col = db_col_for.call(role) %>
@@ -121,6 +99,7 @@
             <div class="flex items-center gap-2">
               <span class="text-heading font-medium text-sm"><%= role.to_s.titleize %></span>
               <% if has_custom %><span class="text-xs text-muted">(custom)</span><% end %>
+              <% if role_vars[role.to_sym] %><code class="font-mono text-2xs text-muted truncate"><%= role_vars[role.to_sym] %></code><% end %>
             </div>
             <input type="text"
                    name="theme_setting[<%= db_col %>]"
@@ -136,6 +115,17 @@
           <% end %>
         </div>
       <% end %>
+
+      <div class="pt-4 border-t border-subtle space-y-2" data-test="style-derived-tokens">
+        <p class="label-upper">Derived, read only</p>
+        <% derived_tokens.each do |label, var| %>
+          <div class="flex items-center gap-4">
+            <div class="w-10 h-6 rounded border border-subtle shrink-0" style="background: var(<%= var %>)"></div>
+            <span class="text-heading font-medium text-sm"><%= label %></span>
+            <code class="font-mono text-2xs text-muted truncate"><%= var %></code>
+          </div>
+        <% end %>
+      </div>
 
       <div class="pt-4 border-t border-subtle">
         <button type="submit" class="btn btn-primary" :disabled="saving"
