@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.129.0 — 2026-11-05
+
 ### Changed
 
 - **Tricks starts with the buttons, then what you can add to them.** A new Button tricks group
@@ -59,6 +61,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
     to be let go.
   - A stale page says so. A refused token reads "This page has expired" with a reload hint on
     the voice line and the typed error, and a refused send keeps its words in the box.
+
 ## 0.128.0 — 2026-11-05
 
 ### Fixed
