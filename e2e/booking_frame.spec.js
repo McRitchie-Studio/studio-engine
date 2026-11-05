@@ -427,10 +427,10 @@ test("a page's own booking link opens the same popup, and the backdrop closes it
 
 // A MODIFIED CLICK OPENS A TAB, AND THE BROWSER'S OWN TARGET LIST SAYS SO. Do not go
 // back to context.waitForEvent("page"). Playwright 1.62.1 sometimes never fires that
-// event for a tab Chromium did open. It failed this spec on two `accepted` runs, and
-// a slow machine shows it about once in 50 clicks, on a bare page with no engine code
-// too: at that miss Chromium listed a new page target at the link's URL, and its
-// request had gone out, but context.pages() stayed at one for as long as the test ran.
+// event for a tab Chromium did open. It failed this spec on two `accepted` runs.
+// Linux Chromium held to 0.4 of a CPU shows it about once in 80 clicks, on a bare page
+// with no engine code too. At that miss Chromium listed a new page target at the
+// link's URL and its request had gone out, but context.pages() still held one page.
 //
 // So this reads what the visitor gets: one new tab, at this URL. This lane is
 // Chromium only (playwright.config.js), so the browser's protocol is there to ask.
