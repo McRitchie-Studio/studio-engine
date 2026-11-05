@@ -17,8 +17,10 @@ const { watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive } = requ
 //   - "page-header" removed from LAZY: 7 red, every spec that needs the controller.
 //   - revealOpenTab not called: 1 red, the open tab.
 //   - the failed-load selector dropped from the bar's rule: 1 red, the failed load.
-//   - no fix to the title's layout (before this spec's fix): 1 red, the long title,
-//     on the page's sideways overflow.
+//   - the row does not wrap: 1 red, the long title, on the tabs' room.
+//   - the tabs' floor back to 0: 1 red, the long title, on the tabs' room.
+//   - the line clamp removed: 1 red, the long title, on its three lines.
+//   - overflow-wrap removed: 1 red, the long title, on the page's sideways overflow.
 //   - the flex and grid measure removed from the controller: 1 red, the parents, on
 //     the bar at rest.
 
@@ -270,6 +272,7 @@ test("a long title wraps inside the page and leaves the tabs reachable, at 320, 
   for (const width of [320, 390, 1280]) {
     const viewport = { width, height: 800 };
     await expectLongTitleHolds(page, viewport, { title: words, right: "tabs" }, `${width} words, tabs`);
+    await expectLongTitleHolds(page, viewport, { title: "Reconciliation Run", right: "tabs" }, `${width} fits but leaves little, tabs`);
     await expectLongTitleHolds(page, viewport, { title: unbroken, right: "tabs", meta: "1" }, `${width} unbroken, meta, tabs`);
     await expectLongTitleHolds(page, viewport, { title: words, right: "actions" }, `${width} words, action`);
     await expectLongTitleHolds(page, viewport, { title: unbroken, right: "none" }, `${width} unbroken, title only`);

@@ -1173,7 +1173,12 @@
 # keep the strip alone -> all three snapshot specs on the plain path; remove the partial's
 # x-transition attributes -> the slide spec reads 0 frames between on-screen and off-screen.
 #   npx playwright test --list                                             -> 536
-total_specs: 536
+#
+# 536 -> 538: e2e/page_header.spec.js, two more. A long title's boxes at 320, 390 and 1280, and
+# the bar at rest in a flex or grid parent, depend on layout and a measured place, so neither is
+# in the response bytes. Their controls are listed at the top of that file.
+#   npx playwright test --list                                             -> 538
+total_specs: 538
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1488,7 +1493,10 @@ total_specs: 536
 #
 # 526 -> 536: e2e/sidebar_turbo_snapshot.spec.js, named above.
 #   npx playwright test --list                                             -> 536 tests, 74 files
-executed: 536
+#
+# 536 -> 538: e2e/page_header.spec.js, named above.
+#   npx playwright test --list                                             -> 538 tests, 74 files
+executed: 538
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
