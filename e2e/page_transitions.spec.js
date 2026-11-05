@@ -148,25 +148,54 @@ function readMidway(page) {
   });
 }
 
+// The share of the frame painted the page's own color, and the share painted black. The lab's
+// pages are mostly blank, so a page shaded by anything behind it reads as a low first share.
+function shares(page, shot, color) {
+  return page.evaluate(async ([encoded, css]) => {
+    const [red, green, blue] = css.match(/\d+/g).map(Number);
+    const blob = await (await fetch(`data:image/png;base64,${encoded}`)).blob();
+    const bitmap = await createImageBitmap(blob);
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const context = canvas.getContext("2d");
+    context.drawImage(bitmap, 0, 0);
+    const { data } = context.getImageData(0, 0, bitmap.width, bitmap.height);
+    let same = 0;
+    let black = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (Math.abs(data[i] - red) + Math.abs(data[i + 1] - green) + Math.abs(data[i + 2] - blue) <= 3) same += 1;
+      if (data[i] + data[i + 1] + data[i + 2] <= 3) black += 1;
+    }
+    const total = data.length / 4;
+    return { same: same / total, black: black / total };
+  }, [shot.toString("base64"), color]);
+}
+
+async function setTheme(page, theme) {
+  await page.evaluate((dark) => { document.documentElement.classList.toggle("dark", dark); }, theme === "dark");
+}
+
 for (const theme of ["dark", "light"]) {
   test(`a slide stays opaque over the page color, ${theme} theme`, async ({ page }) => {
-    await open(page, `direction=left&theme=${theme}`);
-    await page.evaluate((value) => { document.documentElement.dataset.theme = value; }, theme);
+    await open(page, "direction=left");
+    await setTheme(page, theme);
     await pausedMidway(page);
     const midway = await readMidway(page);
     expect(midway.oldOpacity).toBe("1");
     expect(midway.newOpacity).toBe("1");
-    expect(midway.backdrop).not.toBe("rgb(0, 0, 0)");
     expect(midway.backdrop).toBe(midway.page);
+    const painted = await shares(page, await page.screenshot(), midway.page);
+    expect(painted.same, "blank page reads as the page color mid-move").toBeGreaterThan(0.5);
+    expect(painted.black).toBeLessThan(0.01);
   });
 
   test(`an unfold has the page color behind it, ${theme} theme`, async ({ page }) => {
-    await open(page, `direction=right&style=unfold&theme=${theme}`);
-    await page.evaluate((value) => { document.documentElement.dataset.theme = value; }, theme);
+    await open(page, "direction=right&style=unfold");
+    await setTheme(page, theme);
     await pausedMidway(page);
     const midway = await readMidway(page);
-    expect(midway.backdrop).not.toBe("rgb(0, 0, 0)");
     expect(midway.backdrop).toBe(midway.page);
+    const painted = await shares(page, await page.screenshot(), midway.page);
+    expect(painted.black, "no black wedge").toBeLessThan(0.01);
   });
 }
 
