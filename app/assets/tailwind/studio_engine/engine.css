@@ -1160,8 +1160,8 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
        --glass-icon-size, --glass-icon-gap between icon and label, and --glass-section-gap,
        which sets the space under a section and above its header and from which the title and
        Log out padding derive. A row's no-jump description needs no rule of its own: the 18px
-       label and 14px description take 32px when the label lifts its usual 8px, so a 44px row
-       leaves about 6px above and below them.
+       label and 14px description take 32px, and with the lift at 7px a 44px row leaves 6px above
+       and below them.
 
        THE PHONE gets a narrower inset, the full width and a lighter blur, which costs less
        through the slide. */
@@ -1177,6 +1177,7 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       --glass-icon-size: 1.375rem;
       --glass-icon-gap: 0.625rem;
       --glass-section-gap: 1rem;
+      --sidebar-row-lift: 0.4375rem;
       --glass-fill: rgb(250 249 253 / 0.97);
       --glass-thin-fill: rgb(255 255 255 / 0.72);
       --glass-filter: blur(24px) saturate(150%) brightness(1.15);
@@ -1332,23 +1333,23 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
     [data-sidebar-row-label] { transition: transform 140ms ease-in; }
     [data-sidebar-row-described]:focus-visible [data-sidebar-row-label],
     [data-sidebar-row-described][aria-disabled="true"]:focus [data-sidebar-row-label] {
-      transform: translateY(-0.5rem);
+      transform: translateY(calc(-1 * var(--sidebar-row-lift, 0.5rem)));
       transition: transform 200ms ease-out 150ms;
     }
     [data-sidebar-row-described]:focus-visible [data-sidebar-row-desc],
     [data-sidebar-row-described][aria-disabled="true"]:focus [data-sidebar-row-desc] {
       opacity: 1;
-      transform: translateY(-0.5rem);
+      transform: translateY(calc(-1 * var(--sidebar-row-lift, 0.5rem)));
       transition: opacity 200ms ease-out 150ms, transform 200ms ease-out 150ms;
     }
     @media (hover: hover) {
       [data-sidebar-row-described]:hover [data-sidebar-row-label] {
-        transform: translateY(-0.5rem);
+        transform: translateY(calc(-1 * var(--sidebar-row-lift, 0.5rem)));
         transition: transform 200ms ease-out 150ms;
       }
       [data-sidebar-row-described]:hover [data-sidebar-row-desc] {
         opacity: 1;
-        transform: translateY(-0.5rem);
+        transform: translateY(calc(-1 * var(--sidebar-row-lift, 0.5rem)));
         transition: opacity 200ms ease-out 150ms, transform 200ms ease-out 150ms;
       }
     }
@@ -1361,7 +1362,7 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       [data-sidebar-row-described]:hover [data-sidebar-row-desc],
       [data-sidebar-row-described]:focus-visible [data-sidebar-row-desc],
       [data-sidebar-row-described][aria-disabled="true"]:focus [data-sidebar-row-desc] {
-        transform: translateY(-0.5rem);
+        transform: translateY(calc(-1 * var(--sidebar-row-lift, 0.5rem)));
         transition: opacity 200ms ease-out 150ms;
       }
     }
