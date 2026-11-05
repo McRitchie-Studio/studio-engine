@@ -6,6 +6,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Changed
 
+- **The `/admin/style` copy is trimmed.** Each section keeps at most one short sentence of intro,
+  and the notes under specimens are cut the same way. Controls, specimens and error messages are
+  unchanged. The hidden copy-to-agent references on the modal cards are unchanged too.
+
 - **A bad or missing CSRF token on a JSON or `Accept: */*` request is now a 422 with no ErrorLog
   row, on every controller using `Studio::ErrorHandling`.** The catch-all answered JSON 500 and
   wrote a row. It now answers `422 {error, reason: "invalid_token"}` in every environment, and a
