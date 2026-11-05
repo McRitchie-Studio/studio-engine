@@ -7,11 +7,7 @@
     to a 404. -%>
 <section id="components" class="section-target space-y-6">
   <%= render "studio/section_header", title: "Components" %>
-  <div class="space-y-1">
-    <p class="text-muted text-sm max-w-2xl">
-      The engine's ViewComponent classes, one preview per state, in the component gallery.
-    </p>
-  </div>
+  <p class="text-muted text-sm max-w-2xl">One preview per state, in the component gallery.</p>
 
   <% if Studio.lookbook_mounted? %>
     <ul class="grid gap-4 sm:grid-cols-2" data-component-previews>

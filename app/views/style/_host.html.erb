@@ -92,17 +92,7 @@
      opposite of what a living style guide is for. %>
 <section id="host-modals" class="section-target space-y-8" x-data="{}">
   <%= render "studio/section_header", title: Studio.app_name %>
-  <div class="space-y-1">
-    <p class="text-muted text-sm max-w-2xl">
-      This app&rsquo;s own modals, contributed by
-      <code class="font-mono text-2xs bg-inset px-1.5 py-0.5 rounded">app/views/style/host/_modals.html.erb</code>.
-      Every section above belongs to the engine and is inherited; everything
-      here belongs to <%= Studio.app_name %> and ships with it. These specimens
-      drive the app&rsquo;s <strong>real</strong>
-      <code class="font-mono text-2xs bg-inset px-1.5 py-0.5 rounded">$store.modals</code>
-      host, so the card that opens here is the card that opens in production.
-    </p>
-  </div>
+  <p class="text-muted text-sm max-w-2xl">This app&rsquo;s own modals, from <code class="font-mono text-2xs">app/views/style/host/_modals.html.erb</code>.</p>
 
   <%# The app's content. Reached only when it resolves - style/index.html.erb
       owns that guard, because the section nav needs the same answer. %>

@@ -102,7 +102,8 @@ class StylePageTest < ActiveSupport::TestCase
       assert_includes first["class"].split, "section-header", "#{id}: sticky travels only inside its parent, so it is a direct child"
       assert first.has_attribute?("data-pin-section"), id
       assert_nil first["data-pin"], id
-      assert_equal title, first.at_css("h2.section-header-title")&.text
+      assert_equal "h2", first.name, id
+      assert_equal title, first.text.strip
       assert_includes first["style"], "--pin-section-top", id
       assert_nil section["style"], "#{id}: the class owns the scroll margin"
     end
@@ -722,7 +723,7 @@ class StylePageTest < ActiveSupport::TestCase
     # WHY THE ASSERTION IS POSITIVE AND NOT A REFUTE. The version this replaces
     # was `refute_includes html, "SPL token"`, guarding against framing the token
     # as a wallet-held SPL token. The rendered prose states the fact by NEGATING
-    # it — "not a fungible SPL token" — so the refute would fail on the correct
+    # it — "not a wallet SPL token" — so the refute would fail on the correct
     # copy. A substring refute cannot tell a claim from its denial; assert the
     # claim you want instead.
     assert_includes html, "program-owned",

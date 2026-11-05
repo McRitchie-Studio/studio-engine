@@ -124,9 +124,7 @@
         <%= render layout: "style/specimen",
               locals: { klass: "studio/_section_header (#{state.downcase})",
                         usage: %(<section id="modals" class="section-target">\n  <%= render "studio/section_header", title: "Modals" %\>\n  ...\n</section>) } do %>
-          <%= tag.div(class: "section-header px-4", data: data) do %>
-            <p class="section-header-title">Modals</p>
-          <% end %>
+          <%= tag.p("Modals", class: "section-header px-4", data: data) %>
         <% end %>
       <% end %>
     </div>

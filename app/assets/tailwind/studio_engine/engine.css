@@ -390,15 +390,20 @@ body.modal-open .studio-app-banner {
 }
 
 @utility section-header {
+  @apply text-heading;
   position: relative;
-  display: flex;
-  align-items: center;
   min-width: 0;
   min-height: var(--section-header-h);
   padding-block: 0.25rem;
   margin-block-end: 0.25rem;
   border-block: 1px solid transparent;
   background-color: transparent;
+  font-size: calc(var(--type-base, 16px) * 1.25);
+  font-weight: 700;
+  line-height: 1.3;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   transition: background-color 150ms ease, border-color 150ms ease;
 
   html[data-pin-live] & {
@@ -413,28 +418,21 @@ body.modal-open .studio-app-banner {
   }
 }
 
-@utility section-header-title {
-  @apply text-heading;
-  font-size: calc(var(--type-base, 16px) * 1.25);
-  font-weight: 700;
-  line-height: 1.3;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
+/* Where a jump lands. A jump goes deep, so what counts is the stack once PINNED, with the
+   navbar compact and the page row stuck: heights, not --pin-section-top, whose value at the
+   top of the page holds the row's rest place and whatever scrolls away above it. So this one
+   composes, which a thing placed on screen must not: a margin is read once, at the jump. Less
+   the pixel that lets the header leave its place, so its title shows on the bar.
 
-/* Where a jump lands. A section's top one pixel past the header's line: the header has left
-   its place, so its title shows on the bar. A target inside a section: a bar's height lower,
-   clear of the section's own bar. The fallback is for a page the publisher has not reached.
-   A jump from the top of the page reads this while the line is still low, and studio/pinned_stack
-   lands it again once the line has risen. */
+   A JUMP FROM THE TOP OF THE PAGE reads the navbar still tall, and lands by the navbar's
+   collapse below the line. Landing short is safe, the title shows. Landing past is safe too,
+   since the bar holds the title. A target inside a section: a bar's height lower. */
 @utility section-target {
-  scroll-margin-top: calc(var(--pin-section-top, calc(var(--nav-h, 0px) + 5rem)) - 1px);
+  scroll-margin-top: calc(var(--nav-h, 5rem) + var(--pin-page-h, 0px) - 1px);
 }
 
 @utility section-subtarget {
-  scroll-margin-top: calc(var(--pin-section-top, calc(var(--nav-h, 0px) + 5rem)) + var(--section-header-h));
+  scroll-margin-top: calc(var(--nav-h, 5rem) + var(--pin-page-h, 0px) + var(--section-header-h));
 }
 
 /* -- Scrims: tints and shades ----------------------------------------------

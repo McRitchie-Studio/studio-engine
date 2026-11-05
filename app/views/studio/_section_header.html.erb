@@ -6,8 +6,9 @@
     inside its parent, and that is what gives the swap: inside a wrapper div, it would
     leave with the wrapper. No backdrop-filter, transform or overflow on an ancestor.
 
-      title      the heading's text.
-      level      the heading's tag. A page should stick one level only: one bar at a time.
+      title      the heading's text. The heading is the sticky element, so an intro can
+                 follow as its next sibling.
+      level      the tag. A page should stick one level only: one bar at a time.
       row_class  the bleed. The default fits a container with px-4, as the page row's does.
 
     AT REST a normal title. STUCK it takes the bar. Its box never changes between the two.
@@ -16,8 +17,7 @@
     one layer, `section`, and only the stuck one counts (studio/pinned_stack, stuckSection).
     So it positions off --pin-section-top, which also stands when none is stuck. Anything
     under the stack, such as a table's sticky header, sits under it with no edit. %>
-<%= tag.div(class: "section-header #{row_class}".strip,
+<%= content_tag(level, title,
+      class: "section-header #{row_class}".strip,
       style: "top: var(--pin-section-top, var(--nav-bottom, var(--nav-h, 0px))); z-index: calc(var(--z-sticky, 30) - 1)",
-      data: { pin_section: "" }) do %>
-  <%= content_tag(level, title, class: "section-header-title") %>
-<% end %>
+      data: { pin_section: "" }) %>

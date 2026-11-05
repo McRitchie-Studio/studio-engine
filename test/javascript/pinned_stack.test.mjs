@@ -405,7 +405,7 @@ test("the publisher puts the bar on the stuck header alone, and a swap keeps the
   globalThis.performance = { now: () => 1000 }
   globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
   globalThis.window = { ...win, ResizeObserver: globalThis.ResizeObserver, requestAnimationFrame: (fn) => fn(),
-    location: { hash: "" }, addEventListener: (type, fn) => { if (type === "scroll") scroll.push(fn) } }
+    addEventListener: (type, fn) => { if (type === "scroll") scroll.push(fn) } }
   try {
     const mod = await freshModule()
     mod.startPinnedStack()
@@ -436,7 +436,7 @@ test("a publish that moved a layer's top asks for one more frame, and it ends", 
   globalThis.document = doc
   globalThis.performance = { now: () => 1000 }
   globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
-  globalThis.window = { ResizeObserver: globalThis.ResizeObserver, location: { hash: "" }, requestAnimationFrame: (fn) => frames.push(fn),
+  globalThis.window = { ResizeObserver: globalThis.ResizeObserver, requestAnimationFrame: (fn) => frames.push(fn),
     addEventListener: (type, fn) => { if (type === "scroll") scroll.push(fn) } }
   const drain = () => { let n = 0; while (frames.length) { frames.shift()(); n++ } return n }
   try {
@@ -456,22 +456,20 @@ test("a publish that moved a layer's top asks for one more frame, and it ends", 
 
 // The publisher started in a page with no section headers, with the frames and the
 // timers held for the test to run.
-const heldPublisher = async ({ hash = "", navigationType = "navigate", getElementById = () => null } = {}) => {
+const heldPublisher = async () => {
   const saved = ["window", "document", "ResizeObserver", "performance", "setTimeout"].map((k) => [k, globalThis[k]])
   const nav = fakeEl({ name: "nav", h: 64, bottom: 64 })
   const page = fakeEl({ name: "page", h: 56, bottom: 120 })
   const doc = fakeDocument(nav, [page])
-  doc.getElementById = getElementById
-  doc.readyState = "complete"
   const frames = []
   const timers = []
   const scroll = []
   let now = 1000
   globalThis.document = doc
-  globalThis.performance = { now: () => now, getEntriesByType: () => [{ type: navigationType }] }
+  globalThis.performance = { now: () => now }
   globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
   globalThis.setTimeout = (fn) => { timers.push(fn); return timers.length }
-  globalThis.window = { ResizeObserver: globalThis.ResizeObserver, location: { hash }, requestAnimationFrame: (fn) => frames.push(fn),
+  globalThis.window = { ResizeObserver: globalThis.ResizeObserver, requestAnimationFrame: (fn) => frames.push(fn),
     addEventListener: (type, fn) => { if (type === "scroll") scroll.push(fn) } }
   const mod = await freshModule()
   mod.startPinnedStack()
@@ -498,11 +496,18 @@ test("a settle reads the layers once more, after it gives their copies back", as
   }
 })
 
-test("a load with a hash looks for its section; a reload or a Back keeps the reader's place", async () => {
-  for (const [type, landed] of [["navigate", true], ["reload", false], ["back_forward", false]]) {
-    let looked = false
-    const run = await heldPublisher({ hash: "#modals", navigationType: type, getElementById: () => { looked = true; return null } })
-    run.restore()
-    assert.equal(looked, landed, type)
+test("a hash the browser cannot decode does not stop the boot", async () => {
+  const run = await heldPublisher()
+  run.restore()
+  const saved = ["window", "document", "ResizeObserver", "performance"].map((k) => [k, globalThis[k]])
+  globalThis.document = fakeDocument(fakeEl({ name: "nav", h: 64, bottom: 64 }))
+  globalThis.performance = { now: () => 1000 }
+  globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
+  globalThis.window = { ResizeObserver: globalThis.ResizeObserver, location: { hash: "#100%" }, requestAnimationFrame: () => 0, addEventListener: () => {} }
+  try {
+    const mod = await freshModule()
+    assert.doesNotThrow(() => mod.startPinnedStack())
+  } finally {
+    saved.forEach(([k, v]) => { globalThis[k] = v })
   }
 })

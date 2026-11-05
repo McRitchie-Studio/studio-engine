@@ -198,14 +198,6 @@ export function stuckSection(rects, line) {
   return found;
 }
 
-// The line a section sits under: the composed top of the section layer.
-export function sectionLine(reading) {
-  for (var i = 0; i < reading.pins.length; i++) {
-    if (reading.pins[i].name === 'section') return reading.pins[i].top;
-  }
-  return null;
-}
-
 function measureSections(nodes, line) {
   // Below the short-screen floor, or before the publisher runs, the CSS leaves these in
   // the flow (engine.css, @utility section-header). A header scrolling past the line
@@ -704,41 +696,6 @@ export function startPinnedStack() {
     window.requestAnimationFrame(function () { queued = false; publishAll(); });
   }
 
-  // A JUMP FROM THE TOP OF THE PAGE LANDS LOW, AND IS LANDED AGAIN. The browser reads a
-  // section's scroll margin while the page row is at rest and the navbar tall. The row
-  // then sticks and the navbar collapses, so the line rises well above the title (114px
-  // on the style guide), and the section above keeps its bar over a gap. So for a moment
-  // after a jump to a section-target, or a load with a hash, a section that sits below
-  // its line is moved onto it. A reader who scrolls, taps or types first keeps their
-  // place, and a jump that was already right moves nothing.
-  var LANDING_MS = 1500;
-  var landing = 0;
-  function landAgain() {
-    var ticket = ++landing;
-    var id = decodeURIComponent(window.location.hash.slice(1));
-    var target = id && document.getElementById(id);
-    if (!target || !target.matches('.section-target')) return;
-    var loaded = null;
-    function frame() {
-      if (ticket !== landing) return;
-      // On a load the browser makes its own jump as loading ends, so the clock starts then.
-      if (loaded === null && document.readyState === 'complete') loaded = performance.now();
-      if (loaded !== null && performance.now() - loaded > LANDING_MS) return;
-      if (loaded !== null) {
-        var line = sectionLine(readStack());
-        var by = line === null ? 0 : target.getBoundingClientRect().top - (line - 1);
-        if (by > 0.5) window.scrollBy({ top: by, behavior: 'instant' });
-      }
-      window.requestAnimationFrame(frame);
-    }
-    window.requestAnimationFrame(frame);
-  }
-  function cancelLanding() { landing++; }
-  window.addEventListener('hashchange', landAgain);
-  ['wheel', 'touchstart', 'keydown', 'pointerdown'].forEach(function (type) {
-    window.addEventListener(type, cancelLanding, { passive: true });
-  });
-
   function invalidate() { forceWrite = true; publishAll(); }
   document.addEventListener('DOMContentLoaded', invalidate);
   document.addEventListener('turbo:load', invalidate);
@@ -769,7 +726,4 @@ export function startPinnedStack() {
   // there: publish now rather than wait for DOMContentLoaded, which also
   // covers a host that imports this after that event has fired.
   invalidate();
-  // Not on a reload or a Back: there the browser restores the reader's own place.
-  var entry = window.location && window.location.hash && performance.getEntriesByType('navigation')[0];
-  if (entry && entry.type === 'navigate') landAgain();
 }

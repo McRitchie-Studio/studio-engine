@@ -737,10 +737,12 @@ class E2eLabController < ActionController::Base
     render(template: "style/index")
   end
 
-  # The same guide under the real navbar, as a host draws it: the whole stack.
+  # The same guide under the real navbar, as a host draws it: the whole stack. ?turbo=1
+  # loads Turbo, as every host does: it moves a tab's hash by pushState and scrolls itself.
   def style_chrome
     @theme_setting = ThemeSetting.current if ThemeSetting.table_exists?
     bar_stack_locals
+    render(:style_chrome, layout: params[:turbo].present? ? "survey_turbo_lab" : "e2e_lab")
   end
 
   # studio/_page_header under the real chrome, for what no adopted page shows: a long

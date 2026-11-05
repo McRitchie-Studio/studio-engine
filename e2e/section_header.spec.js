@@ -8,22 +8,7 @@ const { watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive } = requ
 //
 // Every claim is a box or a computed style, so the response bytes cannot answer one.
 //
-// CONTROLS, each run against this file with the lab server restarted:
-//   - data-pin-section removed from the partial: no bar and no layer. 11 red.
-//   - the header wrapped in a div: it never sticks. 11 red.
-//   - the partial's top off --pin-stack-bottom: the bar chases its own edge. 6 red.
-//   - the stuck rule's fill removed: 1 red, the bar at rest and stuck.
-//   - section-target off --nav-h: 1 red, the tab's jump, on the section's top.
-//   - the glass rule for the row's square corners removed: 1 red, glass.
-//   - the short-screen floor removed: 1 red, the short screen.
-//   - the sticky gate removed from the CSS: 1 red, the page with no publisher.
-//   - no second landing on hashchange: 1 red, the tab's jump.
-//   - no landing on a load: 1 red, the load with a hash.
-//   - input does not cancel a landing: 2 red, the reader who scrolls, the tab's jump.
-//   - no publish after a settle: red on repeats, the style guide, on 8 of 12 runs before
-//     the fix. Its deterministic control is the unit test in pinned_stack.test.mjs.
-// A reload keeping its place, and the extra frame after a top moved, are controlled in
-// test/javascript/pinned_stack.test.mjs: the first is not stable to drive in the lane.
+// CONTROLS: TBD
 
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
@@ -90,48 +75,99 @@ test("the style guide: Style stays, Modals sits directly under it, and Tricks ta
   expect(errors).toEqual([]);
 });
 
-test("a tab's jump lands the section's title on the bar under the row, at both widths", async ({ page }) => {
-  for (const viewport of [DESKTOP, PHONE]) {
-    await open(page, STYLE, viewport);
-    const row = styleRow(page);
-    // Modals first: the jump from the top of the page is the one whose line rises after it.
-    for (const [label, id] of [["Modals", "modals"], ["Tricks", "tricks"], ["Tasks", "tasks"], ["Components", "components"], ["Theme", "theme"]]) {
-      await row.locator("a", { hasText: label }).click();
-      await page.waitForFunction((want) => location.hash === `#${want}`, id);
-      const bar = header(page, id);
-      await expect(row.locator("a[aria-current='true']"), `${label}: the highlight`).toHaveText(label);
-      if (id === "components") {
-        // The last section is too short to reach the line, so the one above keeps its bar.
-        await expect.poll(async () => (await topOf(bar)) >= (await bottomOf(page.locator("[data-pin-section][data-stuck]"))) - 1, `${label}: in view under the bar`).toBe(true);
-        expect(await topOf(bar)).toBeLessThan(viewport.height - 40);
-        continue;
-      }
-      await expect(page.locator("[data-pin-section][data-stuck]"), `${label}: only its own bar`).toHaveText(label);
-      await expectUnder(bar, row);
-      // The section's top is at the line, so its intro is in view and not jumped past.
-      await expect.poll(async () => Math.abs((await topOf(page.locator(`#${id}`))) - (await bottomOf(row))), `${label}: the section's top`).toBeLessThanOrEqual(2);
-    }
+// A jump goes by the stack once pinned. At the top of the page the navbar is still tall, so
+// the first jump lands by the navbar's collapse below the line, in the gap above the section.
+// Later jumps land on the line, with the title on the section's own bar.
+async function expectLanded(page, row, label, id, viewport, exact) {
+  const bar = header(page, id);
+  await expect(row.locator("a[aria-current='true']"), `${label}: the highlight`).toHaveText(label);
+  const title = await topOf(bar);
+  await expect.poll(async () => (await topOf(bar)) >= (await bottomOf(row)) - 1, `${label}: the title is below the row`).toBe(true);
+  expect(title, `${label}: the title is on the screen`).toBeLessThan(viewport.height - 40);
+  if (id === "components") return; // The last section is too short to reach the line.
+  // Whatever bar is up is this section's, or none: never the section above, cut by its end.
+  const stuck = page.locator("[data-pin-section][data-stuck]");
+  if (exact) await expect(stuck, `${label}: its own bar`).toHaveText(label);
+  else if (await stuck.count()) await expect(stuck, `${label}: no other section's bar`).toHaveText(label);
+  if (exact) {
+    await expectUnder(bar, row);
+    await expect.poll(async () => Math.abs((await topOf(page.locator(`#${id}`))) - (await bottomOf(row))), `${label}: the section's top`).toBeLessThanOrEqual(2);
   }
-});
+}
 
-test("a reader who scrolls back up right after a jump keeps their place", async ({ page }) => {
-  await open(page, STYLE, DESKTOP);
-  await styleRow(page).locator("a", { hasText: "Modals" }).click();
-  await page.mouse.move(400, 500);
-  // Up: the section is then below its line, which is what a landing would correct.
-  await page.mouse.wheel(0, -300);
-  await page.waitForTimeout(800);
-  const modalsTop = await page.locator("#modals").evaluate((el) => el.getBoundingClientRect().top);
-  const line = await page.evaluate(() => window.studioPinnedStack.read().layers.section.top);
-  expect(modalsTop, "not hauled back to the section's top").toBeGreaterThan(line + 100);
-});
+const TABS = [["Modals", "modals"], ["Tricks", "tricks"], ["Tasks", "tasks"], ["Components", "components"], ["Theme", "theme"]];
 
-test("a load with a hash lands the title on the bar too", async ({ page }) => {
+for (const [mode, url] of [["without Turbo", STYLE], ["under Turbo", `${STYLE}?turbo=1`]]) {
+  test(`a tab's jump shows the section's title under the row, on the right bar and tab, ${mode}`, async ({ page }) => {
+    const errors = watchPageErrors(page);
+    for (const viewport of [DESKTOP, PHONE]) {
+      await blockOffsiteRequests(page);
+      await page.setViewportSize(viewport);
+      await page.goto(url);
+      await page.waitForFunction(() => document.documentElement.hasAttribute("data-pin-live"));
+      const row = styleRow(page);
+      for (const [index, [label, id]] of TABS.entries()) {
+        await row.locator("a", { hasText: label }).click();
+        await page.waitForFunction((want) => location.hash === `#${want}`, id);
+        await page.waitForTimeout(500);
+        await expectLanded(page, row, label, id, viewport, index > 0);
+      }
+    }
+    expect(errors).toEqual([]);
+  });
+
+  test(`Back keeps the reader's place after two jumps, ${mode}`, async ({ page }) => {
+    await blockOffsiteRequests(page);
+    await page.setViewportSize(PHONE);
+    await page.goto(url);
+    await page.waitForFunction(() => document.documentElement.hasAttribute("data-pin-live"));
+    const row = styleRow(page);
+    await row.locator("a", { hasText: "Modals" }).click();
+    await page.waitForFunction(() => location.hash === "#modals");
+    await page.waitForTimeout(300);
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await page.waitForTimeout(300);
+    await row.locator("a", { hasText: "Tricks" }).click();
+    await page.waitForFunction(() => location.hash === "#tricks");
+    await page.waitForTimeout(300);
+    const before = await page.evaluate(() => window.scrollY);
+    await page.goBack();
+    await page.waitForFunction(() => location.hash === "#modals");
+    await page.waitForTimeout(800);
+    const held = await page.evaluate(() => window.scrollY);
+    await page.waitForTimeout(800);
+    expect(await page.evaluate(() => window.scrollY), "nothing moves the page after Back settles").toBe(held);
+    expect(held, "Back left the jump's place").toBeLessThan(before);
+  });
+
+  test(`a scroll right after a jump is the reader's or the app's, and holds, ${mode}`, async ({ page }) => {
+    await blockOffsiteRequests(page);
+    await page.setViewportSize(DESKTOP);
+    await page.goto(url);
+    await page.waitForFunction(() => document.documentElement.hasAttribute("data-pin-live"));
+    await styleRow(page).locator("a", { hasText: "Modals" }).click();
+    await page.waitForFunction(() => location.hash === "#modals");
+    await page.evaluate(() => window.scrollBy({ top: -300, behavior: "instant" }));
+    const held = await page.evaluate(() => window.scrollY);
+    await page.waitForTimeout(1800);
+    expect(await page.evaluate(() => window.scrollY)).toBe(held);
+  });
+}
+
+test("a load with a hash shows the title, with no error on a hash that cannot be decoded", async ({ page }) => {
+  const errors = watchPageErrors(page);
   await blockOffsiteRequests(page);
   await page.setViewportSize(DESKTOP);
   await page.goto(`${STYLE}#modals`);
-  await expect(page.locator("[data-pin-section][data-stuck]")).toHaveText("Modals");
-  await expectUnder(header(page, "modals"), styleRow(page));
+  await page.waitForTimeout(600);
+  const row = styleRow(page);
+  await expect(row.locator("a[aria-current='true']")).toHaveText("Modals");
+  await expect.poll(async () => (await topOf(header(page, "modals"))) >= (await bottomOf(row)) - 1).toBe(true);
+
+  await page.goto(`${LAB}#100%`);
+  await page.waitForFunction(() => document.documentElement.hasAttribute("data-pin-live"));
+  await expect(page.locator("header[data-nav-timeline-on], header")).toHaveCount(1);
+  expect(errors).toEqual([]);
 });
 
 test("a jump to a target inside a section lands below the section's bar", async ({ page }) => {
@@ -230,7 +266,7 @@ test("a long title stays on one line, and the phone's stack leaves the page its 
   await expect(bar).toHaveAttribute("data-stuck", "");
   const box = await bar.boundingBox();
   expect(box.height).toBeLessThanOrEqual(37);
-  const clipped = await bar.locator("h2").evaluate((el) => el.scrollWidth > el.clientWidth);
+  const clipped = await bar.evaluate((el) => el.scrollWidth > el.clientWidth);
   expect(clipped, "the title ends in an ellipsis").toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect((await bottomOf(bar)) / PHONE.height, "the stack takes under a quarter of a phone").toBeLessThan(0.25);

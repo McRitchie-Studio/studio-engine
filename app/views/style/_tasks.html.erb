@@ -65,23 +65,14 @@
 %>
 <section id="tasks" class="section-target space-y-8">
   <%= render "studio/section_header", title: "Tasks" %>
-  <div class="space-y-1">
-    <p class="text-muted text-sm max-w-2xl">
-      The shared board primitive that every board builds from &mdash; columns, cards, the
-      <code class="font-mono text-2xs">stage-*</code> badge palette, and the drag / optimistic
-      move + reorder. McRitchie Studio's <code class="font-mono text-2xs">/deployments</code> board is
-      the top-of-line; the specimen below is the <strong>real</strong>
-      <code class="font-mono text-2xs">studio/board/board</code> primitive in
-      <code class="font-mono text-2xs">demo: true</code> mode &mdash; drag a card, no save.
-    </p>
-  </div>
+  <p class="text-muted text-sm max-w-2xl">The real board primitive in demo mode, so a drag saves nothing.</p>
 
   <%# ---- The LIVE primitive (demo mode) --------------------------------- %>
   <%# demo: true → drag animates + toasts locally, nothing POSTs. %>
   <div class="space-y-3">
     <div class="flex items-center gap-2">
       <span class="badge" style="color: var(--color-success-ink); border-color: var(--color-success)">Live</span>
-      <p class="label-upper"><code class="font-mono text-2xs">studio/board/board</code> &middot; demo &mdash; drag a card between columns</p>
+      <p class="label-upper"><code class="font-mono text-2xs">studio/board/board</code> &middot; demo</p>
     </div>
     <%= render "studio/board/board",
           demo: true,
@@ -120,7 +111,7 @@
               data-test="chrome-archived-toggle">
         <span x-text="state.showArchived ? 'Hide archived' : 'Show archived'">Show archived</span>
       </button>
-      <span class="label-upper"><code class="font-mono text-2xs">header_slot</code> chrome &middot; binds to <code class="font-mono text-2xs">state.showArchived</code> &mdash; no outer wrapper</span>
+      <span class="label-upper"><code class="font-mono text-2xs">header_slot</code> &middot; binds to <code class="font-mono text-2xs">state.showArchived</code></span>
     </div>
   <% end %>
   <% chrome_kickoff = capture do %>
@@ -150,7 +141,7 @@
   <div class="space-y-3">
     <div class="flex items-center gap-2">
       <span class="badge" style="color: var(--color-primary); border-color: var(--color-primary)">Enriched</span>
-      <p class="label-upper"><code class="font-mono text-2xs">studio/board/board</code> &middot; 0.28.0 chrome &mdash; coloured counts, toggle-able column, archive re-parent</p>
+      <p class="label-upper"><code class="font-mono text-2xs">studio/board/board</code> &middot; coloured counts, toggle-able column, archive re-parent</p>
     </div>
     <%= render "studio/board/board",
           demo: true,
@@ -200,7 +191,7 @@
   <div class="space-y-3">
     <div class="flex items-center gap-2">
       <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">Grid + Lock</span>
-      <p class="label-upper"><code class="font-mono text-2xs">studio/board/board</code> &middot; DG (0.29.0) &mdash; two-level side&rarr;position grid, reorder within a lane, &#128274; pinned starters stay put</p>
+      <p class="label-upper"><code class="font-mono text-2xs">studio/board/board</code> &middot; two-level grid, reorder within a lane, &#128274; pinned starters</p>
     </div>
     <%= render "studio/board/board",
           demo: true,
@@ -246,17 +237,13 @@
 
   <%# ---- The stage palette ---------------------------------------------- %>
   <div class="space-y-3">
-    <p class="label-upper">Stage palette — the pipeline spine</p>
+    <p class="label-upper">Stage palette</p>
     <div class="flex flex-wrap gap-2">
       <% %w[stage-fresh stage-shaping stage-structured stage-refined stage-cohered stage-shipped stage-closed].each do |stage| %>
         <span data-stage="<%= stage %>"><%= render "components/badge", text: stage.sub("stage-", ""), scheme: stage %></span>
       <% end %>
     </div>
-    <p class="text-muted text-xs">
-      Seven stage roles from <code class="font-mono text-2xs">components/_badge</code>. Every pipeline
-      (tasks, deployments, and any future board) draws its columns from this one palette, so a card
-      reads the same wherever it lives.
-    </p>
+    <p class="text-muted text-xs">Every pipeline draws its columns from this palette.</p>
   </div>
 
   <%# ---- Standard vs custom -------------------------------------------- %>
@@ -267,12 +254,12 @@
         <p class="text-heading font-semibold text-sm">What every board inherits</p>
       </div>
       <ul class="text-secondary text-sm space-y-1 list-disc list-inside">
-        <li>Column layout + horizontal scroll with faded edges</li>
-        <li>The <code class="font-mono text-2xs">stage-*</code> badge palette + count chips (colour via <code class="font-mono text-2xs">count_class</code>)</li>
-        <li>Card chrome (<code class="font-mono text-2xs">.card</code>) and the drag / rank handle</li>
+        <li>Column layout and horizontal scroll</li>
+        <li>The <code class="font-mono text-2xs">stage-*</code> badges and count chips</li>
+        <li>Card chrome and the drag handle</li>
         <li>Empty-column drop state</li>
-        <li>Chrome-state home (<code class="font-mono text-2xs">board_state</code> + <code class="font-mono text-2xs">header_slot</code>) &mdash; filters/toggles without an outer wrapper</li>
-        <li>Toggle-able columns (<code class="font-mono text-2xs">show_expr</code>), a kickoff slot, and archive re-parent (<code class="font-mono text-2xs">archive_zone</code>)</li>
+        <li>Filters and toggles with no outer wrapper</li>
+        <li>Toggle-able columns, a kickoff slot and archive re-parent</li>
       </ul>
     </div>
     <div class="card p-5 space-y-2">
@@ -282,9 +269,9 @@
       </div>
       <ul class="text-secondary text-sm space-y-1 list-disc list-inside">
         <li>Which stages become columns</li>
-        <li>The card body — fields, chips, avatars, live timers</li>
-        <li>Filter/toggle logic + header actions, composed onto the shared chrome state</li>
-        <li>Live-update wiring (Turbo Streams on the deploy board)</li>
+        <li>The card body</li>
+        <li>Filter logic and header actions</li>
+        <li>Live updates</li>
       </ul>
     </div>
   </div>
