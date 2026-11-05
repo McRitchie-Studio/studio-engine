@@ -92,6 +92,28 @@ class StylePageTest < ActiveSupport::TestCase
     assert_equal 2, specimen.css(".page-header").size
   end
 
+  test "every section's title is a section header, first in its section, and joins no data-pin" do
+    doc = Nokogiri::HTML.fragment(render_index)
+    { "theme" => "Theme", "modals" => "Modals", "tricks" => "Tricks", "tasks" => "Tasks", "components" => "Components" }.each do |id, title|
+      section = doc.at_css("section##{id}")
+      first = section.element_children.first
+
+      assert_includes section["class"].split, "section-target", id
+      assert_includes first["class"].split, "section-header", "#{id}: sticky travels only inside its parent, so it is a direct child"
+      assert first.has_attribute?("data-pin-section"), id
+      assert_nil first["data-pin"], id
+      assert_equal title, first.at_css("h2.section-header-title")&.text
+      assert_includes first["style"], "--pin-section-top", id
+      assert_nil section["style"], "#{id}: the class owns the scroll margin"
+    end
+
+    specimen = doc.at_css("[data-section-header-specimen]")
+    assert specimen, "the Tricks section documents the primitive"
+    assert_equal 1, specimen.css(".section-header[data-stuck]").size
+    assert_empty specimen.css("[data-pin-section]"), "a specimen must not join the stack"
+    assert_empty doc.css("[style*='nav-h, 0px) + 5rem']"), "no hand-summed scroll margin is left on the page"
+  end
+
   test "the Theme section shows the app's logos" do
     before = Studio.theme_logos
     Studio.theme_logos = [{ file: "brand/mark.svg", title: "The Mark" }]
