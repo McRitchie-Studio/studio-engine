@@ -23,7 +23,7 @@
 # of this guard was defeated three times. So the gate reads the RECEIPT, where all of
 # them show up as the same arithmetic failure:
 #
-#     executed == total_specs
+#     executed == committed specs
 #
 # THE ARITHMETIC IS COMPUTED. `total_specs` and `executed` used to live in this file and
 # every spec add moved them by hand. Two open PRs that each added a spec conflicted on them,
@@ -1194,9 +1194,9 @@
 #
 # NOTE FOR ANYONE ADDING A BROWSER. Playwright counts one test per spec PER PROJECT.
 # Adding a `firefox` project to playwright.config.js does not add specs, but it
-# DOUBLES this number. That is the correct behaviour — the lane really would be
-# running twice the tests — and the reason it is called out is that the failure reads
-# as "5 more than the contract" rather than "you added a browser".
+# DOUBLES what the lane executes while the census stays put, so the gate goes red until
+# the census is taught to multiply. The failure reads as "N more than the census" rather
+# than "you added a browser".
 # Re-derived on THIS tree, never by arithmetic and never by taking a side of a merge:
 #   npx playwright test --list                                             -> 107 tests, 14 files
 #   npx playwright test --list --grep "@devnet"                            -> 0

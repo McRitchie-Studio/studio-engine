@@ -407,8 +407,9 @@ Also not covered:
 
 - **Cross-engine rendering and CSS-support divergence.** Adding projects to
   `playwright.config.js` is a three-line change if a real defect ever needs it.
-  Note it doubles `executed:` in the contract — Playwright counts one test per spec
-  per project.
+  Note it doubles what the lane executes while the census stays put, because
+  Playwright counts one test per spec per project. The census must learn to multiply
+  in the same change.
 - **Turbo navigation, except on the site footer pages and one survey spec.** The
   lab serves Alpine but no Turbo, so `turbo:load` / `turbo:render` listeners never
   fire and specs assert the synchronous first pass. The exceptions load the real
