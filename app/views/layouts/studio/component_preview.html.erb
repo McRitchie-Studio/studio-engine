@@ -3,7 +3,7 @@
     so a preview looks as it does in the app, and nothing else: no navbar, no
     session, no script. -%>
 <!DOCTYPE html>
-<html>
+<html<%= %( data-surface-style="glass").html_safe if Studio.surface_style == :glass %>>
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">

@@ -1,5 +1,5 @@
-// studio/page_transitions: the app-to-app page transition (Studio.page_transition_direction,
-// docs/PAGE_TRANSITIONS.md). Loaded by its own tag in layouts/studio/_head, only with the
+// studio/page_transitions: the app-to-app page transition (Studio.page_transition_direction and
+// Studio.page_transition_style, docs/PAGE_TRANSITIONS.md). Loaded by its own tag in layouts/studio/_head, only with the
 // setting on. It names a style on <html>, and engine.css draws it. It imports nothing.
 //
 // Turbo calls document.startViewTransition BEFORE turbo:before-render, and the browser takes
@@ -8,17 +8,20 @@
 // turbo:visit and from the response, never first at before-render.
 //
 // A full load is the other path to the same look. The new document draws the motion, so the old
-// one only plans it: at pageswap it names what it holds, draws the style here, and leaves it for
+// one only plans it: at pageswap it names what it holds, reads the style here, and leaves it for
 // studio/page_transition_reveal, the classic script that applies it at pagereveal.
 //
 // The effects are from the Codrops Page Transitions demo; the keyframes were written fresh.
 
-export const DIRECTIONS = Object.freeze({
-  left: Object.freeze(["fade-left", "unfold-right"]),
-  right: Object.freeze(["fade-right", "unfold-left"]),
-  top: Object.freeze(["fade-top", "unfold-bottom"]),
-  bottom: Object.freeze(["fade-bottom", "unfold-top"]),
+// The move each pair of settings plays: the first key is Studio.page_transition_style, the second
+// is Studio.page_transition_direction. An unfold is named for the way the new page turns, which
+// is the opposite of the way the page leaves.
+export const STYLES = Object.freeze({
+  slide: Object.freeze({ left: "slide-left", right: "slide-right", top: "slide-top", bottom: "slide-bottom" }),
+  unfold: Object.freeze({ left: "unfold-right", right: "unfold-left", top: "unfold-bottom", bottom: "unfold-top" }),
 })
+// Mirrors the default in lib/studio.rb, for a page with no style meta.
+export const DEFAULT_STYLE = "slide"
 
 // A same-page visit (a refresh, a poll, the second half of a redirect): the transition still
 // runs, and draws nothing.
@@ -29,31 +32,31 @@ export const FULL_LOAD_STYLE_KEY = "studio-page-transition-style"
 const MAX_READY_IMAGES = 12
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)"
 
-export function pickStyle(direction, random = Math.random) {
-  if (!Object.hasOwn(DIRECTIONS, direction)) return null
-  const pair = DIRECTIONS[direction]
-  return pair[Math.floor(random() * pair.length)]
+export function styleFor(direction, style) {
+  const moves = STYLES[Object.hasOwn(STYLES, style) ? style : DEFAULT_STYLE]
+  return Object.hasOwn(moves, direction) ? moves[direction] : null
 }
 
 // The style for one visit, STILL, or null to leave the swap alone (the engine's fade plays,
 // and a morph between two pages stands). An advance visit to the same path can bring a new
 // page, as a launch panel does when it gives way to the chat at its own address, so a name
 // the two share still morphs. A refresh replaces, and stays silent.
-export function planVisit({ direction, from, to, transitions, sharedName, advance }, random = Math.random) {
-  if (!transitions || !from || !to || !Object.hasOwn(DIRECTIONS, direction)) return null
+export function planVisit({ direction, style, from, to, transitions, sharedName, advance }) {
+  const move = styleFor(direction, style)
+  if (!transitions || !from || !to || !move) return null
   if (from === to) return advance && sharedName ? null : STILL
-  return sharedName ? null : pickStyle(direction, random)
+  return sharedName ? null : move
 }
 
 // The style a full load should play, or null for a plain load: planVisit's own rule, so the
 // two paths cannot differ. No morph, since the old page cannot read the new page's names
 // before its picture, and a browser with no activation entry has nothing to compare.
-export function planFullLoad({ direction, from, activation }, random = Math.random) {
+export function planFullLoad({ direction, style, from, activation }) {
   const url = activation && activation.entry && activation.entry.url
   if (!url) return null
   const to = new URL(url).pathname
-  const style = planVisit({ direction, from, to, transitions: true, sharedName: false }, random)
-  return style === STILL ? null : style
+  const move = planVisit({ direction, style, from, to, transitions: true, sharedName: false })
+  return move === STILL ? null : move
 }
 
 // Hands the style to the next document. Storage can refuse, and then the load is plain.
@@ -129,6 +132,11 @@ function readDirection(doc) {
   return meta ? meta.content : null
 }
 
+function readStyle(doc) {
+  const meta = doc.querySelector('meta[name="page-transition-style"]')
+  return meta ? meta.content : null
+}
+
 let installed = false
 
 export function installPageTransitions(doc) {
@@ -193,6 +201,7 @@ export function installPageTransitions(doc) {
     const sharedName = shareName(morphNames(doc), names)
     const style = planVisit({
       direction: readDirection(doc),
+      style: readStyle(doc),
       from,
       to: target,
       transitions: !!doc.startViewTransition && !win.matchMedia(REDUCED_MOTION).matches,
@@ -235,7 +244,7 @@ export function installPageTransitions(doc) {
   // The last moment on the old document. The browser takes its picture after this.
   win.addEventListener("pageswap", (event) => {
     const transition = event.viewTransition
-    const style = transition && planFullLoad({ direction: readDirection(doc), from, activation: event.activation })
+    const style = transition && planFullLoad({ direction: readDirection(doc), style: readStyle(doc), from, activation: event.activation })
     const left = leaveStyle(win, style)
     if (!transition) return
     if (!left) {

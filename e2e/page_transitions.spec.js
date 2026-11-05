@@ -8,16 +8,8 @@ const LAB = "/lab/page_transitions";
 const FADE_OUT = "vt-page-out";
 const PIXEL_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAEBgIApD5fRAAAAABJRU5ErkJggg==";
 
-async function record(page, randomValue = 0) {
-  await page.addInitScript((value) => {
-    // Only for the pick: Turbo draws its history ids from Math.random too, and a constant
-    // gives every history entry one id, which loses the scroll position on Back.
-    window.__random = value;
-    window.addEventListener("turbo:before-render", () => {
-      const real = Math.random;
-      Math.random = () => window.__random;
-      setTimeout(() => { Math.random = real; }, 0);
-    }, { capture: true });
+async function record(page) {
+  await page.addInitScript(() => {
     // Only the transition's own: a page's infinite animation refuses finish().
     window.transitionAnimations = () => document.getAnimations()
       .filter((a) => a.effect && (a.effect.pseudoElement || "").startsWith("::view-transition"));
@@ -42,7 +34,7 @@ async function record(page, randomValue = 0) {
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
-  }, randomValue);
+  });
 }
 
 const seen = (page) => page.evaluate(() => window.__seen);
@@ -53,9 +45,9 @@ async function go(page, testId = "other") {
   await load;
 }
 
-async function open(page, query, randomValue) {
+async function open(page, query) {
   await blockOffsiteRequests(page);
-  await record(page, randomValue);
+  await record(page);
   await page.route("**/e2e/img/pt-hung.png", () => {});
   await page.route("**/e2e/img/pt-failed.png", (route) => route.abort());
   await page.goto(`${LAB}?${query}`);
@@ -98,42 +90,142 @@ function expectPlayed(names, oldName, newName) {
   expect(names).toContain(`::view-transition-new(root) ${newName}`);
 }
 
-test("left plays its fade, then its unfold, moving left", async ({ page }) => {
+// The move on three visits in a row: one setting, one move, and no draw.
+async function expectTheOneMove(page, query, out, plays, never) {
+  await open(page, query);
+  for (let visit = 0; visit < 3; visit += 1) {
+    await page.evaluate(() => { window.__seen.length = 0; });
+    await go(page);
+    const names = await seen(page);
+    expectPlayed(names, out, plays);
+    expect(names).not.toContain(`::view-transition-new(root) ${never}`);
+  }
+}
+
+test("left with no style plays the slide, on every visit", async ({ page }) => {
   const errors = watchPageErrors(page);
-  await open(page, "direction=left", 0);
-  await go(page);
-  expectPlayed(await seen(page), "pt-out-left", "pt-in-from-right");
-  await page.evaluate(() => { window.__random = 0.99; window.__seen.length = 0; });
-  await go(page);
-  expectPlayed(await seen(page), "pt-out-left", "pt-unfold-right");
+  await expectTheOneMove(page, "direction=left", "pt-out-left", "pt-in-from-right", "pt-unfold-right");
   expect(errors).toEqual([]);
 });
 
-test("right plays its fade, then its unfold, moving right", async ({ page }) => {
-  await open(page, "direction=right", 0);
-  await go(page);
-  expectPlayed(await seen(page), "pt-out-right", "pt-in-from-left");
-  await page.evaluate(() => { window.__random = 0.99; window.__seen.length = 0; });
-  await go(page);
-  expectPlayed(await seen(page), "pt-out-right", "pt-unfold-left");
+test("left with style=unfold plays the unfold, on every visit", async ({ page }) => {
+  await expectTheOneMove(page, "direction=left&style=unfold", "pt-out-left", "pt-unfold-right", "pt-in-from-right");
 });
 
-test("top plays its fade, then its unfold, moving up", async ({ page }) => {
-  await open(page, "direction=top", 0);
-  await go(page);
-  expectPlayed(await seen(page), "pt-out-top", "pt-in-from-bottom");
-  await page.evaluate(() => { window.__random = 0.99; window.__seen.length = 0; });
-  await go(page);
-  expectPlayed(await seen(page), "pt-out-top", "pt-unfold-bottom");
+test("right with no style plays the slide, on every visit", async ({ page }) => {
+  await expectTheOneMove(page, "direction=right", "pt-out-right", "pt-in-from-left", "pt-unfold-left");
 });
 
-test("bottom plays its fade, then its unfold, moving down", async ({ page }) => {
-  await open(page, "direction=bottom", 0);
-  await go(page);
-  expectPlayed(await seen(page), "pt-out-bottom", "pt-in-from-top");
-  await page.evaluate(() => { window.__random = 0.99; window.__seen.length = 0; });
-  await go(page);
-  expectPlayed(await seen(page), "pt-out-bottom", "pt-unfold-top");
+test("right with style=unfold plays the unfold, on every visit", async ({ page }) => {
+  await expectTheOneMove(page, "direction=right&style=unfold", "pt-out-right", "pt-unfold-left", "pt-in-from-left");
+});
+
+test("top with no style plays the slide, on every visit", async ({ page }) => {
+  await expectTheOneMove(page, "direction=top", "pt-out-top", "pt-in-from-bottom", "pt-unfold-bottom");
+});
+
+test("top with style=unfold plays the unfold, on every visit", async ({ page }) => {
+  await expectTheOneMove(page, "direction=top&style=unfold", "pt-out-top", "pt-unfold-bottom", "pt-in-from-bottom");
+});
+
+test("bottom with no style plays the slide, on every visit", async ({ page }) => {
+  await expectTheOneMove(page, "direction=bottom", "pt-out-bottom", "pt-in-from-top", "pt-unfold-top");
+});
+
+test("bottom with style=unfold plays the unfold, on every visit", async ({ page }) => {
+  await expectTheOneMove(page, "direction=bottom&style=unfold", "pt-out-bottom", "pt-unfold-top", "pt-in-from-top");
+});
+
+// Stops the motion at its midpoint and reads what the browser computed.
+async function pausedMidway(page) {
+  const seenPaused = page.evaluate(() => new Promise((done) => {
+    const check = () => {
+      const running = window.transitionAnimations().filter((a) => (a.animationName || "").startsWith("pt-"));
+      if (running.length < 2) return requestAnimationFrame(check);
+      running.forEach((a) => { a.pause(); a.currentTime = 350; });
+      requestAnimationFrame(() => requestAnimationFrame(() => done()));
+    };
+    check();
+  }));
+  await page.locator('[data-test="other"]').first().click();
+  await seenPaused;
+}
+
+function readMidway(page) {
+  return page.evaluate(() => {
+    const read = (pseudo) => getComputedStyle(document.documentElement, pseudo);
+    return {
+      oldOpacity: read("::view-transition-old(root)").opacity,
+      newOpacity: read("::view-transition-new(root)").opacity,
+      backdrop: read("::view-transition").backgroundColor,
+      page: getComputedStyle(document.body).backgroundColor,
+    };
+  });
+}
+
+// The share of the frame painted the page's own color, and the share painted black. The lab's
+// pages are mostly blank, so a page shaded by anything behind it reads as a low first share.
+function shares(page, shot, color) {
+  return page.evaluate(async ([encoded, css]) => {
+    const [red, green, blue] = css.match(/\d+/g).map(Number);
+    const blob = await (await fetch(`data:image/png;base64,${encoded}`)).blob();
+    const bitmap = await createImageBitmap(blob);
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const context = canvas.getContext("2d");
+    context.drawImage(bitmap, 0, 0);
+    const { data } = context.getImageData(0, 0, bitmap.width, bitmap.height);
+    let same = 0;
+    let black = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (Math.abs(data[i] - red) + Math.abs(data[i + 1] - green) + Math.abs(data[i + 2] - blue) <= 3) same += 1;
+      if (data[i] + data[i + 1] + data[i + 2] <= 3) black += 1;
+    }
+    const total = data.length / 4;
+    return { same: same / total, black: black / total };
+  }, [shot.toString("base64"), color]);
+}
+
+async function setTheme(page, theme) {
+  await page.evaluate((dark) => { document.documentElement.classList.toggle("dark", dark); }, theme === "dark");
+}
+
+async function expectOpaqueSlide(page, theme) {
+  await open(page, "direction=left");
+  await setTheme(page, theme);
+  await pausedMidway(page);
+  const midway = await readMidway(page);
+  expect(midway.oldOpacity).toBe("1");
+  expect(midway.newOpacity).toBe("1");
+  expect(midway.backdrop).toBe(midway.page);
+  const painted = await shares(page, await page.screenshot(), midway.page);
+  expect(painted.same, "blank page reads as the page color mid-move").toBeGreaterThan(0.5);
+  expect(painted.black).toBeLessThan(0.01);
+}
+
+async function expectUnfoldOverPageColor(page, theme) {
+  await open(page, "direction=right&style=unfold");
+  await setTheme(page, theme);
+  await pausedMidway(page);
+  const midway = await readMidway(page);
+  expect(midway.backdrop).toBe(midway.page);
+  const painted = await shares(page, await page.screenshot(), midway.page);
+  expect(painted.black, "no black wedge").toBeLessThan(0.01);
+}
+
+test("a slide stays opaque over the page color, dark theme", async ({ page }) => {
+  await expectOpaqueSlide(page, "dark");
+});
+
+test("a slide stays opaque over the page color, light theme", async ({ page }) => {
+  await expectOpaqueSlide(page, "light");
+});
+
+test("an unfold has the page color behind it, dark theme", async ({ page }) => {
+  await expectUnfoldOverPageColor(page, "dark");
+});
+
+test("an unfold has the page color behind it, light theme", async ({ page }) => {
+  await expectUnfoldOverPageColor(page, "light");
 });
 
 // Stops the motion partway and compares pixels: chrome that moved with the page differs.
@@ -169,7 +261,7 @@ async function expectChromeHoldsStill(page) {
 }
 
 test("the page moves while the banner stack and the navbar hold still", async ({ page }) => {
-  await open(page, "direction=left", 0);
+  await open(page, "direction=left");
   await expectChromeHoldsStill(page);
   const names = await seen(page);
   expect(names.filter((name) => /(old|new)\(studio-bar-stack\)/.test(name))).toEqual([]);
@@ -177,7 +269,7 @@ test("the page moves while the banner stack and the navbar hold still", async ({
 });
 
 test("the stack has its name for the visit alone, so its tooltip stays over the navbar", async ({ page }) => {
-  await open(page, "direction=left", 0);
+  await open(page, "direction=left");
   const stack = page.locator("[data-vt-held]");
   const name = () => stack.evaluate((el) => getComputedStyle(el).viewTransitionName);
   expect(await name()).toBe("none");
@@ -209,7 +301,7 @@ test("the stack has its name for the visit alone, so its tooltip stays over the 
 });
 
 test("a second banner stack gets no second name, so the transition still plays", async ({ page }) => {
-  await open(page, "direction=left&twice=1", 0);
+  await open(page, "direction=left&twice=1");
   await expect(page.locator(".studio-bar-stack")).toHaveCount(2);
   await expect(page.locator("[data-vt-held]")).toHaveCount(1);
   await go(page);
@@ -217,7 +309,7 @@ test("a second banner stack gets no second name, so the transition still plays",
 });
 
 test("a same-page visit plays nothing", async ({ page }) => {
-  await open(page, "direction=left", 0);
+  await open(page, "direction=left");
   await go(page, "same");
   const names = await seen(page);
   expect(names.filter((name) => /\((root)\) /.test(name) && !name.includes("group"))).toEqual([]);
@@ -228,7 +320,7 @@ test("the setting off plays no style, with no script, no marks and no name", asy
   page.on("request", (request) => requests.push(request.url()));
   const moduleRequests = () => requests.filter((url) => url.includes("studio/page_transitions"));
 
-  await open(page, "", 0);
+  await open(page, "");
   expect(await page.locator('meta[name="page-transition-direction"]').count()).toBe(0);
   expect(await page.evaluate(() => document.documentElement.dataset.pageTransitionDirection)).toBeUndefined();
   await expect(page.locator("[data-vt-held]")).toHaveCount(0);
@@ -248,7 +340,7 @@ test("the setting off plays no style, with no script, no marks and no name", asy
 });
 
 test("a hung image releases the swap at the cap", async ({ page }) => {
-  await open(page, "direction=left&img=hung", 0);
+  await open(page, "direction=left&img=hung");
   const waited = await page.evaluate(() => new Promise((done) => {
     document.addEventListener("turbo:before-render", () => {
       const started = performance.now();
@@ -262,7 +354,7 @@ test("a hung image releases the swap at the cap", async ({ page }) => {
 });
 
 test("a failed image does not hold the visit", async ({ page }) => {
-  await open(page, "direction=left&img=failed", 0);
+  await open(page, "direction=left&img=failed");
   const waited = await page.evaluate(() => new Promise((done) => {
     document.addEventListener("turbo:before-render", () => {
       const started = performance.now();
@@ -282,7 +374,7 @@ test("the incoming image is decoded before the swap, and another listener's resu
     event.preventDefault();
     setTimeout(resume, 0);
   }));
-  await open(page, "direction=left&img=slow", 0);
+  await open(page, "direction=left&img=slow");
   await page.route("**/e2e/img/pt-slow.png", async (route) => {
     await new Promise((done) => setTimeout(done, 300));
     await route.fulfill({ body: Buffer.from(PIXEL_PNG, "base64"), contentType: "image/png" });
@@ -298,7 +390,7 @@ test("the incoming image is decoded before the swap, and another listener's resu
 });
 
 test("the overlay never shows during the image wait", async ({ page }) => {
-  await open(page, "direction=left&img=hung&overlay=1", 0);
+  await open(page, "direction=left&img=hung&overlay=1");
   // From before-render on: a slow response may show the overlay, as it always has.
   await page.evaluate(() => {
     window.__overlayShown = 0;
@@ -313,7 +405,7 @@ test("the overlay never shows during the image wait", async ({ page }) => {
 });
 
 test("a chat head on one page alone moves with the page", async ({ page }) => {
-  await open(page, "direction=left&morph=a", 0);
+  await open(page, "direction=left&morph=a");
   await go(page);
   const names = await seen(page);
   expectPlayed(names, "pt-out-left", "pt-in-from-right");
@@ -321,7 +413,7 @@ test("a chat head on one page alone moves with the page", async ({ page }) => {
 });
 
 test("a chat head on both pages morphs, and no style plays", async ({ page }) => {
-  await open(page, "direction=left&morph=both", 0);
+  await open(page, "direction=left&morph=both");
   await go(page);
   const names = await seen(page);
   expect(names.some((name) => name.startsWith("::view-transition-group(agent-portrait)"))).toBe(true);
@@ -337,7 +429,7 @@ async function visitHere(page, options) {
 }
 
 test("an advance visit to the same path morphs a shared name, and no style plays", async ({ page }) => {
-  await open(page, "direction=left&morph=both", 0);
+  await open(page, "direction=left&morph=both");
   await visitHere(page, {});
   const names = await seen(page);
   expect(names.some((name) => name.startsWith("::view-transition-group(agent-portrait)"))).toBe(true);
@@ -345,7 +437,7 @@ test("an advance visit to the same path morphs a shared name, and no style plays
 });
 
 test("a refresh of the same path plays nothing, with a chat head on the page", async ({ page }) => {
-  await open(page, "direction=left&morph=both", 0);
+  await open(page, "direction=left&morph=both");
   await visitHere(page, { action: "replace" });
   const names = await seen(page);
   expect(names.some((name) => name.includes("agent-portrait"))).toBe(false);
@@ -364,7 +456,7 @@ test("a visit that redirects moves the page once", async ({ page }) => {
       return transition;
     };
   });
-  await open(page, "direction=left", 0);
+  await open(page, "direction=left");
   await go(page, "redirect");
   await expect(page.locator('[data-test="page-b"]')).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/lab/page_transitions_b");
@@ -388,14 +480,14 @@ async function refuseForm(page) {
 }
 
 test("after a refused form, the next link still moves the page", async ({ page }) => {
-  await open(page, "direction=left", 0);
+  await open(page, "direction=left");
   await refuseForm(page);
   await go(page);
   expectPlayed(await seen(page), "pt-out-left", "pt-in-from-right");
 });
 
 test("after a refused form, a replace visit to another path still moves the page", async ({ page }) => {
-  await open(page, "direction=left", 0);
+  await open(page, "direction=left");
   await refuseForm(page);
   const load = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
   await page.evaluate(() => window.Turbo.visit(document.querySelector('[data-test="other"]').href, { action: "replace" }));
@@ -404,7 +496,7 @@ test("after a refused form, a replace visit to another path still moves the page
 });
 
 test("after a refused form, an advance to the same path still morphs", async ({ page }) => {
-  await open(page, "direction=left&morph=both", 0);
+  await open(page, "direction=left&morph=both");
   await refuseForm(page);
   await visitHere(page, {});
   const names = await seen(page);
@@ -412,7 +504,7 @@ test("after a refused form, an advance to the same path still morphs", async ({ 
 });
 
 test("Back between two chat heads still morphs, from Turbo's cache", async ({ page }) => {
-  await open(page, "direction=left&morph=both", 0);
+  await open(page, "direction=left&morph=both");
   await go(page);
   await page.evaluate(() => { window.__seen.length = 0; });
   const load = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
@@ -424,7 +516,7 @@ test("Back between two chat heads still morphs, from Turbo's cache", async ({ pa
 });
 
 test("Back from a scrolled page plays the app's direction and restores the scroll", async ({ page }) => {
-  await open(page, "direction=left", 0);
+  await open(page, "direction=left");
   await page.evaluate(() => window.scrollTo(0, 800));
   await page.waitForTimeout(200); // Turbo records the position on a throttled scroll.
   // Not locator.click: Playwright would scroll the link into view first.
@@ -444,7 +536,7 @@ test("Back from a scrolled page plays the app's direction and restores the scrol
 
 test("a modal open across the swap is gone on arrival, and the move still plays", async ({ page }) => {
   const errors = watchPageErrors(page);
-  await open(page, "direction=left&modal=1", 0);
+  await open(page, "direction=left&modal=1");
   await page.evaluate(() => window.Alpine.store("modals").open("lab-first", { title: "Card" }));
   await expect(page.locator('[role="dialog"]')).toBeVisible();
   const left = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
@@ -459,7 +551,7 @@ test("a modal open across the swap is gone on arrival, and the move still plays"
 
 test("a sidebar open across the swap comes back closed, and the move still plays", async ({ page }) => {
   const errors = watchPageErrors(page);
-  await open(page, "direction=left&sidebar=1", 0);
+  await open(page, "direction=left&sidebar=1");
   await page.waitForFunction(() => window.Alpine && window.Alpine.store("sidebars"));
   await page.evaluate(() => { window.Alpine.store("sidebars").linkTreeOpen = true; });
   await expect(page.locator("#studio-link-sidebar")).toBeVisible();
@@ -474,13 +566,13 @@ test("a sidebar open across the swap comes back closed, and the move still plays
 
 test("at phone width the chrome holds still while the page moves", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await open(page, "direction=top", 0);
+  await open(page, "direction=top");
   await expectChromeHoldsStill(page);
   expectPlayed(await seen(page), "pt-out-top", "pt-in-from-bottom");
 });
 
 test("leaving a page scrolled, the stack does not slide in, and the collapsed navbar still pins", async ({ page }) => {
-  await open(page, "direction=left", 0);
+  await open(page, "direction=left");
   await page.evaluate(() => window.scrollTo(0, 800));
   await page.waitForTimeout(100);
   const left = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
@@ -498,7 +590,7 @@ test.describe("with reduced motion", () => {
 
   test("the swap is plain: no transition, no pause, nothing marked to play", async ({ page }) => {
     const errors = watchPageErrors(page);
-    await open(page, "direction=left&img=hung", 0);
+    await open(page, "direction=left&img=hung");
     const result = await page.evaluate(() => new Promise((done) => {
       const started = {};
       document.addEventListener("turbo:before-render", (event) => {
@@ -521,7 +613,7 @@ test.describe("with reduced motion", () => {
 
 test("a browser without view transitions gets the plain swap, with no pause", async ({ page }) => {
   await page.addInitScript(() => { delete Document.prototype.startViewTransition; });
-  await open(page, "direction=left&img=hung", 0);
+  await open(page, "direction=left&img=hung");
   const attribute = await page.evaluate(() => new Promise((done) => {
     let started;
     document.addEventListener("turbo:before-render", () => { started = performance.now(); }, { once: true });

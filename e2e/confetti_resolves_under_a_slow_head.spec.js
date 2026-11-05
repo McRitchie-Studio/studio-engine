@@ -40,4 +40,8 @@ test("confetti resolves when the parse of the head is slower than the module's p
   // The mechanism, named: no module the head loads arrives by a Link header preload.
   const link = (await response.allHeaders())["link"] || "";
   expect(link, "a Link header modulepreload is fetched before the import map exists").not.toContain("studio_confetti");
+  // And no module at all: Firefox refuses the map once any module preload has started
+  // (test/views/head_sends_no_module_preload_test.rb). Chromium cannot see that refusal,
+  // so this lane reads the header that causes it.
+  expect(link, "Firefox refuses an import map after a module preload").not.toContain("modulepreload");
 });

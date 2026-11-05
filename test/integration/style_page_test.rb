@@ -107,8 +107,34 @@ class StylePageTest < ActiveSupport::TestCase
     labels = doc.css("#theme .label-upper").map { |n| n.text.strip }
 
     assert_includes labels, "Semantic tokens"
-    assert_includes labels, "Typography"
+    assert_equal "Typography", doc.at_css('#theme [data-test="style-type-ladder"] h3').text.strip
     assert doc.at_css("#theme .border-strong"), "the semantic token specimens render"
+  end
+
+  test "the Theme section opens on the logos, and Typography sits beside the editor" do
+    prior = Studio.theme_logos
+    Studio.theme_logos = [{ file: "brand/mark.svg", title: "The Mark" }]
+    html = render_index
+
+    assert_operator html.index("The Mark"), :<, html.index("Role colors"), "the logos lead"
+    doc = Nokogiri::HTML.fragment(html)
+    assert doc.at_css('#theme [data-test="style-type-ladder"]')
+    assert_equal "edited", doc.at_css('#theme [data-test="style-theme-preview"]')["x-show"], "the preview waits for an edit"
+  ensure
+    Studio.theme_logos = prior
+  end
+
+  test "the Glass specimens follow the app's own switches" do
+    prior = Studio.surface_style
+    Studio.surface_style = :default
+    off = Nokogiri::HTML.fragment(render_index)
+    assert off.at_css('[data-test="style-glass"]')
+    assert_includes off.at_css('[data-test="style-glass"]').text, "surface style is off on this app"
+    Studio.surface_style = :glass
+    refute_includes Nokogiri::HTML.fragment(render_index).at_css('[data-test="style-glass"]').text, "surface style is off on this app"
+    assert off.css('[data-test="style-glass-icons"] li').size >= Studio::Icons.names.size
+  ensure
+    Studio.surface_style = prior
   end
 
   # --- 2. the require_admin gate actually gates ------------------------------
@@ -480,8 +506,8 @@ class StylePageTest < ActiveSupport::TestCase
       assert_includes theme_slice, token,
         "Theme owns the color role token #{token} (moved out of Tricks)"
     end
-    assert_includes theme_slice, "The colors",
-      "Theme leads with the colors block"
+    assert_includes theme_slice, "Role colors",
+      "Theme holds the one color list"
     refute_includes html, "Theme tokens",
       "the Tricks section no longer carries a 'Theme tokens' sub-section"
   end
@@ -564,7 +590,7 @@ class StylePageTest < ActiveSupport::TestCase
     refute_nil modals_start, "the Modals section anchor must exist"
     refute_nil tricks_start, "the Tricks section anchor must exist"
     slice = html[modals_start...tricks_start]
-    slice.scan(%r{text-xl font-bold text-heading">([^<]+)</h3>}).flatten
+    slice.scan(%r{type-h4 text-heading">([^<]+)</h3>}).flatten
   end
 
   test "the Modals sub-sections carry the right names, in the right order" do

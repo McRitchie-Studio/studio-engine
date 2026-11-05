@@ -1,6 +1,6 @@
 <%#  Theme section of the living style guide (admin/style) — the LANDING section.
-     Theme owns "the colors": it leads with the 7 role tokens/swatches, then the
-     editor with a live dark/light preview, then the logos, the semantic tokens and
+     Theme owns "the colors": it leads with the role editor, which names each role's CSS
+     variable and the derived tokens, with a live dark/light preview, then the logos, the semantic tokens and
      the type. GET /admin/theme redirects here.
      
      Save-in-place: this section intercepts Save + Regenerate and submits them via
@@ -42,17 +42,14 @@
   # Seed the live-preview editor with role -> hex, resolved from saved values.
   seed_colors = roles.index_with { |role| current_hex.call(role) }
 
-  # The 7 role tokens read live off the resolved theme (cta/text/border-strong
-  # are the semantic names — there is no --color-heading var).
-  token_swatches = [
-    ["--color-cta",           "CTA / primary"],
-    ["--color-surface",       "Surface"],
-    ["--color-success",       "Success"],
-    ["--color-danger",        "Danger"],
-    ["--color-warning",       "Warning"],
-    ["--color-text",          "Heading / text"],
-    ["--color-border-strong", "Border (strong)"]
-  ]
+  # Each role's CSS variable (there is no --color-heading or --color-primary var for a page to
+  # paint with: cta and text are the semantic names). Dark and light are each theme's page.
+  role_vars = { primary: "--color-cta", dark: "--color-page (dark)", light: "--color-page (light)", success: "--color-success",
+                warning: "--color-warning", danger: "--color-danger", accent: "--color-accent" }
+
+  # Not roles: Studio::ThemeResolver works these out from the roles, so they read here and
+  # no one edits them.
+  derived_tokens = [["Surface", "--color-surface"], ["Text", "--color-text"], ["Border (strong)", "--color-border-strong"]]
 
   csrf_ok = respond_to?(:protect_against_forgery?) && protect_against_forgery?
 %>
@@ -60,7 +57,7 @@
          x-data="dsThemeEditor(<%= seed_colors.to_json %>)">
   <div class="flex flex-wrap items-start justify-between gap-3">
     <div class="space-y-1">
-      <h2 class="text-2xl font-bold text-heading">Theme</h2>
+      <h2 class="type-h3 text-heading">Theme</h2>
       <p class="text-muted text-sm max-w-2xl">
         The color foundation. The 7-role system, editable here. Edits preview live; Save writes them
         and Regenerate clears the theme cache. Both persist <strong>in place</strong> — the page never
@@ -75,25 +72,32 @@
     </form>
   </div>
 
-  <%# ---- The colors — the role tokens/swatches (Theme owns these) ---------- %>
-  <div class="space-y-3">
-    <p class="label-upper">The colors — 7 role tokens</p>
-    <p class="text-muted text-sm max-w-2xl">
-      Read live off this app's theme via <code class="font-mono text-2xs">var(--color-*)</code>. Change
-      the app or its light/dark mode and every swatch (and every specimen on this page) follows.
-    </p>
-    <div class="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-      <% token_swatches.each do |var, label| %>
-        <div class="card overflow-hidden">
-          <div class="h-16 border-b border-subtle" style="background: var(<%= var %>)"></div>
-          <div class="p-3 space-y-0.5">
-            <p class="text-sm text-heading font-medium"><%= label %></p>
-            <code class="font-mono text-2xs text-muted break-all"><%= var %></code>
+  <%# THE LOGOS, first in the section. A host may supply its own block in
+      app/views/style/host/_logos.html.erb, the same seam as host modals: the hub's has
+      one-click PNG downloads, which draw through a script only the hub carries. %>
+  <% if lookup_context.exists?("logos", ["style/host"], true) %>
+    <%= render "style/host/logos" %>
+  <% else %>
+  <% logos = Studio.respond_to?(:theme_logos) ? Array(Studio.theme_logos) : [] %>
+  <% if logos.any? %>
+    <div class="space-y-3">
+      <p class="label-upper">Logos</p>
+      <div class="grid gap-4 grid-cols-2 md:grid-cols-5">
+        <% logos.each do |logo| %>
+          <% file = logo.is_a?(Hash) ? logo[:file] : logo %>
+          <% title = logo.is_a?(Hash) ? logo[:title] : file %>
+          <div class="card p-4 space-y-3">
+            <p class="text-sm text-heading font-medium"><%= title %></p>
+            <div class="flex items-center justify-center w-20 h-20 rounded-lg" style="background-color: #ddd; background-image: linear-gradient(45deg, #777 25%, transparent 25%, transparent 75%, #777 75%), linear-gradient(45deg, #777 25%, transparent 25%, transparent 75%, #777 75%); background-size: 12px 12px; background-position: 0 0, 6px 6px;">
+              <img src="/<%= file %>" alt="<%= title %>" class="max-w-16 max-h-16 rounded">
+            </div>
+            <code class="font-mono text-2xs text-muted break-all"><%= file %></code>
           </div>
-        </div>
-      <% end %>
+        <% end %>
+      </div>
     </div>
-  </div>
+  <% end %>
+  <% end %>
 
   <div class="grid gap-6 lg:grid-cols-2">
     <%# ---- Role-color editor (posts to /admin/theme, intercepted in place) - %>
@@ -103,7 +107,8 @@
       <% if csrf_ok %>
         <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>" autocomplete="off">
       <% end %>
-      <h3 class="text-lg font-bold text-heading">Role colors</h3>
+      <h3 class="type-h4 text-heading">Role colors</h3>
+      <p class="text-muted text-sm">Every specimen on this page reads these through its CSS variable, so it follows the app and its light or dark mode.</p>
 
       <% roles.each do |role| %>
         <% db_col = db_col_for.call(role) %>
@@ -119,6 +124,7 @@
             <div class="flex items-center gap-2">
               <span class="text-heading font-medium text-sm"><%= role.to_s.titleize %></span>
               <% if has_custom %><span class="text-xs text-muted">(custom)</span><% end %>
+              <% if role_vars[role.to_sym] %><code class="font-mono text-2xs text-muted truncate"><%= role_vars[role.to_sym] %></code><% end %>
             </div>
             <input type="text"
                    name="theme_setting[<%= db_col %>]"
@@ -135,14 +141,28 @@
         </div>
       <% end %>
 
+      <div class="pt-4 border-t border-subtle space-y-2" data-test="style-derived-tokens">
+        <p class="label-upper">Derived, read only</p>
+        <% derived_tokens.each do |label, var| %>
+          <div class="flex items-center gap-4">
+            <div class="w-10 h-6 rounded border border-subtle shrink-0" style="background: var(<%= var %>)"></div>
+            <span class="text-heading font-medium text-sm"><%= label %></span>
+            <code class="font-mono text-2xs text-muted truncate"><%= var %></code>
+          </div>
+        <% end %>
+      </div>
+
       <div class="pt-4 border-t border-subtle">
         <button type="submit" class="btn btn-primary" :disabled="saving"
                 x-text="saving ? 'Saving…' : 'Save theme'">Save theme</button>
       </div>
     </form>
 
-    <%# ---- Live dark/light preview (Alpine, updates as you edit) ----------- %>
-    <div class="space-y-3">
+    <%# The half beside the editor: Typography, then the live dark/light preview, which
+        appears once a role color has been edited. %>
+    <div class="space-y-6 min-w-0">
+      <%= render "style/type_ladder" %>
+    <div class="space-y-3" x-show="edited" x-cloak data-test="style-theme-preview">
       <p class="label-upper">Preview</p>
       <p class="text-muted text-sm">A live dark/light mock — it tracks the editor as you type, before you save.</p>
       <div class="grid gap-3 sm:grid-cols-2">
@@ -168,28 +188,9 @@
         </div>
       </div>
     </div>
-  </div>
-  
-  <% logos = Studio.respond_to?(:theme_logos) ? Array(Studio.theme_logos) : [] %>
-  <% if logos.any? %>
-    <div class="space-y-3">
-      <p class="label-upper">Logos</p>
-      <div class="grid gap-4 grid-cols-2 md:grid-cols-5">
-        <% logos.each do |logo| %>
-          <% file = logo.is_a?(Hash) ? logo[:file] : logo %>
-          <% title = logo.is_a?(Hash) ? logo[:title] : file %>
-          <div class="card p-4 space-y-3">
-            <p class="text-sm text-heading font-medium"><%= title %></p>
-            <div class="flex items-center justify-center w-20 h-20 rounded-lg" style="background-color: #ddd; background-image: linear-gradient(45deg, #777 25%, transparent 25%, transparent 75%, #777 75%), linear-gradient(45deg, #777 25%, transparent 25%, transparent 75%, #777 75%); background-size: 12px 12px; background-position: 0 0, 6px 6px;">
-              <img src="/<%= file %>" alt="<%= title %>" class="max-w-16 max-h-16 rounded">
-            </div>
-            <code class="font-mono text-2xs text-muted break-all"><%= file %></code>
-          </div>
-        <% end %>
-      </div>
     </div>
-  <% end %>
-  
+  </div>
+
   <%# Semantic tokens: the utilities a page paints with, under the role colours. %>
   <div class="space-y-3">
     <p class="label-upper">Semantic tokens</p>
@@ -217,21 +218,4 @@
     </div>
   </div>
   
-  <%# Type in this app's own font, named by role: the font itself is the host's. %>
-  <div class="space-y-3">
-    <p class="label-upper">Typography</p>
-    <div class="card p-6 space-y-4">
-      <p class="text-heading text-3xl font-extrabold">Heading</p>
-      <p class="text-heading text-xl font-bold">Subheading</p>
-      <p class="text-body text-base">Body text. The quick brown fox jumps over the lazy dog.</p>
-      <p class="text-secondary text-sm">Secondary text. Additional context and metadata.</p>
-      <p class="text-muted text-xs">Muted text. Timestamps, hints and fine print.</p>
-      <hr class="border-subtle">
-      <div class="flex flex-wrap gap-4">
-        <% [400, 500, 600, 700, 800, 900].each do |weight| %>
-          <span class="text-heading text-lg" style="font-weight: <%= weight %>"><%= weight %></span>
-        <% end %>
-      </div>
-    </div>
-  </div>
   </section>

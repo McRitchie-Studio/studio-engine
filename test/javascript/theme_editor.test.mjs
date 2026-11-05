@@ -49,6 +49,15 @@ test("dsThemeEditor: the seed overrides the defaults one role at a time", () => 
   assert.equal(dsThemeEditor().colors.primary, "#000")
 })
 
+test("dsThemeEditor: the preview block waits for the first edit", () => {
+  const editor = dsThemeEditor({ primary: "#111111" })
+  assert.equal(editor.edited, false)
+  globalThis.document = { documentElement: { style: { setProperty() {} } } }
+  editor.updatePreview()
+  assert.equal(editor.edited, true)
+  delete globalThis.document
+})
+
 test("formRequest sends the form's real method, asks for JSON, and follows no redirect", () => {
   const patch = new Map([["_method", "patch"], ["theme[primary]", "#111111"]])
   const request = formRequest(patch)

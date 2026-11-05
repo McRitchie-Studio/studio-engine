@@ -178,6 +178,22 @@ module Studio
     @@page_transition_direction = direction
   end
 
+  # One of :slide or :unfold. The ONE style this app's pages play, on every page change and
+  # every full load. Alex McRitchie's ruling, 2026-11-04: one app, one way, nothing random. The
+  # default is :slide, the plainer of the two, so a host that sets only a direction gets one
+  # steady move and never a draw. It does nothing without a direction, and nil means the default.
+  PAGE_TRANSITION_STYLES = %i[slide unfold].freeze
+  mattr_reader :page_transition_style, default: :slide
+
+  def self.page_transition_style=(value)
+    style = value.presence&.to_sym || :slide
+    unless PAGE_TRANSITION_STYLES.include?(style)
+      raise ArgumentError, "Studio.page_transition_style must be one of " \
+                           "#{PAGE_TRANSITION_STYLES.join(', ')} (got #{value.inspect})"
+    end
+    @@page_transition_style = style
+  end
+
   # Minimum ms the nav spinner stays visible once shown (_head.html.erb).
   # Apps wrapping multi-second operations in the spinner (e.g. Solana RPC)
   # keep the high default to avoid flicker; smooth-load apps typically drop
@@ -275,6 +291,22 @@ module Studio
     @@sidebar_style = SidebarSections.style!(value)
   end
 
+  # ---- Surfaces ----
+  # How cards look. :glass makes them translucent over a soft ambient page, once the host
+  # layout says so on its root: <html data-surface-style="<%= Studio.surface_style %>">.
+  # :default is what every app has today. engine.css, THE GLASS SURFACES, holds the look.
+  SURFACE_STYLES = %i[default glass].freeze
+  mattr_reader :surface_style, default: :default
+
+  def self.surface_style=(value)
+    style = value.respond_to?(:to_sym) ? value.to_sym : value
+    unless SURFACE_STYLES.include?(style)
+      raise ArgumentError, "Studio.surface_style must be one of #{SURFACE_STYLES.join(', ')}, got #{value.inspect}"
+    end
+
+    @@surface_style = style
+  end
+
   # ---- Navbar links ----
   # Links for the engine navbar's desktop bar and phone row. The default []
   # renders nothing, so the navbar stays byte-identical until an app opts in.
@@ -353,6 +385,10 @@ module Studio
   #   config.loader = { style: :sparkle, icon: "/brand/icon-dark.svg",
   #                     art: "/brand/loader-sparkle.svg" }
   mattr_reader :loader, default: Loader.normalize(nil)
+
+  # The page-load overlay reaches every page through layouts/studio/_head, at the one
+  # standard pace in Studio::Loader. false opts this app out. docs/LOADER.md.
+  mattr_accessor :loader_overlay, default: true
 
   def self.loader=(config)
     @@loader = Loader.normalize(config)

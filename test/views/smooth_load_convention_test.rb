@@ -155,10 +155,20 @@ class SmoothLoadConventionTest < ActiveSupport::TestCase
     refute_includes head, "_navSpinnerMinMs = 2500"
   end
 
+  test "engine.css paints the backdrop with the page color, and a slide keeps its opacity" do
+    css = File.read(CSS_PATH)
+
+    assert_match(/\[data-page-transition="still"\]\)::view-transition \{\s*background: var\(--color-page, Canvas\);/, css)
+    refute_match(/::view-transition \{\s*background: #000/, css)
+    slides = css.scan(/^@keyframes pt-(?:out|in-from)-[^\n]+$/)
+    assert_equal 8, slides.size
+    slides.each { |rule| refute_includes rule, "opacity", rule }
+  end
+
   test "engine.css draws all eight page transition styles, each behind its attribute" do
     css = File.read(CSS_PATH)
 
-    %w[fade-left unfold-right fade-right unfold-left fade-top unfold-bottom fade-bottom unfold-top].each do |style|
+    %w[slide-left unfold-right slide-right unfold-left slide-top unfold-bottom slide-bottom unfold-top].each do |style|
       assert_includes css, %(html[data-page-transition="#{style}"]::view-transition-old(root))
       assert_includes css, %(html[data-page-transition="#{style}"]::view-transition-new(root))
     end

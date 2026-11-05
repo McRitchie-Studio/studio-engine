@@ -148,6 +148,21 @@ class LoaderRenderTest < ActiveSupport::TestCase
     assert_nil loader.at_css(".sr-only")
   end
 
+  test "the pace has one definition: the helper's defaults and the module's fallbacks read the same numbers" do
+    overlay = render_view { |view| view.studio_loader_overlay }.at_css(".studio-loader-overlay")
+    assert_equal "350", overlay["data-delay"]
+    assert_equal "750", overlay["data-min-show"]
+    assert_equal 350, Studio::Loader::OVERLAY_DELAY_MS
+    assert_equal 750, Studio::Loader::OVERLAY_MIN_SHOW_MS
+    source = File.read(File.expand_path("../../app/javascript/studio/loader.js", __dir__))
+    assert_includes source, "DEFAULT_DELAY_MS = #{Studio::Loader::OVERLAY_DELAY_MS}"
+    assert_includes source, "DEFAULT_MIN_SHOW_MS = #{Studio::Loader::OVERLAY_MIN_SHOW_MS}"
+  end
+
+  test "an app can set its own minimum, and zero turns it off" do
+    assert_equal "0", render_view { |view| view.studio_loader_overlay(min_show: 0) }.at_css(".studio-loader-overlay")["data-min-show"]
+  end
+
   test "the overlay renders hidden, once, with its delay, its cap and a caption line" do
     overlay = render_view { |view| view.studio_loader_overlay(delay: 500) }.at_css(".studio-loader-overlay")
 

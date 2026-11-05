@@ -27,6 +27,22 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
     to be let go.
   - A stale page says so. A refused token reads "This page has expired" with a reload hint on
     the voice line and the typed error, and a refused send keeps its words in the box.
+## 0.128.0 — 2026-11-05
+
+### Fixed
+
+- **The modified-click booking spec no longer waits on a Playwright event that can stay silent.**
+  `e2e/booking_frame.spec.js` timed out on two `accepted` runs because Playwright 1.62.1 sometimes
+  never fires its `page` event for a tab Chromium did open. The spec now reads the new tab from
+  Chromium's target list. It still needs one new tab at the booking URL, no dialog, and the first
+  page unmoved. No host change: a modified click on a booking link always opened its tab.
+
+- **Firefox runs the shared head's import map.** The head's two URL module tags (`studio/alpine`,
+  `studio/sticky_table_header`) sent a `Link: rel=modulepreload` response header, and Firefox then
+  refused the import map: every bare `studio/*` import failed and no panel opened, on every host
+  that renders the head. Both tags now pass `preload_links_header: false`. They keep their place in
+  the document, their `data-turbo-track` and their CSP treatment. Hosts: keep a module tag of your
+  own below the import map, and pass the same option if it loads by URL.
 
 - **Hold to talk, before the phone test.** Studio's shared voice chat, from the review of
   `engine-chat-takes-voice`:
@@ -51,6 +67,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **`/admin/style` Theme: logos first, Typography beside the editor, a preview that waits for an edit.** A
+  host may supply its own logo block in `app/views/style/host/_logos.html.erb`.
+- **`Studio.surface_style = :glass`: opt-in translucent cards over a soft ambient page.** A host
+  sets it and writes `data-surface-style` on its root. It reaches `.card`, `.card-hover`,
+  `.empty-state` and `.bg-surface.rounded-xl.border`. Menus stay solid. Real blur is only on
+  `.surface-glass-blur`, because a dense board cannot afford it on every card.
 - **`Studio.sidebar_style = :glass`: an opt-in floating panel for the link sidebar.** The panel
   insets from the page's edge, in both themes. Where the browser supports `backdrop-filter` it
   blurs the page through a 72% fill, and a nearly solid fill replaces that under the
@@ -74,8 +96,28 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **`Studio.sidebar_geo_signpost`: a host may take the Geo row out of the link sidebar.** It
   defaults to true, so no app changes. False draws no Geo row in the panel. The partial
   `components/_geo_signpost` stays, so a host that moves Geo renders it on its own page.
+- **One loader pace for every app.** Under 350ms no loader and no added wait; once shown, at
+  least 750ms (`Studio::Loader::OVERLAY_DELAY_MS`, `OVERLAY_MIN_SHOW_MS`; `min_show:` beside
+  `delay:` on `studio_loader_overlay`). `layouts/studio/_head` now carries the overlay in a
+  `<template>`, and `studio/loader` adds it to the body, so an app with no overlay of its own gets
+  one on this bump. `config.loader_overlay = false` opts out. A slow visit in such an app now shows
+  the overlay, and a visit that answers between 350ms and 1100ms lands later than it did. The wait
+  holds a visit's good HTML response ahead of the view transition's old picture, so the move plays
+  after the loader goes. Failures, downloads, frames, forms, a full-load answer and
+  `StudioLoader.hide()` never wait. See `docs/LOADER.md`, *The standard pace*.
+- **`config.page_transition_style`,** `:slide` (the default) or `:unfold`: one app plays one move.
 
 ### Changed
+
+- **Page transitions draw nothing at random.** Alex McRitchie's ruling of 2026-11-04 replaces
+  the random draw per page change of 2026-11-03. Every page change and full load plays the app's
+  one move, and with no style set that move is the slide. A consumer that reads
+  `data-page-transition` or `Math.random` around a visit must change: `fade-*` is now `slide-*`,
+  and `pickStyle` and `DIRECTIONS` are gone.
+- **Page transitions paint the app's page color behind the move, and pages stay opaque.** The
+  black backdrop and the 0.3 opacity are gone, so blank areas no longer darken, a full-width hero
+  has no dark strip beside it, a light theme no longer greys, and an unfold has no black wedges. The
+  leaving page of an unfold stays opaque too.
 
 - **The browser lane counts its own specs.** `bin/lib/e2e_spec_census.rb` computes the spec count
   from `e2e/`, as the hub does, and `bin/e2e-executed-set-check` reads it. `config/e2e_lane.yml`

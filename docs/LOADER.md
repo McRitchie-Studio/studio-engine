@@ -58,19 +58,63 @@ The icon is drawn underneath and the layers are inlined over it, so the two
 files must share a viewBox. Art that is missing, outside `public/`, or has no
 marked layer falls back to Breathe rather than blanking the loader.
 
+## The standard pace
+
+Every app has one standard for quick loads and long loads:
+
+| The visit | What the user sees |
+|---|---|
+| Under 350ms | No loader, and no added wait |
+| Longer | The loader appears at 350ms and stays at least 750ms, until the page is ready |
+
+Both numbers are defined once, in `Studio::Loader` (`OVERLAY_DELAY_MS`, `OVERLAY_MIN_SHOW_MS`).
+`studio/loader` falls back to the same two, and a test holds them level.
+
+**Every engine app gets this with no view edit.** `layouts/studio/_head` carries the overlay in
+a `<template>`, because the body is the host's, and `studio/loader` adds it to the body when a
+visit starts. A host that still calls `studio_loader_overlay` keeps its own, and only that one
+shows. `config.loader_overlay = false` opts an app out. A layout that does not render
+`layouts/studio/_head` gets neither: Rantly has its own head today.
+
+**Where the wait is.** The wait is on the visit's response, before Turbo sees it. Turbo's
+`turbo:before-render` comes too late. A view transition has already taken the old page's picture
+by then, with rendering paused, so a wait there freezes the loader and carries it out inside the
+moving picture. So the loader stays live through its minimum, hides, and only then does Turbo
+take the picture and play the move. The move's image wait (at most 500ms) runs after that, inside
+the render, so neither wait can cut the other short. They add. With transitions off the same
+minimum applies, and the page swaps when it ends.
+
+**What never waits:** a frame, a form or a prefetch response; a failed visit, a 4xx or 5xx page;
+a download or other non-HTML response; a network failure; a refresh or poll (a `replace` shows no
+overlay); Back to a cached page, where no overlay appears; a response that asks for a full load
+(`turbo-visit-control: reload`, as a signing page does), since the second load is the one that paints.
+
+**`StudioLoader.hide()` is immediate.** It ignores the minimum and ends any wait, because the
+caller owns that moment. A caller's `StudioLoader.show()` has no minimum. A form marked
+`data-studio-loader-overlay` keeps its overlay up for the rest of the minimum, with nothing else
+held. Turbo's top progress bar is unchanged.
+
+Measured in the lab, Chromium, from the click (`e2e/loader_pace.spec.js`):
+
+| Page answers at | Loader in | Loader out | Move start | Move end |
+|---|---|---|---|---|
+| About 50ms | Never | Never | 68 | 785 |
+| 450ms | 385 | 1138 | 1162 | 1886 |
+| 1500ms | 378 | 1572 | 1572 | 2287 |
+
 ## Use it
 
 ```erb
 <%= studio_loader %>                               <%# 96px, the app's style %>
 <%= studio_loader size: 20, label: "Saving" %>     <%# inline, beside text %>
 <%= studio_loader style: :liquid, percent: 40 %>   <%# a fill that follows a percent %>
-<%= studio_loader_overlay %>                       <%# the page-load overlay: once, in the layout body %>
+<%= studio_loader_overlay delay: 500, min_show: 0 %> <%# only to differ from the standard: once, in the layout body %>
 ```
 
-- **Page loads.** `studio_loader_overlay` renders hidden. `studio/loader`
+- **Page loads.** The overlay renders hidden. `studio/loader`
   shows it when a visit the user started (a Turbo `advance` or `restore`)
-  outlasts its `delay:` (350ms) and hides it when the page arrives, so a fast
-  load never flashes it. A `replace` visit never shows it: that is a background
+  outlasts its `delay:` (350ms) and hides it at the end of its `min_show:` (750ms), or
+  when the page arrives if that is later. A fast load never flashes it. A `replace` visit never shows it: that is a background
   refresh, such as a poll's `Turbo.visit(url, { action: "replace" })` or Turbo
   8's page refresh; frames and prefetches fire no visit at all. So is a link
   marked `data-turbo-action="replace"`, even one the user clicks. A form marked
@@ -113,4 +157,5 @@ animation, and the halo, orbit spark, bead and sparkle flares are not drawn.
 brand from `test/fixtures/files/loader`. `/lab/loader_visits` puts the overlay
 under Turbo (`e2e/loader_visits.spec.js`, `e2e/loader_bfcache.spec.js`): a slow
 page, a background replace visit, `data-turbo="false"` forms and a download
-with no extension.
+with no extension. `/lab/page_transitions?slow=450` forces the slow page the pace spec times
+(`e2e/loader_pace.spec.js`).

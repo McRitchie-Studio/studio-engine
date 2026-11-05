@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs"
 import { runInNewContext } from "node:vm"
 
 const source = readFileSync(new URL("../../app/javascript/studio/page_transitions.js", import.meta.url), "utf8")
-const { DIRECTIONS, STILL, READY_CAP_MS, FULL_LOAD_STYLE_KEY, pickStyle, planVisit, planFullLoad, leaveStyle, withCap, shareName, holdRender, installPageTransitions } =
+const { STYLES, DEFAULT_STYLE, STILL, READY_CAP_MS, FULL_LOAD_STYLE_KEY, styleFor, planVisit, planFullLoad, leaveStyle, withCap, shareName, holdRender, installPageTransitions } =
   await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 const visit = { direction: "left", from: "/", to: "/chat", transitions: true, sharedName: false }
@@ -21,29 +21,48 @@ test("without the setting's meta it binds nothing", () => {
   assert.equal(installPageTransitions(doc), false)
 })
 
-test("each direction pairs a fade with the unfold moving the same way", () => {
-  assert.deepEqual(DIRECTIONS.left, ["fade-left", "unfold-right"])
-  assert.deepEqual(DIRECTIONS.right, ["fade-right", "unfold-left"])
-  assert.deepEqual(DIRECTIONS.top, ["fade-top", "unfold-bottom"])
-  assert.deepEqual(DIRECTIONS.bottom, ["fade-bottom", "unfold-top"])
+test("each setting pair names one move", () => {
+  assert.deepEqual(STYLES.slide, { left: "slide-left", right: "slide-right", top: "slide-top", bottom: "slide-bottom" })
+  assert.deepEqual(STYLES.unfold, { left: "unfold-right", right: "unfold-left", top: "unfold-bottom", bottom: "unfold-top" })
 })
 
-test("a page change can draw either style of the pair, and only those", () => {
-  assert.equal(pickStyle("top", () => 0), "fade-top")
-  assert.equal(pickStyle("top", () => 0.49), "fade-top")
-  assert.equal(pickStyle("top", () => 0.5), "unfold-bottom")
-  assert.equal(pickStyle("top", () => 0.999), "unfold-bottom")
+test("nothing in either script draws at random", () => {
+  assert.doesNotMatch(source, /random/i)
+  assert.doesNotMatch(revealSource, /random/i)
 })
 
-test("an unknown direction picks nothing, an inherited Object key included", () => {
-  assert.equal(pickStyle("diagonal"), null)
-  assert.equal(pickStyle("constructor"), null)
+test("the same settings give the same move every time, whatever Math.random says", () => {
+  const real = Math.random
+  try {
+    for (const value of [0, 0.49, 0.5, 0.999]) {
+      Math.random = () => value
+      assert.equal(styleFor("top", "unfold"), "unfold-bottom")
+      assert.equal(styleFor("top", "slide"), "slide-top")
+      assert.equal(planVisit({ ...visit, style: "unfold" }), "unfold-right")
+    }
+  } finally {
+    Math.random = real
+  }
+})
+
+test("no style setting, or an unknown one, plays the default slide", () => {
+  assert.equal(DEFAULT_STYLE, "slide")
+  assert.equal(styleFor("left", null), "slide-left")
+  assert.equal(styleFor("left", undefined), "slide-left")
+  assert.equal(styleFor("left", "swirl"), "slide-left")
+  assert.equal(styleFor("left", "constructor"), "slide-left")
+})
+
+test("an unknown direction plays nothing, an inherited Object key included", () => {
+  assert.equal(styleFor("diagonal", "slide"), null)
+  assert.equal(styleFor("constructor", "unfold"), null)
   assert.equal(planVisit({ ...visit, direction: "constructor" }), null)
 })
 
-test("a plan is the app's own direction on any route, with nothing remembered", () => {
-  for (const [from, to] of [["/", "/chat"], ["/chat", "/"], ["/a", "/b"]]) {
-    assert.equal(planVisit({ ...visit, from, to }, () => 0), "fade-left")
+test("a plan is the app's own direction and style on any route, with nothing remembered", () => {
+  for (const [from, to] of [["/a", "/b"], ["/b", "/a"], ["/", "/deep/nested"], ["/deep/nested", "/"]]) {
+    assert.equal(planVisit({ ...visit, from, to }), "slide-left")
+    assert.equal(planVisit({ ...visit, style: "unfold", from, to }), "unfold-right")
   }
 })
 
@@ -132,10 +151,12 @@ test("with no resume to call, the render is not paused", () => {
 const activation = (url) => ({ entry: { url: `https://app.test${url}` } })
 const fullLoad = { direction: "left", from: "/" }
 
-test("a full load draws from the same pick as a Turbo visit, at the same random value", () => {
-  for (const direction of Object.keys(DIRECTIONS)) {
-    for (const value of [0, 0.49, 0.5, 0.99]) {
-      assert.equal(planFullLoad({ direction, from: "/", activation: activation("/x") }, () => value), pickStyle(direction, () => value))
+test("a full load plays what a Turbo visit plays, for every pair of settings", () => {
+  for (const style of Object.keys(STYLES)) {
+    for (const direction of Object.keys(STYLES[style])) {
+      const move = planFullLoad({ direction, style, from: "/", activation: activation("/x") })
+      assert.equal(move, STYLES[style][direction])
+      assert.equal(move, planVisit({ direction, style, from: "/", to: "/x", transitions: true, sharedName: false }))
     }
   }
 })
@@ -153,11 +174,11 @@ test("a full load with no activation entry, or no direction, plans nothing", () 
 test("the style goes to the next document, and a refusal reads as a plain load", () => {
   const store = new Map()
   const sessionStorage = { setItem: (key, value) => store.set(key, value), removeItem: (key) => store.delete(key) }
-  assert.equal(leaveStyle({ sessionStorage }, "fade-left"), true)
-  assert.equal(store.get(FULL_LOAD_STYLE_KEY), "fade-left")
+  assert.equal(leaveStyle({ sessionStorage }, "slide-left"), true)
+  assert.equal(store.get(FULL_LOAD_STYLE_KEY), "slide-left")
   assert.equal(leaveStyle({ sessionStorage }, null), false)
   assert.equal(store.size, 0)
-  assert.equal(leaveStyle({ sessionStorage: { setItem() { throw new Error("full") } } }, "fade-left"), false)
+  assert.equal(leaveStyle({ sessionStorage: { setItem() { throw new Error("full") } } }, "slide-left"), false)
 })
 
 // A module-level flag lets one document install once, so each case imports its own copy.
@@ -191,14 +212,14 @@ test("pageswap leaves a style and names the stack for the old picture", async ()
   const { root, store, swap } = await installed()
   root.dataset.pageTransitionMorph = ""
   assert.equal(swap("/b"), false)
-  assert.ok(DIRECTIONS.left.includes(store.get(FULL_LOAD_STYLE_KEY)))
+  assert.equal(store.get(FULL_LOAD_STYLE_KEY), "slide-left")
   assert.equal(root.dataset.pageTransitionVisit, "")
   assert.equal(root.dataset.pageTransitionMorph, undefined)
 })
 
 test("pageswap with no transition leaves nothing, and clears a stale style", async () => {
   const { on, root, store } = await installed()
-  store.set(FULL_LOAD_STYLE_KEY, "fade-left")
+  store.set(FULL_LOAD_STYLE_KEY, "slide-left")
   on.win.pageswap({ viewTransition: null, activation: activation("/b") })
   assert.equal(store.size, 0)
   assert.equal(root.dataset.pageTransitionVisit, undefined)
@@ -237,17 +258,17 @@ test("a visit that fails leaves no style at rest", async () => {
 
 test("a visit does not cut a motion that is still running", async () => {
   const { on, root } = await installed()
-  root.dataset.pageTransition = "fade-left"
+  root.dataset.pageTransition = "slide-left"
   on.doc["turbo:visit"]({ detail: { url: "https://app.test/b" } })
-  assert.equal(root.dataset.pageTransition, "fade-left")
+  assert.equal(root.dataset.pageTransition, "slide-left")
 })
 
 test("the document's own first turbo:load leaves a full load's motion alone", async () => {
   const { on, root } = await installed()
-  root.dataset.pageTransition = "fade-left"
+  root.dataset.pageTransition = "slide-left"
   root.dataset.pageTransitionVisit = ""
   on.doc["turbo:load"]({})
-  assert.equal(root.dataset.pageTransition, "fade-left")
+  assert.equal(root.dataset.pageTransition, "slide-left")
   assert.equal(root.dataset.pageTransitionVisit, "")
 })
 
@@ -307,7 +328,7 @@ function transition() {
 }
 
 test("the classic script holds no table of styles and shares the module's key", () => {
-  assert.doesNotMatch(revealSource, /fade-|unfold-/)
+  assert.doesNotMatch(revealSource, /slide-|fade-|unfold-/)
   assert.ok(revealSource.includes(`"${FULL_LOAD_STYLE_KEY}"`))
   assert.doesNotMatch(revealSource, /^\s*(import|export)\s/m)
 })
@@ -330,7 +351,7 @@ test("an arrival applies the left style, names the stack, and cleans up when the
 })
 
 test("a motion's end leaves a Turbo visit's own style alone", async () => {
-  const { listeners, root } = reveal({ style: "fade-left" })
+  const { listeners, root } = reveal({ style: "slide-left" })
   const { viewTransition, finish } = transition()
   listeners.pagereveal({ viewTransition })
   root.dataset.pageTransition = "unfold-right"
@@ -349,8 +370,8 @@ test("an arrival nobody planned is skipped, so the browser's own fade never play
 })
 
 test("a page back from the cache sheds what it wore when it left, with or without a motion", () => {
-  const { listeners, root, store } = reveal({ style: "fade-left" })
-  root.dataset.pageTransition = "fade-left"
+  const { listeners, root, store } = reveal({ style: "slide-left" })
+  root.dataset.pageTransition = "slide-left"
   root.dataset.pageTransitionVisit = ""
   listeners.pagereveal({ viewTransition: null })
   assert.equal(root.dataset.pageTransition, undefined)
@@ -359,9 +380,9 @@ test("a page back from the cache sheds what it wore when it left, with or withou
 })
 
 test("a page with no stack still plays", () => {
-  const { listeners, root } = reveal({ style: "fade-left", stack: null })
+  const { listeners, root } = reveal({ style: "slide-left", stack: null })
   listeners.pagereveal({ viewTransition: transition().viewTransition })
-  assert.equal(root.dataset.pageTransition, "fade-left")
+  assert.equal(root.dataset.pageTransition, "slide-left")
 })
 
 test("storage that throws reads as a plain load, and nothing escapes", () => {
@@ -377,7 +398,7 @@ test("storage that throws reads as a plain load, and nothing escapes", () => {
 test("the first render waits for the whole page only on a planned arrival, up to the cap", () => {
   assert.equal(reveal().appended.length, 0)
   assert.equal(reveal().timers.length, 0)
-  const { appended: [link], timers: [timer] } = reveal({ style: "fade-left" })
+  const { appended: [link], timers: [timer] } = reveal({ style: "slide-left" })
   assert.equal(link.rel, "expect")
   assert.equal(link.blocking, "render")
   assert.match(link.href, /^#/)

@@ -12,7 +12,10 @@ require "nokogiri"
 # [integration] Studio.page_transition_direction against the REAL lib/studio.rb (the
 # test_helper mirror does not validate), and the lab route the browser lane drives.
 class PageTransitionDirectionTest < ActionDispatch::IntegrationTest
-  teardown { Studio.page_transition_direction = nil }
+  teardown do
+    Studio.page_transition_direction = nil
+    Studio.page_transition_style = nil
+  end
 
   test "the writer takes the four directions, as a symbol or a string, and nil" do
     %i[left right top bottom].each do |direction|
@@ -28,6 +31,37 @@ class PageTransitionDirectionTest < ActionDispatch::IntegrationTest
   test "the writer refuses a typo at boot" do
     error = assert_raises(ArgumentError) { Studio.page_transition_direction = :diagonal }
     assert_includes error.message, "left, right, top, bottom"
+  end
+
+  test "the style writer takes the two styles, as a symbol or a string, and nil is the default" do
+    %i[slide unfold].each do |style|
+      Studio.page_transition_style = style
+      assert_equal style, Studio.page_transition_style
+    end
+    Studio.page_transition_style = "unfold"
+    assert_equal :unfold, Studio.page_transition_style
+    Studio.page_transition_style = nil
+    assert_equal :slide, Studio.page_transition_style
+  end
+
+  test "an absent style is the slide, never a draw" do
+    assert_equal :slide, Studio.page_transition_style
+    get "/lab/page_transitions?direction=left"
+    assert_includes response.body, '<meta name="page-transition-style" content="slide">'
+  end
+
+  test "the style writer refuses a typo at boot" do
+    error = assert_raises(ArgumentError) { Studio.page_transition_style = :fade }
+    assert_includes error.message, "slide, unfold"
+  end
+
+  test "the style renders only with a direction" do
+    Studio.page_transition_style = :unfold
+    get "/lab/page_transitions"
+    refute_includes response.body, "page-transition-style"
+
+    get "/lab/page_transitions?direction=right"
+    assert_includes response.body, '<meta name="page-transition-style" content="unfold">'
   end
 
   test "a set direction renders the metas and the module tag; none renders neither" do
@@ -95,6 +129,22 @@ class PageTransitionDirectionTest < ActionDispatch::IntegrationTest
     get "/agent_chat_lab"
     assert_includes response.body, 'data-vt-morph="agent-portrait"'
     assert_includes response.body, 'data-vt-morph="agent-composer"'
+  end
+
+  test "every page's head carries the loader overlay in a template, and the setting takes it away" do
+    get "/lab/page_transitions"
+    head = Nokogiri::HTML(response.body).at_css("head")
+    template = head.at_css("template[data-studio-loader-overlay-template]")
+    assert template, "no overlay template in the head"
+    assert_includes template.inner_html, "data-min-show=\"750\""
+    assert_includes template.inner_html, "data-delay=\"350\""
+    assert_nil Nokogiri::HTML(response.body).at_css("body [data-studio-loader-overlay]"), "a page with no overlay of its own has none in the body"
+
+    Studio.loader_overlay = false
+    get "/lab/page_transitions"
+    refute_includes response.body, "data-studio-loader-overlay-template"
+  ensure
+    Studio.loader_overlay = true
   end
 
   test "the module is pinned for a host, and not preloaded on every page" do

@@ -9,6 +9,15 @@
 //                 data-studio-loader-overlay, outlasts the overlay's data-delay
 //                 ms; hidden when the page arrives. Its role=status label is
 //                 announced: the overlay never marks itself aria-busy.
+//   the pace      one standard for every app: a visit under data-delay ms shows no
+//                 overlay and waits for nothing; once the overlay of a visit has
+//                 shown, it stays data-min-show ms. Turbo's hook for a pause,
+//                 turbo:before-render, comes AFTER a view transition took the old
+//                 page's picture, with rendering paused, so a hold there would
+//                 freeze the loader and carry it out in that picture. So the wait
+//                 is on the response, ahead of all of that: see holdVisitResponse.
+//   the door      a host need not render the overlay. layouts/studio/_head carries
+//                 it in a <template>, and this module adds it to the body at need.
 //   pending       a button holding studio_loader_pending. Turbo marks a
 //                 submitting form aria-busy itself; for a form Turbo does not
 //                 drive, the submitter is marked here, and cleared on pagehide
@@ -20,10 +29,13 @@
 //                 clears at once, on turbo:reload.
 //   the API       window.StudioLoader.show(caption) / hide() for any other long
 //                 wait, and setPercent(el, n) for a loader drawn with percent:.
+//                 hide() is immediate. It ends any wait, because the caller owns
+//                 that moment, and a caller's show() has no minimum.
 //
 // The logic is exported for test/javascript/loader.test.mjs.
 
 export var DEFAULT_DELAY_MS = 350
+export var DEFAULT_MIN_SHOW_MS = 750
 export var MAX_WAIT_MS = 15000
 
 // Only a visit the user started earns the overlay: a click or Turbo.visit
@@ -37,6 +49,11 @@ export function userVisit(event) {
 export function overlayDelay(overlay) {
   var value = overlay ? parseInt(overlay.getAttribute('data-delay'), 10) : NaN
   return value >= 0 ? value : DEFAULT_DELAY_MS
+}
+
+export function overlayMinShow(overlay) {
+  var value = overlay ? parseInt(overlay.getAttribute('data-min-show'), 10) : NaN
+  return value >= 0 ? value : DEFAULT_MIN_SHOW_MS
 }
 
 // The percent a caller handed setPercent, clamped to a number in 0..100.
@@ -58,6 +75,97 @@ function findOverlay(doc) {
 var pendingTimer = null
 var capTimer = null
 var autoShown = false
+var shownAt = null
+var deferredHide = null
+var releaseHold = null
+var visitSignal = null
+
+// The host's own overlay, else the one layouts/studio/_head carries. Added once:
+// querySelector cannot see into a <template>.
+function ensureOverlay(doc) {
+  var overlay = findOverlay(doc)
+  if (overlay || !doc.body) return overlay
+  var template = doc.querySelector('template[data-studio-loader-overlay-template]')
+  if (!template) return null
+  doc.body.appendChild(doc.importNode(template.content, true))
+  return findOverlay(doc)
+}
+
+// What is left of the minimum for an overlay a visit showed. Zero for one that is
+// not showing, and for one a caller opened with show().
+export function minShowLeft(overlay, now) {
+  if (!overlay || overlay.hidden || shownAt === null) return 0
+  return Math.max(0, overlayMinShow(overlay) - (now - shownAt))
+}
+
+// A page that must stay its own document answers this way. Turbo loads it again by
+// a full load, so this response paints nothing, and a wait here would only delay it.
+export function answersWithFullLoad(html) {
+  return /<meta[^>]*(turbo-visit-control[^>]*reload|reload[^>]*turbo-visit-control)/i.test(html || '')
+}
+
+export function noteVisitRequest(event, doc) {
+  if (event.target === doc.documentElement) visitSignal = event.detail.fetchOptions.signal
+}
+
+function endHold() {
+  if (releaseHold) releaseHold()
+}
+
+// Turbo reads response.responseHTML, and only then records the response, caches the
+// page and opens its view transition. So this is the last moment the page is live
+// with the response in hand. The rest of the minimum runs here and the overlay goes,
+// so the old picture has no overlay in it. It always ends: at the timer, at hide(),
+// or at the next visit. A later hold (the transition's wait for images) comes after
+// this one has ended, inside the render, so neither can cut the other short. Turbo
+// renders even a cancelled visit's response, so that HTML never goes: a Back must win.
+//
+// Only a visit's own good HTML waits. A frame, a form and a prefetch have another
+// target. A failure and a download pass straight through.
+export function holdVisitResponse(event, doc) {
+  doc = doc || document
+  if (event.target !== doc.documentElement) return false
+  clearTimeout(pendingTimer)
+  pendingTimer = null
+  var response = event.detail && event.detail.fetchResponse
+  // A body that fails after its headers rejects here, and Turbo fires nothing for it.
+  if (response) Promise.resolve(response.responseHTML).catch(function () { hide(doc) })
+  if (!response || !response.succeeded || !response.isHTML) return false
+  var overlay = findOverlay(doc)
+  if (minShowLeft(overlay, Date.now()) <= 0) return false
+  var signal = visitSignal
+  var held = Promise.resolve(response.responseHTML).then(function (html) {
+    if (answersWithFullLoad(html)) return html
+    var left = minShowLeft(overlay, Date.now())
+    if (left <= 0) return html
+    return new Promise(function (resolve) {
+      var done = function (value) { if (!signal || !signal.aborted) resolve(value) }
+      var timer = setTimeout(function () {
+        releaseHold = null
+        hide(doc)
+        done(html)
+      }, left)
+      releaseHold = function () {
+        clearTimeout(timer)
+        releaseHold = null
+        done(html)
+      }
+    })
+  })
+  Object.defineProperty(response, 'responseHTML', { configurable: true, value: held })
+  return true
+}
+
+// A form's overlay ends with its submit, and no render waits on it, so this only
+// keeps the overlay up for the rest of its minimum.
+export function hideAfterMinimum(doc) {
+  doc = doc || document
+  var left = minShowLeft(findOverlay(doc), Date.now())
+  if (left <= 0) return hide(doc)
+  clearTimeout(deferredHide)
+  deferredHide = setTimeout(function () { hide(doc) }, left)
+  return true
+}
 
 // The overlay's status is a live region; rewriting its label after the overlay
 // unhides makes a screen reader say it, where text already present when a
@@ -77,8 +185,11 @@ export function show(caption, doc) {
   doc = doc || document
   clearTimeout(pendingTimer)
   pendingTimer = null
+  clearTimeout(deferredHide)
+  deferredHide = null
   autoShown = false
-  var overlay = findOverlay(doc)
+  shownAt = null
+  var overlay = ensureOverlay(doc)
   if (!overlay) return false
   var line = overlay.querySelector('[data-studio-loader-caption]')
   if (line) line.textContent = caption || ''
@@ -94,6 +205,10 @@ export function hide(doc) {
   doc = doc || document
   clearTimeout(pendingTimer)
   pendingTimer = null
+  clearTimeout(deferredHide)
+  deferredHide = null
+  shownAt = null
+  endHold()
   var overlay = findOverlay(doc)
   if (!overlay) return false
   overlay.removeAttribute('data-state')
@@ -134,10 +249,14 @@ function armCap(doc) {
 // slow Turbo visit keeps its overlay until the page arrives.
 export function showSoon(caption, doc) {
   doc = doc || document
-  var overlay = findOverlay(doc)
+  var overlay = ensureOverlay(doc)
   if (!overlay || !overlay.hidden) return
   clearTimeout(pendingTimer)
-  pendingTimer = setTimeout(function () { show(caption, doc); autoShown = true }, overlayDelay(overlay))
+  pendingTimer = setTimeout(function () {
+    show(caption, doc)
+    autoShown = true
+    shownAt = Date.now()
+  }, overlayDelay(overlay))
 }
 
 export function markBusy(button, doc) {
@@ -168,7 +287,13 @@ export function installStudioLoader(doc) {
   if (installed) return
   installed = true
 
-  doc.addEventListener('turbo:visit', function (event) { if (userVisit(event)) showSoon('', doc) })
+  doc.addEventListener('turbo:visit', function (event) {
+    // The response a hold still waits on belongs to a visit that is over.
+    endHold()
+    if (userVisit(event)) showSoon('', doc)
+  })
+  doc.addEventListener('turbo:before-fetch-request', function (event) { noteVisitRequest(event, doc) })
+  doc.addEventListener('turbo:before-fetch-response', function (event) { holdVisitResponse(event, doc) })
   // turbo:reload: the response was not HTML (a download), or the visit failed,
   // and Turbo hands the URL to the browser; no page may ever replace this one.
   ;['turbo:load', 'turbo:render', 'turbo:before-cache', 'turbo:fetch-request-error', 'turbo:frame-load', 'turbo:reload'].forEach(function (name) {
@@ -189,7 +314,7 @@ export function installStudioLoader(doc) {
   })
   doc.addEventListener('turbo:submit-end', function (event) {
     var form = event.target
-    if (form && form.hasAttribute && form.hasAttribute('data-studio-loader-overlay')) hide(doc)
+    if (form && form.hasAttribute && form.hasAttribute('data-studio-loader-overlay')) hideAfterMinimum(doc)
   })
 
   // A form Turbo does not drive navigates away on its own; mark the button and,

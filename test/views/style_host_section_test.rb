@@ -197,3 +197,21 @@ class StyleHostSectionTest < ActiveSupport::TestCase
     str.gsub(/\s+/, " ").strip
   end
 end
+
+# The logos seam: a host's style/host/_logos replaces the Theme section's default grid, and with none
+# the default stands. Its own view root, so the host-modals fixture's byte compare above stays true.
+class StyleHostLogosTest < Minitest::Test
+  def test_a_host_logo_block_replaces_the_default_grid
+    Dir.mktmpdir do |root|
+      FileUtils.mkdir_p(File.join(root, "style/host"))
+      File.write(File.join(root, "style/host/_logos.html.erb"), %(<p data-test="host-logos">Ours</p>))
+      theme_seam = File.read("app/views/style/_theme.html.erb")
+      assert_includes theme_seam, %(lookup_context.exists?("logos", ["style/host"], true))
+      assert_includes theme_seam, %(render "style/host/logos")
+
+      lookup = ActionView::LookupContext.new([root, "app/views"])
+      assert lookup.exists?("logos", ["style/host"], true), "a host's partial is found"
+      refute ActionView::LookupContext.new(["app/views"]).exists?("logos", ["style/host"], true), "no host, no seam"
+    end
+  end
+end

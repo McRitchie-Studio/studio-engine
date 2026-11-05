@@ -425,20 +425,44 @@ test("a page's own booking link opens the same popup, and the backdrop closes it
   await expect(dialog(page)).toBeHidden();
 });
 
-test("with no dialog on the page, or on a modified click, the link's href is the fallback", async ({ page, context }) => {
+// A MODIFIED CLICK OPENS A TAB, AND THE BROWSER'S OWN TARGET LIST SAYS SO. Do not go
+// back to context.waitForEvent("page"). Playwright 1.62.1 sometimes never fires that
+// event for a tab Chromium did open. It failed this spec on two `accepted` runs.
+// Linux Chromium held to 0.4 of a CPU shows it about once in 80 clicks, on a bare page
+// with no engine code too. At that miss Chromium listed a new page target at the
+// link's URL and its request had gone out, but context.pages() still held one page.
+//
+// So this reads what the visitor gets: one new tab, at this URL. This lane is
+// Chromium only (playwright.config.js), so the browser's protocol is there to ask.
+async function expectModifiedClickOpensTab(page, link, url) {
+  const cdp = await page.context().browser().newBrowserCDPSession();
+  const tabs = async () => (await cdp.send("Target.getTargets")).targetInfos.filter((target) => target.type === "page");
+  const before = new Set((await tabs()).map((target) => target.targetId));
+
+  await link.click({ modifiers: ["ControlOrMeta"] });
+
+  let opened = [];
+  await expect.poll(async () => {
+    opened = (await tabs()).filter((target) => !before.has(target.targetId));
+    return opened.map((target) => target.url);
+  }).toEqual([expect.stringMatching(url)]);
+
+  await cdp.send("Target.closeTarget", { targetId: opened[0].targetId });
+  await cdp.detach();
+}
+
+test("with no dialog on the page, or on a modified click, the link's href is the fallback", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await stubGoogle(page);
   await page.goto("/lab/site_footer");
   const link = page.locator("footer[data-site-footer] a[data-booking-popup]");
   await expect(link).toHaveAttribute("href", "/lab/site_footer/schedule");
 
-  // A modified click is left to the browser: a new tab on the booking page, and
-  // no dialog here.
-  const [tab] = await Promise.all([context.waitForEvent("page"), link.click({ modifiers: ["ControlOrMeta"] })]);
-  // A new tab starts on about:blank; wait for it to arrive, not merely to load.
-  await tab.waitForURL(/\/lab\/site_footer\/schedule$/);
+  // A modified click is left to the browser: a new tab on the booking page, no
+  // dialog here, and this page stays where it is.
+  await expectModifiedClickOpensTab(page, link, /\/lab\/site_footer\/schedule$/);
   await expect(dialog(page)).toBeHidden();
-  await tab.close();
+  await expect(page).toHaveURL(/\/lab\/site_footer$/);
 
   // No dialog (a page that renders booking links and no popup): the link is a link.
   await dialog(page).evaluate((el) => el.remove());
