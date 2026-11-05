@@ -1,0 +1,39 @@
+<%# studio/_section_header under the real chrome (E2eLabController#section_header): the
+    navbar and the page row above, three sections, and a long table in the second, so
+    the table's clone has to sit under the section's bar. The rows and the table are the
+    engine's partials and a plain host table. %>
+<%= render "studio/banners/stack", devnet: @lab_devnet %>
+<%= render "layouts/navbar", balance_html: nil, scroll_timeline: params[:timeline].present? %>
+<div class="max-w-6xl mx-auto px-4 pt-6 pb-16">
+  <%= render "studio/page_header", title: "Sections", label: "Lab" %>
+  <div class="space-y-16 pt-10">
+    <section id="first" class="section-target space-y-8">
+      <%= render "studio/section_header", title: "First" %>
+      <p>The first section's intro.</p>
+      <div style="height: 1200px">The first section.</div>
+    </section>
+    <section id="second" class="section-target space-y-8">
+      <%= render "studio/section_header", title: "Second, with a title long enough to run past the width of a phone" %>
+      <p>The second section's intro.</p>
+      <table data-test="lab-table" class="w-full text-left">
+        <thead>
+          <tr><th class="px-3 py-2">Rank</th><th class="px-3 py-2">Entry</th></tr>
+        </thead>
+        <tbody>
+          <% 60.times do |i| %>
+            <tr><td class="px-3 py-2"><%= i + 1 %></td><td class="px-3 py-2">Entry <%= i + 1 %></td></tr>
+          <% end %>
+        </tbody>
+      </table>
+      <section id="inner" class="section-subtarget space-y-4">
+        <h3 class="type-h4 text-heading">Inside the second</h3>
+        <div style="height: 900px">An inner group.</div>
+      </section>
+    </section>
+    <section id="third" class="section-target space-y-8">
+      <%= render "studio/section_header", title: "Third" %>
+      <p>The third section's intro.</p>
+      <div style="height: 1600px">The third section.</div>
+    </section>
+  </div>
+</div>

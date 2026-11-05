@@ -5,9 +5,9 @@
     An app that does not draw the gallery here (lookbook not in its bundle, or
     production without Studio.lookbook_in_production) says so instead of linking
     to a 404. -%>
-<section id="components" class="space-y-6" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
+<section id="components" class="section-target space-y-6">
+  <%= render "studio/section_header", title: "Components" %>
   <div class="space-y-1">
-    <h2 class="type-h3 text-heading">Components</h2>
     <p class="text-muted text-sm max-w-2xl">
       The engine's ViewComponent classes, one preview per state, in the component gallery.
     </p>

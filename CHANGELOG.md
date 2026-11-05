@@ -4,6 +4,18 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **Section headers that stack under the page header: `studio/_section_header`.** Render it
+  as the first child of a `<section>`. The title sticks directly under the page row, takes a
+  bar (solid in light and dark, glass under glass), and the next section's header takes its
+  place, by CSS sticky and no scroll script. `/admin/style` uses it on every section,
+  including a host's own. It joins the pinned stack as one layer, `section`: a new
+  `data-pin-section`, and `--pin-section-top`, `-h` and `-bottom`. Only the stuck header
+  counts, so `--pin-stack-bottom` and a table's sticky header sit under it. New classes:
+  `section-header`, `section-header-title`, `section-target` and `section-subtarget`, which
+  replace a hand-written `scroll-margin-top`. Detail: `docs/PAGE_HEADER.md`.
+
 ### Changed
 
 - **A bad or missing CSRF token on a JSON or `Accept: */*` request is now a 422 with no ErrorLog

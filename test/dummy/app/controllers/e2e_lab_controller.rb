@@ -752,6 +752,13 @@ class E2eLabController < ActionController::Base
     @lab_right = params[:right].presence || "tabs"
   end
 
+  # studio/_section_header under the real chrome, with a table inside a section.
+  # ?timeline=1 puts the header on the scroll-driven collapse.
+  def section_header
+    @lab_sticky_table_headers = true
+    bar_stack_locals
+  end
+
   # The style guide's Tasks section: three live boards on the board primitive
   # (a kanban, one with chrome state and an archive column, and a depth chart
   # with locked cards), all in demo mode, so a drag sends nothing.

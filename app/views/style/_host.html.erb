@@ -90,10 +90,9 @@
      A reader who assumes dsModals will build a mirror instead: a second copy of
      every card, free to drift from the one the app actually ships, which is the
      opposite of what a living style guide is for. %>
-<section id="host-modals" class="space-y-8" x-data="{}"
-         style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
+<section id="host-modals" class="section-target space-y-8" x-data="{}">
+  <%= render "studio/section_header", title: Studio.app_name %>
   <div class="space-y-1">
-    <h2 class="type-h3 text-heading"><%= Studio.app_name %></h2>
     <p class="text-muted text-sm max-w-2xl">
       This app&rsquo;s own modals, contributed by
       <code class="font-mono text-2xs bg-inset px-1.5 py-0.5 rounded">app/views/style/host/_modals.html.erb</code>.

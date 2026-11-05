@@ -5,7 +5,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/pinned_stack.js", import.meta.url), "utf8")
-const { composed, order, readsLive, followerSelectors, pinnedAt, measurePin, stackBottom, stackReading, publishedKey, PUBLISHED_EVENT } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
+const { composed, stuckSection, order, readsLive, followerSelectors, pinnedAt, measurePin, stackBottom, stackReading, publishedKey, PUBLISHED_EVENT } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 // A reading as measure() returns it, with an element that answers only the
 // one attribute composed() reads.
@@ -299,4 +299,124 @@ test("a publish is announced only when the stack moved: its bottom, its mode or 
   assert.notEqual(publishedKey(base), publishedKey({ ...base, timeline: false }))
   assert.notEqual(publishedKey(base), publishedKey({ ...base, travel: 0 }))
   assert.equal(PUBLISHED_EVENT, "studio:pinned-stack-published")
+})
+
+// --- the section layer (task stacked-section-headers) ------------------------
+//
+// Many headers, one layer. A header waiting below the fold must not move the stack,
+// and only the stuck one adds its edge.
+
+test("a header counts once it reaches the line, until it is past it", () => {
+  const at = (top) => stuckSection([{ top, bottom: top + 36, parentTop: top - 500 }], 100)
+  assert.equal(at(400), -1, "below the fold")
+  assert.equal(at(101), -1, "still a pixel short")
+  assert.equal(at(100), 0, "on the line")
+  assert.equal(at(80), 0, "being pushed out: part of it still shows")
+  assert.equal(at(64), -1, "pushed out whole")
+})
+
+test("a header resting on the line has not left its place, so it is not stuck", () => {
+  assert.equal(stuckSection([{ top: 100, bottom: 136, parentTop: 100 }], 100), -1)
+})
+
+test("of the headers on the page, the one at the line is the stuck one", () => {
+  const rects = [
+    { top: -900, bottom: -864, parentTop: -900 },
+    { top: 100, bottom: 136, parentTop: -300 },
+    { top: 900, bottom: 936, parentTop: 900 }
+  ]
+  assert.equal(stuckSection(rects, 100), 1)
+})
+
+const sectionEl = (top, parentTop = top - 500) => {
+  const el = fakeEl({ h: 36, bottom: top + 36 })
+  el.getBoundingClientRect = () => ({ top, bottom: top + 36 })
+  el.parentElement = { getBoundingClientRect: () => ({ top: parentTop }) }
+  el.compareDocumentPosition = () => 0
+  return el
+}
+
+// A nav, a page row under it, and the given headers, in document order.
+const withSections = (sections, { attrs = {}, style = {}, position = "sticky", navH = 64, navBottom = 64, pageBottom = 120 } = {}) => {
+  const nav = fakeEl({ name: "nav", h: navH, bottom: navBottom, attrs, style })
+  const page = fakeEl({ name: "page", h: 56, bottom: pageBottom })
+  const doc = fakeDocument(nav, [page])
+  const all = doc.querySelectorAll
+  doc.querySelectorAll = (sel) => (sel === "[data-pin-section]" ? sections : all(sel))
+  return { doc, win: { getComputedStyle: () => ({ position }) } }
+}
+
+const reading = (sections, options) => {
+  const { doc, win } = withSections(sections, options)
+  const saved = [globalThis.document, globalThis.window]
+  globalThis.document = doc
+  globalThis.window = win
+  try { return stackReading() } finally { [globalThis.document, globalThis.window] = saved }
+}
+
+test("headers waiting below the fold do not move the stack, and publish at height 0", () => {
+  const r = reading([sectionEl(900), sectionEl(2000)])
+  assert.equal(r.bottom, 120)
+  assert.deepEqual(r.layers.section, { h: 0, top: 120, bottom: 0 })
+})
+
+test("the stack bottom includes the stuck header", () => {
+  const r = reading([sectionEl(-400), sectionEl(120), sectionEl(900)])
+  assert.equal(r.bottom, 156)
+  assert.deepEqual(r.layers.section, { h: 36, top: 120, bottom: 156 })
+})
+
+test("a header being pushed out gives its room back", () => {
+  const r = reading([sectionEl(100), sectionEl(900)])
+  assert.equal(r.bottom, 136)
+  assert.deepEqual(r.layers.section, { h: 16, top: 120, bottom: 136 })
+})
+
+test("a header the CSS left in the flow never counts", () => {
+  const r = reading([sectionEl(120), sectionEl(900)], { position: "relative" })
+  assert.equal(r.bottom, 120)
+  assert.equal(r.layers.section.h, 0)
+})
+
+test("on the scroll timeline the stuck header stacks by height too", () => {
+  const options = { attrs: { "data-nav-timeline-on": "" }, style: { "--nav-band": "40px" }, navH: 104 }
+  const r = reading([sectionEl(120), sectionEl(900)], options)
+  // The compact bar 64, the row 56, the bar 36.
+  assert.equal(r.bottom, 156)
+  assert.deepEqual(r.layers.section, { h: 36, top: 120, bottom: 156 })
+})
+
+test("the publisher puts the bar on the stuck header alone, and a swap keeps the roster", async () => {
+  const toggled = (el) => { el.toggleAttribute = (n, on) => (on ? el.setAttribute(n, "") : el.removeAttribute(n)); return el }
+  let top = 900
+  const first = toggled(sectionEl(0))
+  first.getBoundingClientRect = () => ({ top, bottom: top + 36 })
+  const second = toggled(sectionEl(2000))
+  second.setAttribute("data-stuck", "") // a Turbo snapshot's leftover
+  const { doc, win } = withSections([first, second])
+  toggled(doc.documentElement)
+  const saved = ["window", "document", "ResizeObserver", "performance"].map((k) => [k, globalThis[k]])
+  const scroll = []
+  globalThis.document = doc
+  globalThis.performance = { now: () => 1000 }
+  globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
+  globalThis.window = { ...win, ResizeObserver: globalThis.ResizeObserver, requestAnimationFrame: (fn) => fn(),
+    addEventListener: (type, fn) => { if (type === "scroll") scroll.push(fn) } }
+  try {
+    const mod = await freshModule()
+    mod.startPinnedStack()
+    assert.equal(doc.documentElement.hasAttribute("data-pin-live"), true, "the publisher says it runs")
+    assert.equal(first.hasAttribute("data-stuck"), false)
+    assert.equal(second.hasAttribute("data-stuck"), false, "the leftover is cleared")
+    assert.equal(doc.documentElement.hasAttribute("data-pin-section-stuck"), false)
+    assert.equal(doc.documentElement.style.getPropertyValue("--pin-section-top"), "120px", "the line is published while none is stuck")
+
+    top = 120
+    scroll.forEach((fn) => fn())
+    assert.equal(first.hasAttribute("data-stuck"), true)
+    assert.equal(second.hasAttribute("data-stuck"), false)
+    assert.equal(doc.documentElement.hasAttribute("data-pin-section-stuck"), true)
+  } finally {
+    saved.forEach(([k, v]) => { globalThis[k] = v })
+  }
 })

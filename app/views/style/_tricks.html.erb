@@ -31,9 +31,9 @@
 
   leveling_on = Studio.feature?(:leveling)
 %>
-<section id="tricks" class="space-y-12" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
+<section id="tricks" class="section-target space-y-12">
+  <%= render "studio/section_header", title: "Tricks" %>
   <div class="space-y-1">
-    <h2 class="type-h3 text-heading">Tricks</h2>
     <p class="text-muted text-sm max-w-2xl">
       A board of style tricks you can see and hand to an agent to use out of the box.
       Each specimen surfaces the rendered primitive, its <strong>class name (one-click
@@ -79,7 +79,7 @@
       <p class="text-muted text-sm">
         <code class="font-mono text-2xs">studio/_page_header</code>: the title, optional meta beside
         it and optional tabs on the right. This page's own title row is one: scroll to see it take the bar.
-        It joins the pinned stack, so a table's sticky header sits under it: navbar, page row, table
+        It joins the pinned stack, so a table's sticky header sits under it: navbar, page row, section, table
         header, each below the last. The rule is in <code class="font-mono text-2xs">docs/PAGE_HEADER.md</code>.
       </p>
     </div>
@@ -101,6 +101,31 @@
                 <a href="#tricks" class="btn btn-sm btn-neutral">Teams</a>
               </div>
             </div>
+          <% end %>
+        <% end %>
+      <% end %>
+    </div>
+  </section>
+
+  <!-- Section header -->
+  <section class="space-y-5" data-section-header-specimen>
+    <div class="space-y-1">
+      <h3 class="type-h4 text-heading">Section header</h3>
+      <p class="text-muted text-sm">
+        <code class="font-mono text-2xs">studio/_section_header</code>: a section's title that sticks under
+        the page row until the next section's takes its place. This page's own section titles are these.
+        The rule is in <code class="font-mono text-2xs">docs/PAGE_HEADER.md</code>.
+      </p>
+    </div>
+    <div class="grid gap-4 lg:grid-cols-2">
+      <%# The classes alone, not the partial: the partial's header sticks and joins the
+          pinned stack, and a specimen must do neither. %>
+      <% [["At rest", {}], ["Stuck", { stuck: "" }]].each do |state, data| %>
+        <%= render layout: "style/specimen",
+              locals: { klass: "studio/_section_header (#{state.downcase})",
+                        usage: %(<section id="modals" class="section-target">\n  <%= render "studio/section_header", title: "Modals" %\>\n  ...\n</section>) } do %>
+          <%= tag.div(class: "section-header px-4", data: data) do %>
+            <p class="section-header-title">Modals</p>
           <% end %>
         <% end %>
       <% end %>
@@ -231,7 +256,7 @@
       loader_config[:art] && Studio::Loader.art(loader_config[:art], style)
     end
   %>
-  <section id="loader" class="space-y-5" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
+  <section id="loader" class="section-subtarget space-y-5">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Branded loader</h3>
       <p class="text-muted text-sm max-w-2xl">
