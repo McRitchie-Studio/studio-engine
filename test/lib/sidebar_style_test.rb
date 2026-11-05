@@ -48,10 +48,17 @@ class SidebarStyleTest < Minitest::Test
     assert_nil current("/booksellers")
   end
 
+  # Both orders: a first-match walk passes one of them and fails the other.
   def test_the_longest_match_wins_whatever_the_order
-    assert_equal "/build/requests", current("/build/requests")
-    assert_equal "/build/requests", current("/build/requests/9")
-    assert_equal "/build", current("/build/9")
+    short_first = [{ links: [{ href: "/build" }, { href: "/build/requests" }] }]
+    long_first = [{ links: [{ href: "/build/requests" }, { href: "/build" }] }]
+    across_sections = [{ links: [{ href: "/build" }] }, { links: [{ href: "/build/requests" }] }]
+
+    [short_first, long_first, across_sections].each do |sections|
+      assert_equal "/build/requests", Studio::SidebarSections.current_href(sections, "/build/requests")
+      assert_equal "/build/requests", Studio::SidebarSections.current_href(sections, "/build/requests/9")
+      assert_equal "/build", Studio::SidebarSections.current_href(sections, "/build/9")
+    end
   end
 
   def test_root_only_matches_itself
@@ -66,6 +73,15 @@ class SidebarStyleTest < Minitest::Test
 
   def test_an_anchor_or_a_mailto_never_lights
     assert_nil Studio::SidebarSections.current_href([{ links: [{ href: "#top" }, { href: "mailto:a@b.c" }, { href: "" }, { href: nil }] }], "/", host: nil)
+  end
+
+  # URI.parse raises InvalidComponentError for this, not InvalidURIError. This runs on every
+  # page under glass, so a raise here is a 500 for a host with such an href.
+  def test_an_href_uri_refuses_lights_nothing_and_leaves_the_other_rows_alone
+    sections = [{ links: [{ href: "mailto:foo?bar" }, { href: "http://exa mple.com/" }, { href: "/books" }] }]
+
+    assert_nil Studio::SidebarSections.current_href(sections, "/nowhere")
+    assert_equal "/books", Studio::SidebarSections.current_href(sections, "/books")
   end
 
   def test_nothing_lights_without_a_path

@@ -1202,17 +1202,25 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       --glass-thin-fill: rgb(36 30 62 / 0.72);
       --glass-filter: blur(24px) saturate(150%) brightness(0.8);
       --glass-ink: #f1effa;
-      --glass-soft-ink: #cdc8e2;
+      --glass-soft-ink: #dedaed; /* 4.5:1 on the thin fill alone over white, if a blur never paints */
       --glass-hover: rgb(255 255 255 / 0.1);
       --glass-line: rgb(255 255 255 / 0.14);
       --glass-shadow: 0 24px 60px rgb(0 0 0 / 0.5);
     }
+    /* The less-transparency rule turns the blur off, rather than this rule asking for that
+       setting's absence: a browser that does not know the media feature answers false to a
+       not query as well, which left Safari and Firefox on the solid fill. */
     @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-      @media not (prefers-reduced-transparency: reduce) {
+      [data-sidebar-glass-shell] {
+        background-color: var(--glass-thin-fill);
+        -webkit-backdrop-filter: var(--glass-filter);
+        backdrop-filter: var(--glass-filter);
+      }
+      @media (prefers-reduced-transparency: reduce) {
         [data-sidebar-glass-shell] {
-          background-color: var(--glass-thin-fill);
-          -webkit-backdrop-filter: var(--glass-filter);
-          backdrop-filter: var(--glass-filter);
+          background-color: var(--glass-fill);
+          -webkit-backdrop-filter: none;
+          backdrop-filter: none;
         }
       }
     }
@@ -1277,6 +1285,10 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       background-color: color-mix(in srgb, var(--color-primary-600) 65%, var(--color-primary-700));
       box-shadow: 0 4px 14px rgb(var(--color-primary-rgb) / 0.4);
       color: #fff;
+    }
+    /* The glow above outranks the row's focus ring, and a box-shadow is all that ring is. */
+    [data-sidebar-glass-shell] nav > [role="group"] > a[aria-current="page"]:focus-visible {
+      box-shadow: inset 0 0 0 2px #fff, 0 4px 14px rgb(var(--color-primary-rgb) / 0.4);
     }
     [data-sidebar-glass-shell] a[aria-current="page"] [data-sidebar-row-desc] { color: rgb(255 255 255 / 0.9); }
     [data-sidebar-glass-shell] nav > [role="group"] > a + a { margin-top: var(--glass-row-gap); }

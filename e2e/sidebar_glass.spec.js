@@ -8,7 +8,8 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 // moved to the aside or removed (the shell spec); edge left on (the shell spec); a portrait left
 // at the host's 20px (the column spec); --glass-row-height below 32px (the hover spec);
 // pointer-events left on the frame (the inset spec); width: 100% dropped at the phone's
-// breakpoint (the phone spec).
+// breakpoint (the phone spec); the current row's :focus-visible rule removed (the focus spec); the
+// less-transparency undo removed (the setting spec).
 
 const panel = (page) => page.locator("#studio-link-sidebar");
 const phonePanel = (page) => page.locator("#studio-link-sidebar-mobile");
@@ -77,6 +78,46 @@ test("the row for this page is marked, and only that row", async ({ page }) => {
 
   await expect(panel(page).locator('a[aria-current="page"]')).toHaveCount(1);
   await expect(panel(page).locator('a[aria-current="page"]')).toContainText("This page");
+});
+
+// The row for this page has no description, so the ring is the only cue a keyboard user gets.
+test("the current row shows a focus ring beside its glow, in both themes", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openGlass(page);
+  const current = panel(page).locator('a[aria-current="page"]');
+  const ring = /rgb\(255, 255, 255\) 0px 0px 0px 2px inset/;
+
+  await expect(current).not.toHaveCSS("box-shadow", ring);
+  for (let presses = 0; presses < 20; presses += 1) {
+    await page.keyboard.press("Tab");
+    if (await current.evaluate((el) => el === document.activeElement)) break;
+  }
+  await expect(current).toBeFocused();
+
+  for (const dark of [true, false]) {
+    await page.evaluate((on) => document.documentElement.classList.toggle("dark", on), dark);
+    await expect(current).toHaveCSS("box-shadow", ring);
+    expect(await current.evaluate((el) => getComputedStyle(el).boxShadow)).toContain("0px 4px 14px");
+  }
+
+  await page.keyboard.press("Tab");
+  await expect(current).not.toHaveCSS("box-shadow", ring);
+  expect(await current.evaluate((el) => getComputedStyle(el).boxShadow)).toContain("0px 4px 14px");
+});
+
+test("the less-transparency setting keeps the solid fill and no blur, in both themes", async ({ page, context }) => {
+  const cdp = await context.newCDPSession(page);
+  await cdp.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-transparency", value: "reduce" }] });
+  await openGlass(page);
+  const read = () => shell(panel(page)).evaluate((el) => {
+    const css = getComputedStyle(el);
+    return { fill: css.backgroundColor, blur: css.backdropFilter };
+  });
+
+  await page.evaluate(() => document.documentElement.classList.add("dark"));
+  await expect.poll(read).toEqual({ fill: "rgba(36, 30, 62, 0.97)", blur: "none" });
+  await page.evaluate(() => document.documentElement.classList.remove("dark"));
+  await expect.poll(read).toEqual({ fill: "rgba(250, 249, 253, 0.97)", blur: "none" });
 });
 
 test("a hover moves no row and keeps both lines inside the row", async ({ page }) => {

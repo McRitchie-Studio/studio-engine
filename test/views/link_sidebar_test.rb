@@ -624,6 +624,40 @@ class LinkSidebarTest < Minitest::Test
     assert_equal ["/admin/geo"], rows.map { |row| row["href"] }
   end
 
+  # Safari and Firefox do not know prefers-reduced-transparency, so a not query is false there
+  # too and the blur never reaches them. The browser lane runs Chromium only, which knows the
+  # feature, so it cannot see this. This is the guard.
+  def test_the_blur_answers_to_supports_alone_and_the_setting_undoes_it
+    css = glass_stylesheet
+
+    refute_match(/@media\s+not\s*\(prefers-reduced-transparency/, css)
+    block = css[/@supports \(\(backdrop-filter: blur\(1px\)\).*?\n    \}\n/m]
+    refute_nil block
+    blur, undo = block.split("@media (prefers-reduced-transparency: reduce)")
+    %w[-webkit-backdrop-filter backdrop-filter].each do |property|
+      assert_match(/^\s*#{property}: var\(--glass-filter\);/, blur)
+      assert_match(/^\s*#{property}: none;/, undo)
+    end
+    assert_includes undo, "background-color: var(--glass-fill);"
+  end
+
+  # A headless WebKit paints the thin fill with no visible blur. If a real browser does too, the
+  # fill alone has to carry the text, over the page that is worst for each theme.
+  def test_the_thin_fill_alone_keeps_resting_text_at_4_5_to_1
+    css = glass_stylesheet
+    light = css[/^\s*\[data-sidebar-glass-shell\] \{\s*--glass-row-height.*?\n    \}/m]
+    dark = css[/^\s*\.dark \[data-sidebar-glass-shell\] \{.*?\n    \}/m]
+
+    { dark => [255, 255, 255], light => [0, 0, 0] }.each do |tokens, page|
+      fill, alpha = thin_fill(tokens)
+      seen = fill.zip(page).map { |ink, under| (alpha * ink) + ((1 - alpha) * under) }
+      %w[--glass-ink --glass-soft-ink].each do |token|
+        ink = tokens[/#{token}: #(\h{6})/, 1].scan(/../).map { |pair| pair.to_i(16) }
+        assert_operator contrast(ink, seen), :>=, 4.5, "#{token} over #{page.inspect}"
+      end
+    end
+  end
+
   def test_the_panel_without_glass_is_untouched_for_other_callers
     view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
     html = view.render(partial: "components/sidebar_panel", locals: { open: "x", edge: true, id: "p" })
@@ -635,6 +669,28 @@ class LinkSidebarTest < Minitest::Test
   end
 
   private
+
+  def glass_stylesheet
+    File.read(File.expand_path("../../app/assets/tailwind/studio_engine/engine.css", __dir__))
+  end
+
+  def thin_fill(tokens)
+    red, green, blue, alpha = tokens.match(%r{--glass-thin-fill: rgb\((\d+) (\d+) (\d+) / ([\d.]+)\)}).captures
+    [[red, green, blue].map(&:to_f), alpha.to_f]
+  end
+
+  def contrast(one, other)
+    lighter, darker = [one, other].map { |rgb| luminance(rgb) }.minmax.reverse
+    (lighter + 0.05) / (darker + 0.05)
+  end
+
+  def luminance(rgb)
+    red, green, blue = rgb.map do |channel|
+      value = channel / 255.0
+      value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055)**2.4
+    end
+    (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
+  end
 
   def with_glass
     prior = Studio.sidebar_style

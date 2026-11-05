@@ -7,8 +7,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 ### Added
 
 - **`Studio.sidebar_style = :glass`: an opt-in floating panel for the link sidebar.** The panel
-  insets from the page's edge with the page blurred through it, in both themes, with a nearly
-  solid fill where `backdrop-filter` is missing. It draws a link's `icon:`, marks the current page's
+  insets from the page's edge, in both themes. Where the browser supports `backdrop-filter` it
+  blurs the page through a 72% fill, and a nearly solid fill replaces that under the
+  reduced-transparency setting or with no support. The blur is read in Chromium. It is not read
+  in a real Safari, and a headless WebKit paints the fill with no visible blur, so the fill alone
+  holds resting text at 4.5:1 over the worst page for each theme. It draws a link's `icon:`, marks the current page's
   row with `aria-current="page"` in the app's primary color, and turns off the separate blurred
   edge. It hangs from the navbar, with square top corners, and its spacing is five tokens on the
   panel's shell. The default stays `:default`, so no app moves until it opts in.

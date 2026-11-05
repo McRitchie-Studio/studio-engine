@@ -71,7 +71,7 @@ module Studio
       return nil if uri.host && uri.host != host
 
       uri.path.chomp("/")
-    rescue URI::InvalidURIError
+    rescue URI::Error
       nil
     end
 
