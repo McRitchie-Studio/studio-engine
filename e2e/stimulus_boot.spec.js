@@ -93,13 +93,11 @@ test("the theme store toggles the root class and remembers the choice", async ({
   await page.goto("/lab/bar_stack");
   await page.waitForFunction(() => Boolean(window.Alpine && window.Alpine.store("theme")));
 
-  const after = await page.evaluate(() => {
-    window.Alpine.store("theme").toggle();
-    return {
-      value: window.Alpine.store("theme").value,
-      dark: document.documentElement.classList.contains("dark"),
-      stored: localStorage.getItem("theme")
-    };
-  });
-  expect(after).toEqual({ value: "light", dark: false, stored: "light" });
+  // A crossfade flips after the old picture, up to a frame later.
+  await page.evaluate(() => { window.Alpine.store("theme").toggle(); });
+  await expect.poll(() => page.evaluate(() => ({
+    value: window.Alpine.store("theme").value,
+    dark: document.documentElement.classList.contains("dark"),
+    stored: localStorage.getItem("theme")
+  }))).toEqual({ value: "light", dark: false, stored: "light" });
 });

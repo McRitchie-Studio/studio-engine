@@ -96,15 +96,13 @@ test("the theme and devMode stores register when studio/application fails to loa
   await expect(body).toHaveClass(/\bdev-mode\b/);
 
   // The theme store still toggles the root and remembers the choice.
-  const after = await page.evaluate(() => {
-    window.Alpine.store("theme").toggle();
-    return {
-      value: window.Alpine.store("theme").value,
-      dark: document.documentElement.classList.contains("dark"),
-      stored: localStorage.getItem("theme")
-    };
-  });
-  expect(after).toEqual({ value: "light", dark: false, stored: "light" });
+  // A crossfade flips after the old picture, up to a frame later.
+  await page.evaluate(() => { window.Alpine.store("theme").toggle(); });
+  await expect.poll(() => page.evaluate(() => ({
+    value: window.Alpine.store("theme").value,
+    dark: document.documentElement.classList.contains("dark"),
+    stored: localStorage.getItem("theme")
+  }))).toEqual({ value: "light", dark: false, stored: "light" });
   await expect(body).not.toHaveClass(/\bhost-dark\b/);
 
   expect(errors).toEqual([]);
