@@ -110,62 +110,66 @@ async function expectLanded(page, row, label, id, viewport, exact) {
 
 const TABS = [["Modals", "modals"], ["Tricks", "tricks"], ["Tasks", "tasks"], ["Theme", "theme"]];
 
-for (const [mode, url] of [["without Turbo", STYLE], ["under Turbo", `${STYLE}?turbo=1`]]) {
-  test(`a tab's jump shows the section's title under the row, on the right bar and tab, ${mode}`, async ({ page }) => {
-    const errors = watchPageErrors(page);
-    for (const viewport of [DESKTOP, PHONE]) {
-      await blockOffsiteRequests(page);
-      await page.setViewportSize(viewport);
-      await page.goto(url);
-      await page.waitForFunction(() => document.documentElement.hasAttribute("data-pin-live"));
-      const row = styleRow(page);
-      for (const [index, [label, id]] of TABS.entries()) {
-        await row.locator("a", { hasText: label }).click();
-        await page.waitForFunction((want) => location.hash === `#${want}`, id);
-        await page.waitForTimeout(500);
-        await expectLanded(page, row, label, id, viewport, index > 0);
-      }
-    }
-    expect(errors).toEqual([]);
-  });
-
-  test(`Back keeps the reader's place after two jumps, ${mode}`, async ({ page }) => {
+// Each check runs without Turbo and under it. Declared bare, twice: the lane's census counts
+// test( in the source, so a loop around test() would not match what runs.
+async function tabJump(page, url) {
+  const errors = watchPageErrors(page);
+  for (const viewport of [DESKTOP, PHONE]) {
     await blockOffsiteRequests(page);
-    await page.setViewportSize(PHONE);
+    await page.setViewportSize(viewport);
     await page.goto(url);
     await page.waitForFunction(() => document.documentElement.hasAttribute("data-pin-live"));
     const row = styleRow(page);
-    await row.locator("a", { hasText: "Modals" }).click();
-    await page.waitForFunction(() => location.hash === "#modals");
-    await page.waitForTimeout(300);
-    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
-    await page.waitForTimeout(300);
-    await row.locator("a", { hasText: "Tricks" }).click();
-    await page.waitForFunction(() => location.hash === "#tricks");
-    await page.waitForTimeout(300);
-    const before = await page.evaluate(() => window.scrollY);
-    await page.goBack();
-    await page.waitForFunction(() => location.hash === "#modals");
-    await page.waitForTimeout(800);
-    const held = await page.evaluate(() => window.scrollY);
-    await page.waitForTimeout(800);
-    expect(await page.evaluate(() => window.scrollY), "nothing moves the page after Back settles").toBe(held);
-    expect(held, "Back left the jump's place").toBeLessThan(before);
-  });
-
-  test(`a scroll right after a jump is the reader's or the app's, and holds, ${mode}`, async ({ page }) => {
-    await blockOffsiteRequests(page);
-    await page.setViewportSize(DESKTOP);
-    await page.goto(url);
-    await page.waitForFunction(() => document.documentElement.hasAttribute("data-pin-live"));
-    await styleRow(page).locator("a", { hasText: "Modals" }).click();
-    await page.waitForFunction(() => location.hash === "#modals");
-    await page.evaluate(() => window.scrollBy({ top: -300, behavior: "instant" }));
-    const held = await page.evaluate(() => window.scrollY);
-    await page.waitForTimeout(1800);
-    expect(await page.evaluate(() => window.scrollY)).toBe(held);
-  });
+    for (const [index, [label, id]] of TABS.entries()) {
+      await row.locator("a", { hasText: label }).click();
+      await page.waitForFunction((want) => location.hash === `#${want}`, id);
+      await page.waitForTimeout(500);
+      await expectLanded(page, row, label, id, viewport, index > 0);
+    }
+  }
+  expect(errors).toEqual([]);
 }
+async function backKeepsPlace(page, url) {
+  await blockOffsiteRequests(page);
+  await page.setViewportSize(PHONE);
+  await page.goto(url);
+  await page.waitForFunction(() => document.documentElement.hasAttribute("data-pin-live"));
+  const row = styleRow(page);
+  await row.locator("a", { hasText: "Modals" }).click();
+  await page.waitForFunction(() => location.hash === "#modals");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+  await page.waitForTimeout(300);
+  await row.locator("a", { hasText: "Tricks" }).click();
+  await page.waitForFunction(() => location.hash === "#tricks");
+  await page.waitForTimeout(300);
+  const before = await page.evaluate(() => window.scrollY);
+  await page.goBack();
+  await page.waitForFunction(() => location.hash === "#modals");
+  await page.waitForTimeout(800);
+  const held = await page.evaluate(() => window.scrollY);
+  await page.waitForTimeout(800);
+  expect(await page.evaluate(() => window.scrollY), "nothing moves the page after Back settles").toBe(held);
+  expect(held, "Back left the jump's place").toBeLessThan(before);
+}
+async function scrollHolds(page, url) {
+  await blockOffsiteRequests(page);
+  await page.setViewportSize(DESKTOP);
+  await page.goto(url);
+  await page.waitForFunction(() => document.documentElement.hasAttribute("data-pin-live"));
+  await styleRow(page).locator("a", { hasText: "Modals" }).click();
+  await page.waitForFunction(() => location.hash === "#modals");
+  await page.evaluate(() => window.scrollBy({ top: -300, behavior: "instant" }));
+  const held = await page.evaluate(() => window.scrollY);
+  await page.waitForTimeout(1800);
+  expect(await page.evaluate(() => window.scrollY)).toBe(held);
+}
+test("a tab's jump shows the section's title under the row, on the right bar and tab, without Turbo", async ({ page }) => tabJump(page, STYLE));
+test("a tab's jump shows the section's title under the row, on the right bar and tab, under Turbo", async ({ page }) => tabJump(page, `${STYLE}?turbo=1`));
+test("Back keeps the reader's place after two jumps, without Turbo", async ({ page }) => backKeepsPlace(page, STYLE));
+test("Back keeps the reader's place after two jumps, under Turbo", async ({ page }) => backKeepsPlace(page, `${STYLE}?turbo=1`));
+test("a scroll right after a jump is the reader's or the app's, and holds, without Turbo", async ({ page }) => scrollHolds(page, STYLE));
+test("a scroll right after a jump is the reader's or the app's, and holds, under Turbo", async ({ page }) => scrollHolds(page, `${STYLE}?turbo=1`));
 
 test("a load with a hash shows the title, with no error on a hash that cannot be decoded", async ({ page }) => {
   const errors = watchPageErrors(page);
