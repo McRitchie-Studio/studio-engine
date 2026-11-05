@@ -488,8 +488,12 @@ class StylePageTest < ActiveSupport::TestCase
     own.each do |title|
       heading = doc.css("section#tricks h2, section#tricks h3").find { |h| h.text.strip == title }
       assert heading, "no #{title.inspect} group"
-      header = heading.ancestors("div.space-y-1").first
-      paragraphs = header.css("> p")
+      # A section header is the sticky element itself, so its intro is its next sibling.
+      paragraphs = if heading["class"].to_s.split.include?("section-header")
+        [heading.next_element].compact.select { |el| el.name == "p" }
+      else
+        heading.ancestors("div.space-y-1").first.css("> p")
+      end
       assert_operator paragraphs.size, :<=, 1, "#{title}: one paragraph at most"
       next if paragraphs.empty?
 
