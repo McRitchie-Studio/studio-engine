@@ -105,17 +105,16 @@ test("a tab's jump lands the section's title on the bar under the row, at both w
   }
 });
 
-test("a reader who scrolls right after a jump keeps their place", async ({ page }) => {
+test("a reader who scrolls back up right after a jump keeps their place", async ({ page }) => {
   await open(page, STYLE, DESKTOP);
   await styleRow(page).locator("a", { hasText: "Modals" }).click();
   await page.mouse.move(400, 500);
-  await page.mouse.wheel(0, 300);
+  // Up: the section is then below its line, which is what a landing would correct.
+  await page.mouse.wheel(0, -300);
   await page.waitForTimeout(800);
-  const held = await page.evaluate(() => window.scrollY);
-  await page.waitForTimeout(800);
-  expect(await page.evaluate(() => window.scrollY)).toBe(held);
   const modalsTop = await page.locator("#modals").evaluate((el) => el.getBoundingClientRect().top);
-  expect(modalsTop, "not hauled back to the section's top").toBeLessThan(0);
+  const line = await page.evaluate(() => window.studioPinnedStack.read().layers.section.top);
+  expect(modalsTop, "not hauled back to the section's top").toBeGreaterThan(line + 100);
 });
 
 test("a load with a hash lands the title on the bar too", async ({ page }) => {

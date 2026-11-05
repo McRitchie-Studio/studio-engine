@@ -501,6 +501,9 @@ export function startPinnedStack() {
     settleTimer = null;
     publishAll();
     releaseFollowers();
+    // That publish measured the layers while they still held their last copies. Given back,
+    // they move to the root's values, so their edges are read once more.
+    schedule();
   }
 
   // The registry and the measurement are module-level (readStack, measurePin
