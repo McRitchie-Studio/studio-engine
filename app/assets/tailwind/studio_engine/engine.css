@@ -1234,8 +1234,8 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
     [data-sidebar-glass-shell] nav > [role="group"] > :is(a, [aria-disabled]),
     [data-sidebar-glass-foot] > a {
       height: 2.125rem;
-      gap: 0.625rem;
-      padding: 0 0.5rem;
+      gap: 0.25rem;
+      padding: 0 0.5rem 0 0.1875rem;
       border-radius: 0.625rem;
       color: var(--glass-ink);
       font-size: inherit;
@@ -1259,17 +1259,17 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       color: #fff;
     }
     [data-sidebar-glass-shell] a[aria-current="page"] [data-sidebar-row-desc] { color: rgb(255 255 255 / 0.9); }
-    /* The fixed column: a line icon, an emoji and a portrait all centre in the same 20px. */
-    [data-sidebar-glass-shell] [data-sidebar-row-icon],
-    [data-sidebar-glass-shell] nav > [role="group"] > a > .studio-emoji-box,
-    [data-sidebar-glass-shell] nav > [role="group"] > a > .studio-emoji-swap {
+    /* The fixed column: a line icon sits in the 24px box the engine's emoji and portrait
+       rows already take (EMOJI_SWAP_CSS), so every label starts at one x. The row's padding
+       and gap are that much less, which puts an 18px icon where the mockup has it. */
+    [data-sidebar-glass-shell] [data-sidebar-row-icon] {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 1.25rem;
+      width: 1.5rem;
       height: 1.25rem;
-      font-size: 0.9375rem;
     }
+    [data-sidebar-glass-shell] nav > [role="group"] > a > :is(.studio-emoji-box, .studio-emoji-swap) { font-size: 0.9375rem; }
     [data-sidebar-glass-foot] {
       padding: 0.5rem 0.625rem;
       border-top: 1px solid var(--glass-line);
