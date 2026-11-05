@@ -1147,8 +1147,10 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
        fill is the same in both, so a browser with no backdrop-filter draws the first tier.
 
        WHAT IT REACHES: .card, .card-hover, .empty-state, and a hand-rolled panel spelled
-       .bg-surface.rounded-xl.border. NOT a menu or a popover: anything .absolute, .fixed or
-       .sticky stays solid, because it floats over text and has no blur to protect it. */
+       .bg-surface.rounded-xl.border. NOT a menu, popover or modal: anything .absolute, .fixed,
+       .sticky or .shadow-2xl, or inside a .fixed scrim or a dialog, stays solid, because it
+       floats over text and has no blur to protect it. Under prefers-reduced-transparency
+       every surface goes solid. */
     html[data-surface-style="glass"] {
       --surface-glass-fill: color-mix(in srgb, var(--color-surface) 62%, transparent);
       --surface-glass-fill-hover: color-mix(in srgb, var(--color-surface) 80%, transparent);
@@ -1180,14 +1182,17 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       pointer-events: none;
       background-image: var(--surface-glass-ambient);
     }
-    html[data-surface-style="glass"] :is(.card, .card-hover, .empty-state, .bg-surface.rounded-xl.border):not(.absolute, .fixed, .sticky) {
+    html[data-surface-style="glass"] :is(.card, .card-hover, .empty-state, .bg-surface.rounded-xl.border):not(.absolute, .fixed, .sticky, .shadow-2xl, .fixed *, [role="dialog"] *) {
       background-color: var(--surface-glass-fill);
       border-color: var(--surface-glass-line);
       box-shadow: var(--surface-glass-highlight), var(--surface-glass-shadow);
     }
-    html[data-surface-style="glass"] .card-hover:not(.absolute, .fixed, .sticky):hover,
-    html[data-surface-style="glass"] a.card:not(.absolute, .fixed, .sticky):hover {
+    html[data-surface-style="glass"] .card-hover:not(.absolute, .fixed, .sticky, .shadow-2xl, .fixed *, [role="dialog"] *):hover,
+    html[data-surface-style="glass"] a.card:not(.absolute, .fixed, .sticky, .shadow-2xl, .fixed *, [role="dialog"] *):hover {
       background-color: var(--surface-glass-fill-hover);
+    }
+    @media (prefers-reduced-transparency: reduce) {
+      html[data-surface-style="glass"] { --surface-glass-fill: var(--color-surface); --surface-glass-fill-hover: var(--color-surface-alt); }
     }
     /* A backdrop-filter starts a stacking context and a containing block, so a tooltip inside
        a blurred card must lift the card above its neighbours. */
