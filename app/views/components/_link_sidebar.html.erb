@@ -7,8 +7,9 @@
 <% sections = studio_sidebar_sections %>
 <%# THE PANEL'S STYLE (Studio.sidebar_style). Under :glass a row draws its link's line icon
     and the row for this page says aria-current, which is what lights it. The default style
-    reads neither, so an app that stays on it renders what it did. %>
-<% glass = Studio.sidebar_style == :glass %>
+    reads neither, so an app that stays on it renders what it did. A caller may pass
+    sidebar_style: for one render; the engine lab does, since the setting is process-wide. %>
+<% glass = (local_assigns[:sidebar_style] || Studio.sidebar_style) == :glass %>
 <% sidebar_request = glass && respond_to?(:request) ? request : nil %>
 <% current_href = sidebar_request && Studio::SidebarSections.current_href(sections, sidebar_request.path, host: sidebar_request.host) %>
 <% sidebar_admin = respond_to?(:admin?) && admin? %>

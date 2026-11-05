@@ -37,7 +37,7 @@
           @click="hostOpen = true">Open host panel</button>
 
   <%= render "components/link_sidebar_trigger" %>
-  <%= render "components/link_sidebar" %>
+  <%= render "components/link_sidebar", sidebar_style: (:glass if params[:glass].present?) %>
 
   <% host_body = capture do %>
     <div class="flex-1 overflow-y-auto p-4">

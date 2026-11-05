@@ -118,6 +118,7 @@ Studio.configure do |config|
   # + slide-out panel. A callable receives the view context (route helpers,
   # logged_in? walls); sections flagged admin: true show to admins only. A group
   # shows a divider and no word; header: true also shows its title above its rows.
+  # config.sidebar_style = :glass               # a floating panel; a link's icon: draws a line icon
   # config.sidebar_sections = ->(view) {
   #   [ { title: "Site", links: [
   #         { label: "Home", href: view.root_path, emoji: "🏠", desc: "Front door" } ] },

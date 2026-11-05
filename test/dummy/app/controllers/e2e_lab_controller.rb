@@ -876,7 +876,7 @@ class E2eLabController < ActionController::Base
     { title: "Admin", admin: true, header: true, links: [{ label: "Errors", href: "/up", emoji: "🚨" }] }
   ].freeze
 
-  # The glass panel's rows (Studio.sidebar_style = :glass, for this request): a portrait with
+  # The glass panel's rows (?glass=1 passes sidebar_style: to the partial, a local): a portrait with
   # its rocket, line icons, the row for this page, and a desc: for the hover.
   LAB_SIDEBAR_GLASS_SECTIONS = [
     { title: "My Apps", header: true, links: [
@@ -889,16 +889,6 @@ class E2eLabController < ActionController::Base
       { label: "Unknown icon", href: "/site_footer/privacy", emoji: "🔒", icon: "no-such-icon" }
     ] }
   ].freeze
-
-  around_action :with_lab_sidebar_style, only: %i[sidebar_panels sidebar_panels_turbo]
-
-  private def with_lab_sidebar_style
-    prior = Studio.sidebar_style
-    Studio.sidebar_style = :glass if params[:glass].present?
-    yield
-  ensure
-    Studio.sidebar_style = prior
-  end
 
   private def sidebar_panels_viewer
     if params[:glass].present?

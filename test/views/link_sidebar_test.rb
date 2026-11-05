@@ -617,6 +617,13 @@ class LinkSidebarTest < Minitest::Test
     assert_empty Nokogiri::HTML5.fragment(html).css("[aria-current]")
   end
 
+  def test_glass_marks_the_geo_row_on_its_own_page
+    html = with_glass { render_sidebar(sections: GLASS_SECTIONS, admin: true, geo_flag: true, geo_routes: true, path: "/admin/geo") }
+    rows = Nokogiri::HTML5.fragment(html).css('#studio-link-sidebar a[aria-current="page"]')
+
+    assert_equal ["/admin/geo"], rows.map { |row| row["href"] }
+  end
+
   def test_the_panel_without_glass_is_untouched_for_other_callers
     view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
     html = view.render(partial: "components/sidebar_panel", locals: { open: "x", edge: true, id: "p" })
