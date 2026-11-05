@@ -26,8 +26,8 @@ engine navbar pins itself. An unknown direction or style raises at boot.
 direction gets one steady move. A missing setting never means a draw. The style does nothing
 without a direction.
 
-With no direction, an app renders as before and keeps the engine's fade. The HTML is the
-same bytes, with one exception every new engine module shares: the import map lists
+With no direction, an app keeps the engine's fade. Apart from the loader's template in the head
+(docs/LOADER.md), the HTML is the same bytes, with one exception every new engine module shares: the import map lists
 `studio/page_transitions`. The browser never fetches it, since no tag imports it and it
 is not preloaded. The CSS bundle grows by rules that no page can match. The full-load sheet
 and script (below) are two more files in a host's assets. No page links them, so no browser
@@ -58,7 +58,7 @@ and Turbo restores the scroll position.
 | The same path, an advance visit, with a morph name on both sides | The engine's fade and the morph |
 | A GET that redirects | The direction once, for the first render. The follow-up visit draws nothing |
 | Two pages that share a morph name | The engine's fade and the morph |
-| Reduced motion, or a browser without view transitions | The plain swap, with no pause |
+| Reduced motion, or a browser without view transitions | The plain swap, with no image pause. A loader that showed still keeps its minimum (docs/LOADER.md) |
 | Arriving at a page whose layout has no metas | The plain swap, with no pause. By a full load, the plain load |
 | Leaving a page whose layout has no metas | The plain swap. An image on the new page can pause it, up to the cap. By a full load, the plain load |
 | A full load to another path: a link with `data-turbo="false"`, `location.assign`, a form that posts natively, a redirect, a Turbo visit answered by `turbo-visit-control: reload` | The direction, once. See [Full page loads](#full-page-loads) |
@@ -229,7 +229,8 @@ ships later, so the app keeps booting, and the setting takes effect on the reloc
 | moms-app | Its forked navbar has no pin. Add `vt-pinned-header`, once per page |
 | McRitchie Industries | It is on engine 0.122.0, below 0.124.0, where the setter first exists. So it needs the engine bump first (its pin is `~> 0.118`). Then `config.page_transition_direction = :top` and no style line. `smooth_load` is on, its navbar is the engine's, its body is `bg-page`, and it has no inline names to mark |
 | Commercial Welding | Its wrapper has `data-studio-bar-stack` and no `.studio-bar-stack`, so its utility bar moves with the page. Add the class to the wrapper. Its forked navbar is pinned already |
-| alex-build, Voicebox, Rantly, Cyvasse | Nothing further. Check that pages answer fast, because of `no-preview` |
+| alex-build, Voicebox, Cyvasse | Nothing further. Check that pages answer fast, because of `no-preview` |
+| Rantly | Its layout has its own head, not `layouts/studio/_head`, so a direction does nothing there |
 
 ## Proposed assignment
 
@@ -237,8 +238,8 @@ A proposal for Alex McRitchie to change, not a ruling.
 
 | App | Direction | Style | State |
 |---|---|---|---|
-| McRitchie Studio (hub) | `:left` | `:slide` | Set |
-| Turf Monster | `:right` | `:unfold` | Set. The flip suits a game |
+| McRitchie Studio (hub) | `:left` | `:slide` | Set by task `hub-sets-transition-style` |
+| Turf Monster | `:right` | `:unfold` | Set by task `turf-sets-transition-flip`. The flip suits a game |
 | McRitchie Industries | `:top` | `:slide` | Not adopted. See the table above |
 | alex-build | `:right` | `:slide` | Not adopted |
 | Cyvasse, moms-app | `:top` | `:slide` | Not adopted |
