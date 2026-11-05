@@ -14,6 +14,10 @@ require "test_helper"
 # 0.115.1.rc1 and failed 11 hub e2e specs (task confetti-resolves-on-hub); a module
 # with bare imports takes javascript_import_module_tag, which sends no header.
 #
+# The engine's own URL tags now pass preload_links_header: false
+# (head_sends_no_module_preload_test.rb), so the header no longer reaches them. This
+# rule stays: a host that preloads such a module fails the same way.
+#
 # This reads every engine view, finds each javascript_include_tag with type "module",
 # and scans the module's source for a static import or re-export of a specifier that
 # is not a URL or a relative path, following relative imports (a bare one a hop down

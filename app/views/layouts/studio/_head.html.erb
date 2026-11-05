@@ -213,12 +213,17 @@
     carry no body and need no nonce under a policy that allows 'self'. The session
     store (studio/_session_stamp, above) and the full-load script above are the two
     classic scripts, and each says why.
-    A MODULE LOADED BY URL MUST IMPORT NO BARE SPECIFIER. javascript_include_tag
-    also sends a `Link: rel=modulepreload` response header, which the browser
-    acts on before it parses this map, so a bare import in that module can
-    resolve against no map at all and fail for good (0.115.1.rc1, task
+    A MODULE TAG BY URL SENDS NO PRELOAD HEADER. javascript_include_tag answers
+    type: "module" with a `Link: rel=modulepreload` response header unless the call
+    passes preload_links_header: false, and the browser acts on that header before it
+    parses this map. Firefox then refuses the map outright ("Import maps are not allowed
+    after a module load or preload has started"), so every bare studio/* import on the
+    page fails and no panel opens (task firefox-import-map-preload,
+    test/views/head_sends_no_module_preload_test.rb).
+    A MODULE LOADED BY URL ALSO IMPORTS NO BARE SPECIFIER. A preload that arrived some
+    other way would resolve it against no map and fail for good (0.115.1.rc1, task
     confetti-resolves-on-hub). A module with bare imports takes a
-    javascript_import_module_tag, which sends no header. %>
+    javascript_import_module_tag. %>
 <%# THE ENGINE'S BROWSER BOOT (studio/application): its every-page Stimulus
     controllers, the pinned stack, and the Alpine shims. A module tag, so it
     carries the nonce. %>
@@ -317,7 +322,7 @@
     assigns window.Alpine and starts Alpine in a microtask after it is evaluated,
     which as a module is after every module above it. window.Alpine is not
     deprecated; Alpine itself and every host read it. %>
-<%= javascript_include_tag "studio/alpine", type: "module", "data-turbo-track": "reload" %>
+<%= javascript_include_tag "studio/alpine", type: "module", preload_links_header: false, "data-turbo-track": "reload" %>
 <% if sticky_table_headers %>
-  <%= javascript_include_tag "studio/sticky_table_header", type: "module", "data-turbo-track": "reload" %>
+  <%= javascript_include_tag "studio/sticky_table_header", type: "module", preload_links_header: false, "data-turbo-track": "reload" %>
 <% end %>

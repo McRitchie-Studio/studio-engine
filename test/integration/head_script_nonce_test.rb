@@ -277,6 +277,23 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
                     "confetti imports a bare specifier, so it must not load by URL (its Link preload beats the map)"
   end
 
+  # Firefox refuses an import map once a module preload has started, and a Link header
+  # starts one before the body parses. The session lab's classic store still sends its
+  # plain preload, which proves the header runs here; the sticky lab renders both of
+  # the head's module tags. test/views/head_sends_no_module_preload_test.rb reads Rails'
+  # own helper; this reads the whole page.
+  test "the head's Link header starts no module preload" do
+    get "/lab/session_drift?fp=fp-alice&issued=1000&state=authenticated"
+    assert_response :success
+    assert_includes response.headers["Link"].to_s, "rel=preload", "no Link header on this page, so this proves nothing"
+    refute_includes response.headers["Link"].to_s, "modulepreload"
+
+    get "/lab/sticky_table"
+    assert_response :success
+    assert_includes response.body, "studio/sticky_table_header", "the sticky lab renders no sticky module"
+    refute_includes response.headers["Link"].to_s, "modulepreload"
+  end
+
   # The favicon link carries the file's content version (Studio::PublicFileVersion),
   # and a host with no public/favicon.png keeps the bare link it always had.
   test "the favicon link carries the current file's digest, and is bare without the file" do
