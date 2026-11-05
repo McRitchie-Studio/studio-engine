@@ -80,7 +80,10 @@
   x-transition:leave-end="translate-x-full"
   class="<%= display_class %> fixed right-0 <%= width_class %> bg-surface border-l border-subtle shadow-2xl <%= z_class %> flex-col <%= panel_class %>"
   style="top:var(--nav-bottom, var(--nav-h, 6rem));height:calc(100% - var(--nav-bottom, var(--nav-h, 6rem)))"
-  data-pin-edge<%= "\n  data-sidebar-edge".html_safe if edge %>
+  data-pin-edge
+  <% if edge %>
+  data-sidebar-edge
+  <% end %>
   role="<%= role %>"
   <% if labelledby %>aria-labelledby="<%= labelledby %>"<% elsif aria_label.present? %>aria-label="<%= aria_label %>"<% end %>>
   <div class="flex flex-col h-full">
