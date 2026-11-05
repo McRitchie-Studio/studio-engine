@@ -54,6 +54,18 @@ class SiteFooterTest < Minitest::Test
     assert_nil Studio::SiteFooter.chat_row(ChatViewer.new(nil), path: ->(_view) { nil })
   end
 
+  def test_a_chat_path_that_raises_is_no_row_and_is_reported
+    said = []
+    before = Studio::SiteFooter.reporter
+    Studio::SiteFooter.reporter = ->(message) { said << message }
+
+    assert_nil Studio::SiteFooter.chat_row(ChatViewer.new(nil), path: ->(_view) { raise KeyError, "no route" })
+    assert_equal ["[studio.site_footer] site_footer_chat_path raised KeyError: the Chat link is hidden"], said
+  ensure
+    Studio::SiteFooter.reporter = before
+    Studio::SiteFooter.reset_reported!
+  end
+
   def test_the_chat_row_defaults_its_label_and_takes_a_path_from_the_view
     assert_equal ["Chat", "/chat"], chat_row
     assert_equal ["Talk to us", "/chat"], chat_row(label: "Talk to us")

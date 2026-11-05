@@ -568,6 +568,20 @@ async function expectHeldTurn(page, theme) {
 test("a held turn says it was received and never asks for a resend, in dark; a hub still saying failed keeps its line", async ({ page }) => { await expectHeldTurn(page, "dark"); });
 test("a held turn says it was received and never asks for a resend, in light; a hub still saying failed keeps its line", async ({ page }) => { await expectHeldTurn(page, "light"); });
 
+test("a message the hub holds, through the real proxy: no typing line, and nothing asks for a resend", async ({ page }) => {
+  const errors = watchPageErrors(page);
+  await openSignedIn(page);
+  const input = page.locator('[data-test="agent-chat-input"]');
+  await input.fill("[hub-held] Are you there?");
+  await input.press("Enter");
+  const turn = page.locator('[data-test="agent-chat-turn"]').filter({ hasText: "[hub-held] Are you there?" });
+  await expect(turn.locator('[data-test="agent-chat-held"]')).toBeVisible();
+  await expect(turn.locator('[data-test="agent-chat-failed"]')).toBeHidden();
+  await expect(page.locator('[data-test="agent-chat-typing"]')).toBeHidden();
+  await expect(input, "the app took it (forgery is on for this path)").toHaveValue("");
+  expect(errors).toEqual([]);
+});
+
 test("the picker fits a short stuck window: the chip stays on screen and every microphone is reachable", async ({ page }) => {
   await openSignedIn(page, { spareMics: 10 });
   // A long thread, so the composer's own place is below the window and only sticking holds

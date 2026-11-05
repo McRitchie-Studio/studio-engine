@@ -306,6 +306,9 @@ that imports only `engine.css` sees both of its labels.
 - `e2e/agent_chat.spec.js`: the chat in a browser against the stand-in hub
   `e2e/boot.rb` runs (`AgentChatStubHub#converse!`, the hub's shared-id shape).
 - `test/javascript/agent_chat_voice.test.mjs`: every refusal line, the take's body,
-  `voice` carrying no name, a queued take, a failed send keeping the words.
+  `voice` carrying no name, a queued take, a failed send keeping the words, a tap's
+  line, a typed send clearing the old line, the line's height through a hold.
 - `e2e/agent_chat_voice.spec.js`: a real hold at 390px, light and dark, through the
-  mock transcriber and the proxy to the stand-in hub, and the footer's Chat link.
+  mock transcriber and the proxy to the stand-in hub, and the footer's Chat link. It
+  measures the held button's box stuck and not, and drives a tap, a held key on the
+  refused-microphone help, a held turn, a typed send and the picker in a short window.

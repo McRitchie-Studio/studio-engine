@@ -25,7 +25,8 @@ module Studio
   # POST that still holds the visitor's anon token sends {email:, anon_token:},
   # and the hub folds the anonymous thread into the person's. A turn is
   # {id, role: "user"|"agent", text, created_at, status} with status
-  # pending|typing|answered|failed.
+  # pending|typing|answered|failed|held. held: stored, and no automatic answer is
+  # coming (a hub that predates it says failed for the same message).
   #
   # `voice` marks a spoken message: {check, score, duration_ms}, what POST
   # /voice/takes answered for the take (voice_param). NEVER A NAME: the hub

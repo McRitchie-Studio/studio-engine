@@ -163,7 +163,7 @@ device gives are inserted as text, never markup.
 
 Keyboard and screen readers: the chip, every option and the help link wear the
 same 3px primary focus ring. Esc in the open list closes it and puts focus back
-on the chip. The option in use carries `aria-current="true"`; options carry no
+on the chip, and stops there, so a modal around the chip keeps its own Esc. The option in use carries `aria-current="true"`; options carry no
 `aria-pressed` (picking is not a toggle). The help's drawing of Chrome's address
 bar shows a drawn bar, not the app's host.
 
