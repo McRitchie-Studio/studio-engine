@@ -138,12 +138,15 @@ canvas-confetti, `studio_confetti`, `sticky_table_header`, Leaflet) now load as
 modules: by a `type="module"` tag after the import map, by an importmap pin, or
 by `import()`. `studio/session.js` stays a synchronous classic script above the
 map, because host modules register with `window.StudioSession` as they
-evaluate (`layouts/studio/_head` says why). A module the head loads by URL
-(`javascript_include_tag ..., type: "module"`) may import no bare specifier:
-that helper also sends a `Link: rel=modulepreload` header, which the browser
-acts on before it parses the import map, so a bare import can resolve against
-no map and fail. A module with bare imports, like `studio_confetti`, takes
-`javascript_import_module_tag` (`test/views/head_url_modules_import_no_bare_specifier_test.rb`). `studio/local_path`, the browser twin of
+evaluate (`layouts/studio/_head` says why). A module tag by URL
+(`javascript_include_tag ..., type: "module"`) passes `preload_links_header: false`:
+by default that helper sends a `Link: rel=modulepreload` header, the browser acts on
+it before it parses the import map, and Firefox then refuses the map, so every bare
+import on the page fails (`test/views/head_sends_no_module_preload_test.rb`). A host
+module tag above the map, or one that keeps the header, does the same. A module loaded
+by URL also imports no bare specifier: a module with bare imports, like
+`studio_confetti`, takes `javascript_import_module_tag`
+(`test/views/head_url_modules_import_no_bare_specifier_test.rb`). `studio/local_path`, the browser twin of
 `Studio::LocalPath.local?`, is held to the Ruby rule by
 `test/lib/studio/local_path_js_parity_test.rb`, which also runs every
 `node:test` file in `test/javascript` in the engine suite.
