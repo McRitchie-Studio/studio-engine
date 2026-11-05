@@ -1,7 +1,7 @@
 const { test, expect } = require("@playwright/test");
 const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 
-// [e2e] The survey stepper (studio/surveys/show + _script), at phone width.
+// [e2e] The survey stepper (studio/surveys/show + studio/survey), at phone width.
 //
 // WHY THIS IS IN THE BROWSER LANE. The server renders one plain form with every
 // question in it; test/integration/survey_flow_test.rb grades that form. The
@@ -14,6 +14,10 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 // The survey is test/dummy/config/surveys/first_game.rb, loaded by the engine
 // from the dummy's config/surveys exactly as a consuming app's would be. Each
 // test gets a fresh browser context, so a fresh session and a fresh response.
+//
+// 18 -> 20 by survey-flow-autosave-race. Cancelling a save in flight and what the
+// visitor reads after a real 409 exist only in a browser. The first spec is RED
+// with the abort removed from survey.js, the second with the 409 branch removed.
 
 const PHONE = { width: 375, height: 740 };
 const SURVEY = "/surveys/first-game";

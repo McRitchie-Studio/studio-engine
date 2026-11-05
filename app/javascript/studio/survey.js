@@ -208,8 +208,8 @@ export function enhanceSurvey(root, win = window, doc = document) {
       setError(step, "");
     }
     if (current === steps.length - 1) {
-      // No autosave here: the POST carries every answer, and a PATCH racing
-      // it would land after completion and be refused.
+      // No autosave here: the POST carries every answer. The submit handler
+      // cancels any earlier save still in flight.
       submitForm();
     } else {
       if (step.dataset.key) save(step);

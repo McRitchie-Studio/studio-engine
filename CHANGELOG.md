@@ -13,6 +13,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **`CHANGELOG.md` merges with `merge=union`,** so parallel PRs stop conflicting on it. A branch
   forked before a roll can land an entry under the rolled heading: `docs/RELEASE.md`, *Rolling
   `Unreleased` into a version*, says how to read and fix that.
+
 ### Fixed
 
 - **A late survey autosave can no longer change a completed response.** `record_answer` rewrote
