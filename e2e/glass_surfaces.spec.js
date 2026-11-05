@@ -235,3 +235,16 @@ test("badges and inputs take their own light, and a stuck header is a glass bar"
   expect(await css(page, "bar", "backdropFilter")).toContain("blur");
   expect(alpha(await css(page, "bar", "backgroundColor"))).toBeLessThan(1);
 });
+
+test("less transparency makes every surface solid, in both themes", async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => document.body.insertAdjacentHTML("beforeend", `<nav id="nav" class="nav-shell">N</nav><div id="blur" class="card surface-glass-blur">B</div>`));
+  await optIn(page);
+  await (await page.context().newCDPSession(page)).send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-transparency", value: "reduce" }] });
+  for (const dark of [false, true]) {
+    await theme(page, dark);
+    for (const id of ["card", "blur", "bar", "nav"]) expect(alpha(await css(page, id, "backgroundColor")), `${id} ${dark}`).toBe(1);
+    for (const id of ["blur", "bar", "nav", "primary"]) expect(await css(page, id, "backdropFilter"), `${id} ${dark}`).toBe("none");
+    expect(await css(page, "primary", "backgroundImage")).not.toContain("/ 0.94");
+  }
+});

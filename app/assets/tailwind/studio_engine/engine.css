@@ -1425,9 +1425,6 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000),
         var(--surface-glass-highlight), var(--surface-glass-shadow), var(--tw-shadow, 0 0 #0000);
     }
-    @media (prefers-reduced-transparency: reduce) {
-      html[data-surface-style="glass"] { --surface-glass-fill: var(--color-surface); --surface-glass-fill-hover: var(--color-surface-alt); }
-    }
     /* A backdrop-filter starts a stacking context and a containing block, so a tooltip inside
        a blurred card must lift the card above its neighbours. */
     @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -1603,6 +1600,15 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
     }
     html[data-surface-style="glass"] .badge { box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--lit-badge); }
     html[data-surface-style="glass"] .input-field { box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--lit-input); }
+
+    /* LESS TRANSPARENCY: every surface above goes solid and drops its blur. Last, to win on order;
+       both spellings of the root, since html.dark outranks a bare html[...] on specificity. */
+    @media (prefers-reduced-transparency: reduce) {
+      html[data-surface-style="glass"], html.dark[data-surface-style="glass"] { --surface-glass-fill: var(--color-surface); --surface-glass-fill-hover: var(--color-surface-alt); }
+      html[data-surface-style="glass"] :is(.surface-glass-blur, .nav-shell, .page-header:is([data-stuck], [data-studio-controller-failed~="page-header"] + .page-header)),
+      html.dark[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(.btn-sm, :disabled, [aria-disabled="true"]) { --lit-fill-alpha: 1; -webkit-backdrop-filter: none; backdrop-filter: none; }
+      html[data-surface-style="glass"] :is(.nav-shell, .page-header:is([data-stuck], [data-studio-controller-failed~="page-header"] + .page-header)) { background-color: var(--color-page); }
+    }
 
     /* THE SIDEBAR ROW'S DESCRIPTION (components/_link_sidebar, _geo_signpost). At rest
        a row with a description is one line, the height of any other row. On hover or
