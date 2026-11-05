@@ -1092,13 +1092,13 @@ config.navbar_account_sidebar = { flag: "gearOpen", controls: %w[gear-sidebar ge
 
 ### Sidebar panel lead and close hook
 
-Every panel draws a soft blurred band along its inner edge from `md` up, from a
-`data-sidebar-edge` hook and engine.css. It takes no clicks. A host overriding
-`components/_sidebar_panel` drops the band with that attribute.
-
-`components/_sidebar_panel` takes two opt-in locals; unset, the panel renders
+`components/_sidebar_panel` takes three opt-in locals; unset, the panel renders
 as before:
 
+- `edge: true` draws a soft blurred band along the panel's inner edge from `md`
+  up, through a `data-sidebar-edge` hook and engine.css. It takes no clicks. The
+  link sidebar passes it. It softens the page beside the panel, so leave it off
+  a panel kept open beside live content.
 - `title_html:` HTML in the title's place, for a panel whose header leads with
   a live status line. It is content, not a name: it never feeds
   `aria-labelledby` or `aria-label`, so a caller that passes it instead of

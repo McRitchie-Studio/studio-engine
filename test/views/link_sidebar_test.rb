@@ -355,6 +355,14 @@ class LinkSidebarTest < Minitest::Test
   # e2e/sidebar_panel_close.spec.js (which listener runs first). This tier holds the
   # seam between the two files: the ids the module scopes to are the ids rendered here,
   # each with the close button the module claims.
+  def test_both_panels_ask_for_the_blurred_edge
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: SECTIONS, admin: true))
+
+    %w[#studio-link-sidebar #studio-link-sidebar-mobile].each do |panel|
+      assert_equal "", doc.at_css(panel)["data-sidebar-edge"], panel
+    end
+  end
+
   def test_the_module_scopes_its_close_claim_to_the_panels_rendered_here
     source = File.read(File.expand_path("../../app/javascript/studio/link_sidebar.js", __dir__))
     scope = source[/^export const LINK_SIDEBAR_PANELS = "([^"]+)"/, 1]

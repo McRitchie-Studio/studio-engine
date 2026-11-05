@@ -17,8 +17,8 @@
 # (/tasks/navbar-gear-and-name-hover); a one-line sidebar row centers its icon
 # (/tasks/sidebar-rows-center-icon-and-label); the link sidebar's title became the
 # viewer's name or a greeting, its section labels gave way to dividers and its rows
-# to one line each at rest (/tasks/sidebar-greeting-and-no-labels); the sidebar panel
-# gained data-sidebar-edge for its blurred edge (/tasks/sidebar-edge-blur).
+# to one line each at rest (/tasks/sidebar-greeting-and-no-labels); the link sidebar's
+# panels gained data-sidebar-edge for their blurred edge (/tasks/sidebar-edge-blur).
 
 require "bundler/setup"
 

@@ -1085,7 +1085,7 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       }
     }
 
-    /* THE SIDEBAR'S EDGE (components/_sidebar_panel). A soft band along the panel's
+    /* THE SIDEBAR'S EDGE (components/_sidebar_panel, edge: true). A soft band along the panel's
        inner edge, where the page behind is blurred and fades out to sharp, so the panel
        stands off a busy page with no scrim and no darkening.
 

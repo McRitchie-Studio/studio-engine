@@ -53,8 +53,8 @@ If your app doesn't create its own `app/views/layouts/_navbar.html.erb`, the eng
   accessible name, not a visible label: a divider separates the groups. A row
   is one line at rest. A link's optional `desc:` fades in on hover or keyboard
   focus and moves nothing; a touch screen does not show it, so keep it extra.
-  From `md` up, the panel's inner edge blurs the page behind it in a 40px band
-  (engine.css, THE SIDEBAR'S EDGE).
+  From `md` up, the link sidebar's inner edge blurs the page behind it in a 40px
+  band (`edge: true` on `components/_sidebar_panel`; engine.css, THE SIDEBAR'S EDGE).
 
 ## How to Override
 

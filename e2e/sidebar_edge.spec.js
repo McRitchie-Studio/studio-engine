@@ -1,7 +1,7 @@
 const { test, expect } = require("@playwright/test");
 const { blockOffsiteRequests } = require("./helpers");
 
-// [e2e] The sidebar's blurred edge (engine.css, THE SIDEBAR'S EDGE). It is a pseudo-element
+// [e2e] The link sidebar's blurred edge (engine.css, THE SIDEBAR'S EDGE). It is a pseudo-element
 // with a backdrop filter, so no box and no byte says what it does: these compare the pixels
 // beside the panel with the band on and off.
 //
