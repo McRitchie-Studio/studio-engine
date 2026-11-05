@@ -55,6 +55,7 @@ export function mountMicrophoneChip(root, { win = window } = {}) {
   let silentLabel = null
   let lastTakeSilent = false
   let helpSession = null
+  let keysDown = new Set()
   let permission = null
   let destroyed = false
 
@@ -296,6 +297,7 @@ export function mountMicrophoneChip(root, { win = window } = {}) {
     root.dataset.microphoneHelp = kind
 
     if (dialog.open) return
+    keysDown = new Set()
     helpSession = { returnFocus: returnTo || doc.activeElement, done: false }
     if (typeof dialog.showModal === "function") dialog.showModal()
     else dialog.setAttribute("open", "")
@@ -316,6 +318,20 @@ export function mountMicrophoneChip(root, { win = window } = {}) {
     const back = session.returnFocus
     const target = back && back.isConnected && back.offsetParent !== null ? back : chip
     if (target) target.focus()
+  }
+
+  // A key held on the talk button when a refusal opens the dialog lands on Close, the
+  // focused button: its repeats would press Close (Enter), and its keyup would finish
+  // the press (Space). Only a key pressed since the dialog opened counts. Mouse and
+  // touch are not keys, and Esc is not one of these two.
+  function onDialogKey(event) {
+    if (event.key !== " " && event.key !== "Enter") return
+    if (event.type === "keydown") {
+      if (event.repeat) event.preventDefault()
+      else keysDown.add(event.key)
+    } else if (!keysDown.delete(event.key)) {
+      event.preventDefault()
+    }
   }
 
   // ---- Wiring --------------------------------------------------------------
@@ -342,6 +358,8 @@ export function mountMicrophoneChip(root, { win = window } = {}) {
     if (event.key !== "Escape") return
     if (dialog && dialog.contains(event.target)) return
     if (!panel || panel.hidden) return
+    // The list's Esc, not a modal's or a page's around the chip.
+    event.stopPropagation()
     closePanel()
     if (chip) chip.focus()
   }
@@ -352,7 +370,11 @@ export function mountMicrophoneChip(root, { win = window } = {}) {
   listeners.forEach(([name, fn]) => win.addEventListener(name, fn))
   root.addEventListener("click", onClick)
   root.addEventListener("keydown", onKey)
-  if (dialog) dialog.addEventListener("close", onDialogClose)
+  if (dialog) {
+    dialog.addEventListener("close", onDialogClose)
+    dialog.addEventListener("keydown", onDialogKey, true)
+    dialog.addEventListener("keyup", onDialogKey, true)
+  }
   if (media && media.addEventListener) media.addEventListener("devicechange", onDeviceChange)
   watchPermission()
   refresh()
@@ -365,7 +387,11 @@ export function mountMicrophoneChip(root, { win = window } = {}) {
       listeners.forEach(([name, fn]) => win.removeEventListener(name, fn))
       root.removeEventListener("click", onClick)
       root.removeEventListener("keydown", onKey)
-      if (dialog) dialog.removeEventListener("close", onDialogClose)
+      if (dialog) {
+        dialog.removeEventListener("close", onDialogClose)
+        dialog.removeEventListener("keydown", onDialogKey, true)
+        dialog.removeEventListener("keyup", onDialogKey, true)
+      }
       if (media && media.removeEventListener) media.removeEventListener("devicechange", onDeviceChange)
       if (permission) permission.onchange = null
       if (dialog && dialog.open) dialog.close()

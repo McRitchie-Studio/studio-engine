@@ -102,14 +102,19 @@ test("within: the promise's value, else the fallback once the wait is over", asy
 
 // A stand-in composer: the voice section inside the chat's form.
 function composer({ embedder = null, draft = "" } = {}) {
-  const status = { textContent: "" }
+  const status = { textContent: "", offsetHeight: 40, style: {} }
   const input = { value: draft }
   const refreshes = []
   const form = {
     getAttribute: () => "/agent_chat/messages",
     querySelector: (s) => (s === "[data-agent-chat-input]" ? input : s.includes("authenticity_token") ? { value: "form-token" } : null)
   }
-  const chat = { dispatchEvent: (event) => refreshes.push(event) }
+  const chatListeners = {}
+  const chat = {
+    dispatchEvent: (event) => refreshes.push(event),
+    addEventListener: (type, fn) => { chatListeners[type] = fn },
+    removeEventListener: (type) => { delete chatListeners[type] }
+  }
   const listeners = {}
   const root = {
     dataset: { agentChatVoiceSoul: "alex", agentChatVoiceName: "Alex", agentChatVoiceTakesUrl: "/voice/takes", agentChatVoiceState: "idle" },
@@ -119,7 +124,7 @@ function composer({ embedder = null, draft = "" } = {}) {
     addEventListener: (type, fn) => { listeners[type] = fn },
     removeEventListener: (type) => { delete listeners[type] }
   }
-  return { root, status, input, refreshes, listeners, state: () => root.dataset.agentChatVoiceState }
+  return { root, status, input, refreshes, listeners, chatListeners, state: () => root.dataset.agentChatVoiceState }
 }
 
 function answer(status, body, headers = {}) {
@@ -349,4 +354,79 @@ test("a take that lands after an unmount goes nowhere", async () => {
   voice.destroy()
   assert.deepEqual(page.listeners, {})
   assert.equal(calls.length, 0)
+})
+
+const recorderSays = (page, state) => page.listeners["studio:voice-recorder:state"]({ detail: { state } })
+
+test("a tap says to hold, on the one line, with the recorder's own words when it has them", () => {
+  const page = composer()
+  mount(page, async () => answer(200, {}))
+  recorderSays(page, "tapped")
+  assert.equal(page.state(), "tapped")
+  assert.equal(page.status.textContent, MESSAGES.tapped)
+  assert.doesNotMatch(MESSAGES.tapped, /microphone/i, "a tap is not the microphone's fault")
+})
+
+test("a recorder that failed or was refused speaks on the one line: its own line would move the button", () => {
+  const page = composer()
+  const own = { textContent: "Your microphone is busy in another app." }
+  const query = page.root.querySelector
+  page.root.querySelector = (s) => (s === "[data-voice-recorder-status]" ? own : query(s))
+  mount(page, async () => answer(200, {}))
+  recorderSays(page, "failed")
+  assert.equal(page.state(), "failed")
+  assert.equal(page.status.textContent, own.textContent)
+  own.textContent = "Allow the microphone to record."
+  recorderSays(page, "denied")
+  assert.equal(page.state(), "refused")
+  assert.equal(page.status.textContent, own.textContent)
+})
+
+// CONTROL: remove the sent listener in mountAgentChatVoice and the first assert fails.
+test("a later typed send clears the line a take left; a take in hand or a hold keeps its own", async () => {
+  const page = composer()
+  const { fetcher } = scripted(answer(200, HEARD), answer(201, { turn: TURN, voice: { speaker: "Pat" } }))
+  mount(page, fetcher)
+  page.status.textContent = "Sent. Spoken by Pat."
+  page.root.dataset.agentChatVoiceState = "sent"
+  page.chatListeners["studio:agent-chat:sent"]({ detail: { turn: TURN } })
+  assert.equal(page.status.textContent, "")
+  assert.equal(page.state(), "idle")
+
+  page.status.textContent = MESSAGES.listening
+  page.root.dataset.agentChatVoiceState = "listening"
+  page.chatListeners["studio:agent-chat:sent"]({ detail: { turn: TURN } })
+  assert.equal(page.status.textContent, MESSAGES.listening, "a person still holding keeps their line")
+})
+
+test("a typed send while a take is being transcribed leaves that line alone", async () => {
+  const page = composer()
+  let release
+  const fetcher = () => new Promise((resolve) => { release = resolve })
+  const voice = mount(page, fetcher)
+  const done = voice.takeArrived(take())
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(page.state(), "transcribing")
+  page.chatListeners["studio:agent-chat:sent"]({ detail: { turn: TURN } })
+  assert.equal(page.state(), "transcribing")
+  release(answer(422, { reason: "no_speech" }))
+  await done
+})
+
+// CONTROL: drop holdLine in onState and the first assert fails.
+test("the line holds its height for the whole hold, however long the old line was", () => {
+  const page = composer()
+  mount(page, async () => answer(200, {}))
+  page.status.textContent = "A long old refusal, three lines at a phone's width."
+  page.status.offsetHeight = 60
+
+  recorderSays(page, "starting")
+  assert.equal(page.status.style.height, "60px", "taken before the old line clears")
+  assert.equal(page.status.style.overflow, "hidden", "a take landing mid-hold cannot grow it")
+  recorderSays(page, "recording")
+  assert.equal(page.status.style.height, "60px")
+
+  recorderSays(page, "captured")
+  assert.equal(page.status.style.height, "", "let go, the line takes what it needs")
+  assert.equal(page.status.style.overflow, "")
 })

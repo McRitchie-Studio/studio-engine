@@ -104,12 +104,13 @@ module Studio
       "silent" => { "button" => "Hold to talk" },
       "failed" => { "button" => "Hold to try again" },
       "denied" => { "button" => "Hold to talk" },
+      "tapped" => { "button" => "Hold to talk" },
       "unsupported" => { "button" => "Hold to talk" }
     }.freeze
 
     # The microphone chip's first words (the engine's say "tap Record").
     VOICE_CHIP_COPY = {
-      "prompt" => { "chip" => "Microphone: hold to talk to allow",
+      "prompt" => { "chip" => "Microphone: hold to allow",
                     "note" => "Hold the talk button once and allow the microphone. Then you can pick one here." }
     }.freeze
 

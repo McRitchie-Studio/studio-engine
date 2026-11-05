@@ -9,7 +9,7 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { studioSource, loadStudioModule } from "./support/studio_module.mjs"
 
-const { mountVoiceRecorder, pickMimeType, formatElapsed, mergeCopy, failedLine, COPY, EVENTS } = await loadStudioModule("studio/voice_recorder")
+const { mountVoiceRecorder, pickMimeType, formatElapsed, mergeCopy, failedLine, COPY, EVENTS, READY, TAP_MS } = await loadStudioModule("studio/voice_recorder")
 
 class El {
   constructor(attrs = {}, children = []) {
@@ -201,6 +201,7 @@ test("the busy line: Chrome's older TrackStartError too, and a page's copy overr
   assert.equal(failedLine({ name: "TrackStartError" }), COPY.failed.busy)
   assert.equal(failedLine({ name: "NotFoundError" }), COPY.failed.missing)
   assert.equal(failedLine(null), COPY.failed.missing)
+  assert.equal(failedLine({ name: "AbortError" }), COPY.failed.busy, "Firefox's word for a microphone it could not start")
   const copy = mergeCopy({ failed: { busy: "Mic in use elsewhere." } })
   assert.equal(failedLine({ name: "NotReadableError" }, copy), "Mic in use elsewhere.")
   assert.equal(copy.failed.missing, COPY.failed.missing, "the other failed lines stand")
@@ -231,6 +232,7 @@ test("hold mode records while pressed; letting go before the microphone opens re
   r.root.fire("pointerdown", r.button, { pointerId: 1 })
   await flush()
   assert.equal(r.root.dataset.voiceRecorderState, "recording")
+  win.tick(TAP_MS)
   r.root.fire("pointerup", r.button)
   await flush()
   assert.equal(takes(r.root, EVENTS.take).length, 1)
@@ -238,7 +240,7 @@ test("hold mode records while pressed; letting go before the microphone opens re
   r.root.fire("pointerdown", r.button, { pointerId: 1 })
   r.root.fire("pointerup", r.button)
   await flush()
-  assert.equal(r.root.dataset.voiceRecorderState, "idle")
+  assert.equal(r.root.dataset.voiceRecorderState, "tapped", "let go before the microphone opened")
   assert.equal(log.recorders.length, 1, "no second recording started")
   assert.equal(log.stopped, 2, "the late microphone is let go")
 })
@@ -345,4 +347,62 @@ test("a hint is announced on the root, and a blank line blanks it rather than fa
   assert.equal(r.status.textContent, "", "Listening... is not written by the recorder")
   r.root.fire("pointerup", r.button)
   await flush()
+})
+
+// CONTROL: drop the TAP_MS check in finish() and this fails at "silent": the tap is
+// blamed on the microphone, and the chip's silent run opens the help on its own.
+test("hold mode: a tap under TAP_MS asks for a hold, and never blames the microphone", async () => {
+  const { win, log, open } = stubWindow({ level: 0 })
+  const r = buildRecorder({ "data-voice-recorder-mode": "hold" })
+  mountVoiceRecorder(r.root, { win, open })
+
+  for (const ms of [40, TAP_MS - 1]) {
+    r.root.fire("pointerdown", r.button, { pointerId: 1 })
+    await flush()
+    assert.equal(r.root.dataset.voiceRecorderState, "recording")
+    win.tick(ms)
+    r.root.fire("pointerup", r.button)
+    await flush()
+    assert.equal(r.root.dataset.voiceRecorderState, "tapped")
+    assert.equal(r.status.textContent, COPY.tapped.status)
+  }
+  assert.ok(READY.includes("tapped"), "a tap takes a new press")
+  assert.equal(takes(r.root, EVENTS.silent).length, 0)
+  assert.equal(takes(r.root, EVENTS.take).length, 0)
+  assert.ok(!log.announced.includes("studio:microphone:silent"), "the chip's silent run never moves, so its help stays shut")
+  assert.ok(log.announced.includes("studio:microphone:closed"), "the microphone is let go")
+})
+
+test("hold mode: a hold of TAP_MS that heard nothing is still silent; a refused microphone is still refused", async () => {
+  const { win, log, open } = stubWindow({ level: 0 })
+  const r = buildRecorder({ "data-voice-recorder-mode": "hold" })
+  mountVoiceRecorder(r.root, { win, open })
+  r.root.fire("pointerdown", r.button, { pointerId: 1 })
+  await flush()
+  win.tick(TAP_MS)
+  r.root.fire("pointerup", r.button)
+  await flush()
+  assert.equal(r.root.dataset.voiceRecorderState, "silent")
+  assert.ok(log.announced.includes("studio:microphone:silent"))
+
+  const refused = stubWindow({ open: async () => { throw Object.assign(new Error("no"), { name: "NotAllowedError" }) } })
+  const q = buildRecorder({ "data-voice-recorder-mode": "hold" })
+  mountVoiceRecorder(q.root, { win: refused.win, open: refused.open })
+  q.root.fire("pointerdown", q.button, { pointerId: 1 })
+  q.root.fire("pointerup", q.button)
+  await flush()
+  assert.equal(q.root.dataset.voiceRecorderState, "denied", "a tap the browser refused is a refusal, not a tap")
+  assert.ok(refused.log.announced.includes("studio:microphone:denied"), "so the help still opens")
+})
+
+test("toggle mode has no tap: a quick stop is judged by what it heard", async () => {
+  const { win, open } = stubWindow({ level: 0.1 })
+  const r = buildRecorder()
+  mountVoiceRecorder(r.root, { win, open })
+  r.root.fire("click", r.button)
+  await flush()
+  win.tick(40)
+  r.root.fire("click", r.button)
+  await flush()
+  assert.equal(r.root.dataset.voiceRecorderState, "captured")
 })

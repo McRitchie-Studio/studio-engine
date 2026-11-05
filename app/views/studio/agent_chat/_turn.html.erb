@@ -1,5 +1,5 @@
 <%# locals: (turn:, name:) %>
-<%# One turn of the chat (studio/agent_chat/_chat), from a hub turn {id, role, text, status}, identified by its id AND role (data-turn-key "<id>:<role>"): the hub answers one message row as a user turn and an agent turn sharing the row's id. The page renders it twice, blank, as the <template>s studio/agent_chat clones; a host may also render real turns with it. The visitor's words sit in a right-hand bubble; the agent's are plain text across the thread (as the hub's agent-reply), its name kept for a screen reader. Text only, never HTML: the script sets textContent. A failed turn says so. %>
+<%# One turn of the chat (studio/agent_chat/_chat), from a hub turn {id, role, text, status}, identified by its id AND role (data-turn-key "<id>:<role>"): the hub answers one message row as a user turn and an agent turn sharing the row's id. The page renders it twice, blank, as the <template>s studio/agent_chat clones; a host may also render real turns with it. The visitor's words sit in a right-hand bubble; the agent's are plain text across the thread (as the hub's agent-reply), its name kept for a screen reader. Text only, never HTML: the script sets textContent. A failed turn says so. A held one (stored, no automatic answer coming) says that, and never asks for a resend. %>
 <% agent = turn["role"].to_s == "agent" %>
 <% status = turn["status"].to_s %>
 <div class="flex flex-col gap-2 min-w-0" data-agent-chat-turn data-role="<%= agent ? "agent" : "user" %>"
@@ -16,4 +16,6 @@
   <% end %>
   <p class="<%= agent ? "self-start" : "self-end" %> text-xs text-danger-ink" data-agent-chat-failed data-test="agent-chat-failed"
      <%= "hidden" unless status == "failed" %>><%= name %> could not answer this one. Send it again.</p>
+  <p class="<%= agent ? "self-start" : "self-end" %> text-xs text-muted" data-agent-chat-held data-test="agent-chat-held"
+     <%= "hidden" unless status == "held" %>>Your message was received, but it won't get an automatic answer.</p>
 </div>

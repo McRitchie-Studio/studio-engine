@@ -14,9 +14,9 @@
 //   </div>
 //
 // STATES, on data-voice-recorder-state: idle -> starting -> recording ->
-// captured | silent | failed, plus denied (the microphone was refused) and
-// unsupported (no MediaRecorder). Any of idle, captured, silent, failed and
-// denied takes a new press.
+// captured | silent | failed, plus denied (the microphone was refused),
+// unsupported (no MediaRecorder) and, in hold mode, tapped (let go too soon to be a
+// take). Any of idle, captured, silent, failed, denied and tapped takes a new press.
 //
 // EVENTS, dispatched on the root (they bubble):
 //   studio:voice-recorder:take    detail { blob, mimeType, durationMs, peakRms, microphone: { label, deviceId } }
@@ -49,7 +49,12 @@ export const MIME_CANDIDATES = [
   "audio/ogg;codecs=opus"
 ]
 
-export const READY = ["idle", "captured", "silent", "failed", "denied"]
+export const READY = ["idle", "captured", "silent", "failed", "denied", "tapped"]
+
+// Hold mode: a take shorter than this is a tap, not a hold. It says how to use the
+// button and tells the chip nothing: the frames a tap records are too few to judge
+// the microphone by, and two silent takes in a row would open the help.
+export const TAP_MS = 300
 
 // How long a take may stay silent before the status asks whether the
 // microphone is on.
@@ -66,6 +71,7 @@ export const COPY = {
             missing: "I couldn't find a microphone. Plug one in and try again.",
             busy: "Your microphone is busy in another app. Close it there, then try again." },
   denied: { button: "Record", status: "Allow the microphone to record." },
+  tapped: { button: "Record", status: "Hold the button while you talk, then let go." },
   unsupported: { button: "Record", status: "This browser can't record here. Try Safari or Chrome." }
 }
 
@@ -83,8 +89,9 @@ export function formatElapsed(ms) {
 
 // The line for a microphone that would not open (NotAllowedError is "denied",
 // not this). NotReadableError is a microphone another app holds (Chrome's
-// older name, TrackStartError); everything else reads as no microphone found.
-export const BUSY_ERRORS = ["NotReadableError", "TrackStartError"]
+// older name, TrackStartError; Firefox can say AbortError); everything else
+// reads as no microphone found.
+export const BUSY_ERRORS = ["NotReadableError", "TrackStartError", "AbortError"]
 
 export function failedLine(error, copy = COPY) {
   const busy = !!error && BUSY_ERRORS.includes(error.name)
@@ -216,7 +223,7 @@ export function mountVoiceRecorder(root, { win = window, open = openMicrophone, 
     // Destroyed, or let go of (hold mode) before the microphone opened.
     if (destroyed || stopWanted) {
       release()
-      if (!destroyed) setState("idle")
+      if (!destroyed) setState(mode === "hold" ? "tapped" : "idle")
       return
     }
     chunks = []
@@ -275,6 +282,10 @@ export function mountVoiceRecorder(root, { win = window, open = openMicrophone, 
     recorder = null
     release()
     if (destroyed) return
+    if (mode === "hold" && durationMs < TAP_MS) {
+      setState("tapped")
+      return
+    }
     if (blob.size === 0 || !heard) {
       setState("silent", silentMessage(copy.silent.named, microphone.label))
       announce(MICROPHONE_EVENTS.silent, { label: microphone.label }, win)

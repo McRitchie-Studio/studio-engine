@@ -386,13 +386,34 @@ module Studio
     # means the app has no chat, and `allowed` (a callable taking the viewer, nil
     # when signed out) can hide it, e.g. admins only while testing. A hook that
     # raises hides the entry and logs; the footer is on every page, and a link
-    # meant for a few must not show because its gate broke.
+    # meant for a few must not show because its gate broke. So does a path that
+    # raises: without the path there is no link, and the page still renders.
     def chat_row(view, path:, label: nil, allowed: nil)
-      href = path.respond_to?(:call) ? path.call(view) : path
+      href = chat_href(view, path)
       return nil if text(href).nil?
       return nil unless chat_allowed?(view, allowed)
 
       [text(label) || "Chat", href]
+    end
+
+    def chat_href(view, path)
+      path.respond_to?(:call) ? path.call(view) : path
+    rescue StandardError => error
+      SiteFooter.reporter.call("[studio.site_footer] site_footer_chat_path raised #{error.class}: the Chat link is hidden")
+      capture_once(error)
+      nil
+    end
+
+    # ErrorLog is a row per call, and the footer is on every page: one per error class.
+    def capture_once(error)
+      key = "site_footer_chat_path #{error.class}"
+      return if SiteFooter.reported.key?(key) || SiteFooter.reported.size >= REPORTED_LIMIT
+      return unless defined?(::ErrorLog) && ::ErrorLog.respond_to?(:capture!)
+
+      SiteFooter.reported[key] = true
+      ::ErrorLog.capture!(error)
+    rescue StandardError
+      nil # reporting is best-effort: the footer still renders
     end
 
     def chat_allowed?(view, allowed)

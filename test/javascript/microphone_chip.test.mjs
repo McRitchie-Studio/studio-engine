@@ -100,8 +100,10 @@ test("Esc in the open list closes it and returns focus to the chip", async () =>
   const option = page.list.all().find((el) => el.dataset.microphoneOption === "arctis")
   option.focus()
 
-  page.root.fire("keydown", option, { key: "Escape" })
+  let stopped = 0
+  page.root.fire("keydown", option, { key: "Escape", stopPropagation() { stopped += 1 } })
 
+  assert.equal(stopped, 1, "a modal around the chip keeps its own Esc")
   assert.equal(page.panel.hidden, true)
   assert.equal(page.chip.getAttribute("aria-expanded"), "false")
   assert.equal(page.doc.activeElement, page.chip, "focus is back on the chip")

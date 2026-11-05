@@ -24,6 +24,12 @@
 //            just answered. The turn shows at once, the chat follows it, and it
 //            polls now; a poll already in flight is followed by one more, so a
 //            refresh is never swallowed.
+//   SENT     a typed send the app took dispatches studio:agent-chat:sent on the
+//            chat's section, {detail: {turn}}; studio/agent_chat_voice clears its
+//            old line on it.
+//   HELD     a turn the hub holds (status "held": stored, no automatic answer is
+//            coming) is settled and says so, and never asks for a resend. A hub
+//            that still reports it as "failed" gets the failed line.
 //   TYPING   the typing line shows while the hub says an answer is pending:
 //            "thinking", then "typing" once a turn's status is "typing".
 //
@@ -38,6 +44,7 @@ export const OFFLINE_MS = 15000
 export const FOLLOW_PX = 20
 export const LIMIT = 50
 export const REFRESH_EVENT = "studio:agent-chat:refresh"
+export const SENT_EVENT = "studio:agent-chat:sent"
 const UNSETTLED = new Set(["pending", "typing"])
 
 export function settled(turn) {
@@ -114,7 +121,8 @@ export function mountAgentChat(root, {
   doc = globalThis.document,
   now = () => Date.now(),
   setTimer = (fn, ms) => globalThis.setTimeout(fn, ms),
-  clearTimer = (id) => globalThis.clearTimeout(id)
+  clearTimer = (id) => globalThis.clearTimeout(id),
+  CustomEventClass = globalThis.CustomEvent
 } = {}) {
   const $ = (selector) => root.querySelector(selector)
   const log = $("[data-agent-chat-log]")
@@ -171,6 +179,8 @@ export function mountAgentChat(root, {
       if (text && text.textContent !== String(turn.text ?? "")) text.textContent = String(turn.text ?? "")
       const failed = node.querySelector("[data-agent-chat-failed]")
       if (failed) failed.hidden = turn.status !== "failed"
+      const held = node.querySelector("[data-agent-chat-held]")
+      if (held) held.hidden = turn.status !== "held"
     }
     const waiting = state.pending || state.turns.some((turn) => !settled(turn))
     if (typing) typing.hidden = !waiting
@@ -221,7 +231,7 @@ export function mountAgentChat(root, {
     if (!state.alive) return undefined
     if (turn) {
       state.turns = mergeTurns(state.turns, [turn])
-      state.pending = true
+      state.pending = turn.status !== "held"
       state.following = true
       state.waitingSince = now()
       setOffline(false)
@@ -260,12 +270,13 @@ export function mountAgentChat(root, {
       if (response.status === 201 && data.turn) {
         input.value = ""
         state.turns = mergeTurns(state.turns, [data.turn])
-        state.pending = true
+        state.pending = data.turn.status !== "held"
         state.following = true
         setOffline(false)
         render()
         toEnd()
         if (status) status.textContent = "Sent."
+        root.dispatchEvent(new CustomEventClass(SENT_EVENT, { detail: { turn: data.turn } }))
         state.waitingSince = now()
         clearTimer(state.timer)
         state.timer = setTimer(poll, POLL_MS)
