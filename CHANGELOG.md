@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.130.0 — 2026-11-05
+
 ### Added
 
 - **Section headers that stack under the page header: `studio/_section_header`.** Render it
