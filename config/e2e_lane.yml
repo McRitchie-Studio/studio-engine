@@ -1,12 +1,13 @@
 # THE BROWSER LANE'S CONTRACT — what the green `playwright` check actually covers.
 #
-# ONE file, read by BOTH halves of the guard, so there is exactly ONE number to move:
+# Both halves of the guard read the census of e2e/ (bin/lib/e2e_spec_census.rb), so there
+# is no number to move:
 #
 #   · bin/e2e-executed-set-check        THE RUNTIME GATE. Reads Playwright's OWN report
 #                                       after the lane runs and asserts the set it
-#                                       EXECUTED matches this contract.
+#                                       EXECUTED matches the census.
 #   · test/lib/e2e_lane_contract_test.rb THE STATIC GUARD. Reads the committed specs and
-#                                       config and asserts they DECLARE this contract,
+#                                       config and asserts the census can read them,
 #                                       and that nothing in the lane can narrow the set.
 #
 # THE PROPERTY, AND WHY IT IS ASSERTED AT RUNTIME.

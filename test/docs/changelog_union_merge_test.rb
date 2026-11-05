@@ -132,6 +132,16 @@ class ChangelogUnionMergeTest < Minitest::Test
     assert_match(/a merge across a roll/, failure.message)
   end
 
+  # The other direction: a stale branch takes the rolled file into itself. Union writes
+  # the merged-into side first, so the entry stays in the bucket, where it belongs.
+  def test_merging_the_roll_into_a_stale_branch_keeps_its_entry_in_the_bucket
+    clean, merged = merge(ancestor: base, upstream: entry(base, "Fixed", "stale branch"), branch: roll(base))
+
+    assert clean
+    assert_equal "\n### Fixed\n\n- stale branch\n", unreleased_bucket(merged)
+    assert_shape merged
+  end
+
   def test_the_real_file_passes_the_new_rule_with_its_bucket_empty
     assert_shape base
   end
