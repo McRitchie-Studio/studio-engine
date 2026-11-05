@@ -81,7 +81,7 @@ test("the band moves with the panel through the slide", async ({ page }) => {
     while (!node.getAnimations().length) await new Promise(requestAnimationFrame);
     const slide = node.getAnimations()[0];
     slide.pause();
-    slide.currentTime = 30000;
+    slide.currentTime = 15000;
     await new Promise(requestAnimationFrame);
     return node.getBoundingClientRect().left;
   });

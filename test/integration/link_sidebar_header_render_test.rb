@@ -24,8 +24,8 @@ class LinkSidebarHeaderRenderTest < ActionDispatch::IntegrationTest
     { title: "Admin", admin: true, header: true, links: [{ label: "Errors", href: "/up", emoji: "*" }] }
   ].freeze
 
-  setup { @prior = Studio.sidebar_sections }
-  teardown { Studio.sidebar_sections = @prior }
+  setup { @prior = [Studio.sidebar_sections, Studio.sidebar_geo_signpost] }
+  teardown { Studio.sidebar_sections, Studio.sidebar_geo_signpost = @prior }
 
   test "a host's header: true reaches the panel, and only for the sections that opted in" do
     Studio.sidebar_sections = DECLARED
@@ -51,6 +51,19 @@ class LinkSidebarHeaderRenderTest < ActionDispatch::IntegrationTest
 
     assert_empty page.css(HEADER)
     assert_equal ["You", "My Apps", "Help", "Admin"], page.css(GROUPS).map { |group| group["aria-label"] }.first(4)
+  end
+
+  test "sidebar_geo_signpost false takes the Geo group out of the navbar's panel, and the partial still renders" do
+    Studio.sidebar_sections = DECLARED
+    group_names = ->(page) { page.css(GROUPS).map { |group| group["aria-label"] } }
+
+    assert_includes group_names.call(Nokogiri::HTML5(NavbarRenderHost.render_navbar(signed_in: true, admin: true))), "Geo, admin"
+
+    Studio.sidebar_geo_signpost = false
+    assert_equal ["You", "My Apps", "Help", "Admin"], group_names.call(Nokogiri::HTML5(NavbarRenderHost.render_navbar(signed_in: true, admin: true)))
+
+    html = NavbarRenderHost.render_inline(%(<%= render "components/geo_signpost", variant: :sidebar, close_action: "" %>), signed_in: true, admin: true)
+    assert_includes html, "Geo", "the partial is the host's to render on its own page"
   end
 
   test "the engine lab shows the case on its own knob and leaves the plain page alone" do

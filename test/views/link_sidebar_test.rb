@@ -415,6 +415,28 @@ class LinkSidebarTest < Minitest::Test
     assert_includes html, ">Geo<", "and the row must say what it is"
   end
 
+  def test_the_geo_row_is_on_by_default_and_a_host_may_take_it_out
+    assert_equal true, Studio.sidebar_geo_signpost
+
+    previous = Studio.sidebar_geo_signpost
+    on = render_sidebar(sections: SECTIONS, admin: true, geo_flag: true, geo_routes: true)
+    Studio.sidebar_geo_signpost = false
+    off = render_sidebar(sections: SECTIONS, admin: true, geo_flag: true, geo_routes: true)
+    off_disabled = render_sidebar(sections: SECTIONS, admin: true, geo_flag: false, geo_routes: false)
+
+    assert_equal ["Site", "Ops, admin", "Geo, admin"], group_names(on)
+    assert_equal ["Site", "Ops, admin"], group_names(off), "no Geo group, so no stray divider"
+    assert_includes on, "/admin/geo"
+    refute_includes off, "/admin/geo"
+    refute_includes off_disabled, "geo-signpost-disabled"
+  ensure
+    Studio.sidebar_geo_signpost = previous
+  end
+
+  def group_names(html)
+    Nokogiri::HTML5.fragment(html).css('#studio-link-sidebar nav > [role="group"]').map { |group| group["aria-label"] }
+  end
+
   # Signage, not silence, for an app that has not turned geo on — the same
   # contract the dropdown carries, in the chrome that suppresses the dropdown.
   def test_the_sidebar_signposts_geo_even_where_it_is_unreachable

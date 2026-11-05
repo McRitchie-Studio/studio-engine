@@ -327,6 +327,7 @@ does not cache "nowhere" — and fail every gate closed — for 24 hours.
 | `geo_blocked_redirect` | `nil` | where an HTML request lands (default `root_path`) |
 | `draw_geo_routes` | `false` | draw `/admin/geo` + `/geo/check` |
 | `geo_blocking_enabled` | `nil` | `nil` reads `ENABLE_GEO_BLOCKING`; true/false decides in code. Governs the admin dropdown's Geo row only |
+| `sidebar_geo_signpost` | `true` | `false` takes the Geo row out of the link sidebar. `components/_geo_signpost` stays, for a host to render on its own page |
 | `configure_geocoder` | `true` | let the engine configure the lookup |
 | `geo_ip_provider` | `:ipinfo_io` | Geocoder `ip_lookup` |
 | `geo_ip_api_key` | `nil` | falls back to `ENV["IPINFO_API_TOKEN"]` |

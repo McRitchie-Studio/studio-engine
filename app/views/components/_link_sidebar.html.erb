@@ -129,8 +129,11 @@
         rather than called: this partial renders in hosts and test rigs that
         provide studio_sidebar_sections without the rest of the helper, and a
         bare call would raise for them. The two must stay the same question —
-        if the helper's rule changes, this changes with it. %>
-    <% if sidebar_admin && sections.any? { |section| section[:admin] } %>
+        if the helper's rule changes, this changes with it.
+
+        A host that moves Geo to its own page sets Studio.sidebar_geo_signpost = false
+        and renders components/_geo_signpost there. %>
+    <% if Studio.sidebar_geo_signpost && sidebar_admin && sections.any? { |section| section[:admin] } %>
       <%= sidebar_group.call(title: "Geo", admin: true, first: false) do %>
         <%= render "components/geo_signpost", variant: :sidebar, close_action: close_action %>
       <% end %>

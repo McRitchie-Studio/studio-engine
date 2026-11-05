@@ -148,6 +148,7 @@ test("groups show no label word, a divider separates them, and every kind of row
   const headers = panel(page).locator("[data-sidebar-group-header]");
   await expect(headers).toHaveCount(2);
   expect(await headers.allInnerTexts()).toEqual(["MY APPS", "ADMIN"]);
+  expect(await panel(page).locator('nav > [role="group"][aria-label="You"] [data-sidebar-group-header]').count(), "the engine's You stays wordless").toBe(0);
   const label = await headers.first().evaluate((node) => {
     const style = getComputedStyle(node);
     const rowTop = node.nextElementSibling.getBoundingClientRect().top;
@@ -165,7 +166,7 @@ test("groups show no label word, a divider separates them, and every kind of row
   const divided = await panel(page).locator('nav > [role="group"]').evaluateAll((nodes) =>
     nodes.map((node) => [node.getAttribute("aria-label"), getComputedStyle(node).borderTopWidth])
   );
-  expect(divided.slice(0, 3)).toEqual([["My Apps", "0px"], ["Help", "1px"], ["Admin", "1px"]]);
+  expect(divided.slice(0, 4)).toEqual([["You", "0px"], ["My Apps", "1px"], ["Help", "1px"], ["Admin", "1px"]]);
 
   // It is no click target: a click on the word navigates nowhere and leaves the panel open.
   const before = page.url();

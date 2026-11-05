@@ -22,6 +22,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   announces the title once. The header is plain text outside the rows: it takes no click, and a
   row keeps its height, its centering and its no-jump description. A section with a blank title
   draws no header. The engine lab shows the case at `/lab/sidebar_panels?sidebar=1&headers=1`.
+- **`Studio.sidebar_geo_signpost`: a host may take the Geo row out of the link sidebar.** It
+  defaults to true, so no app changes. False draws no Geo row in the panel. The partial
+  `components/_geo_signpost` stays, so a host that moves Geo renders it on its own page.
 
 ### Changed
 
