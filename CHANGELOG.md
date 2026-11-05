@@ -17,6 +17,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   replace a hand-written `scroll-margin-top`. The publisher now reads the layers once more after
   a settle and after a layer's top moves, so a layer under a layer does not keep a stale line.
   Detail: `docs/PAGE_HEADER.md`.
+## 0.129.0 — 2026-11-05
 
 ### Changed
 
@@ -60,6 +61,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
     to be let go.
   - A stale page says so. A refused token reads "This page has expired" with a reload hint on
     the voice line and the typed error, and a refused send keeps its words in the box.
+
 ## 0.128.0 — 2026-11-05
 
 ### Fixed
