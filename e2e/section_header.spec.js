@@ -9,7 +9,20 @@ const { watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive } = requ
 // Every claim is a box or a computed style, so the response bytes cannot answer one.
 //
 // CONTROLS, each run against this file with the lab server restarted:
-//   @@CONTROLS@@
+//   - data-pin-section removed from the partial: no bar and no layer. 10 red.
+//   - the header wrapped in a div: it never sticks. 12 red.
+//   - the partial's top off --pin-stack-bottom: the bar chases its own edge. 5 red.
+//   - the stuck rule's fill removed: 1 red, the bar at rest and stuck.
+//   - section-target on the old --pin-section-top, or on --nav-h + 5rem: 2 red, the tab's
+//     jump with and without Turbo, on the highlight or the bar above.
+//   - section-target on --nav-h alone, too high: 2 red, the same, on the section's top.
+//   - the glass rule for the row's square corners removed: 1 red, glass.
+//   - the short-screen floor removed: 1 red, the short screen.
+//   - the sticky gate removed from the CSS: 1 red, the page with no publisher.
+// The extra frame after a top moved and the read after a settle are controlled in
+// test/javascript/pinned_stack.test.mjs. Hub and Turf were checked by hand on this engine:
+// the lab's Turbo layout stops 30px short of the page's end, so the short last section
+// is left out of TABS here.
 
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
