@@ -169,6 +169,22 @@ test("the strict page itself raises no violation when its overlay shows", async 
   expect(await page.evaluate(() => window.__t.violations || [])).toEqual([]);
 });
 
+test("a slow replace visit never shows the overlay the head carries", async ({ page }) => {
+  await timeline(page, "direction=left");
+  // Read on every frame, never held from before the visit: the overlay may not exist yet.
+  const shown = page.evaluate(() => new Promise((done) => {
+    let seen = false;
+    const tick = () => {
+      const overlay = document.querySelector("[data-studio-loader-overlay]");
+      if (overlay && !overlay.hidden) seen = true;
+    };
+    const timer = setInterval(tick, 20);
+    window.Turbo.visit(document.querySelector('[data-test="other"]').href.replace("page_transitions_b?", "page_transitions_b?slow=900&"), { action: "replace" });
+    setTimeout(() => { clearInterval(timer); done(seen); }, 800);
+  }));
+  expect(await shown).toBe(false);
+});
+
 test("Back to a cached page gains no wait", async ({ page }) => {
   await timeline(page, "direction=left");
   await click(page);
