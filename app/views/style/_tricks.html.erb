@@ -1,20 +1,10 @@
-<%#  Tricks section of the living style guide (admin/style).
-     A board of style tricks you can SEE rendered live and hand to an agent to use
-     out of the box. Each specimen (via the shared _specimen partial) surfaces the
-     rendered primitive, its class name (one-click copy), and a copyable usage
-     snippet. Every class here is a REAL engine class (engine.css component layer
-     or engine-motion.css motion/effect/leveling layer), so a consumer that
-     imports the engine's Tailwind entry (host.css brings both) styles the
-     specimens for real.
+<%#  Tricks section of the living style guide (admin/style). Buttons come first,
+     then what you can add to a button, then the other primitives. Each specimen
+     (the shared _specimen partial) shows the real engine class live, with its name
+     and a usage snippet to copy.
 
-     The Leveling group renders the REAL .level-badge tiers ported into the engine
-     from Turf Monster, capability-gated by Studio.feature?(:leveling). When a host
-     has leveling OFF (McRitchie Studio's default), its specimens render "disabled
-     but present" via the _specimen `disabled:` local - visible and previewable,
-     but greyed and flagged, never hidden.
-
-     The color tokens/swatches now live in the Theme section (the landing section
-     owns "the colors"); this section is the trick board. %>
+     The Leveling group is gated by Studio.feature?(:leveling). With it off, its
+     specimens render "disabled but present": visible, greyed and flagged, never hidden. %>
 <%
   # Keyed by the WHOLE class, never "btn-" + a name: Tailwind compiles only the
   # @utility names it can read in source.
@@ -30,26 +20,24 @@
   }
 
   leveling_on = Studio.feature?(:leveling)
+
+  # An ERB snippet cannot be written literally inside an ERB template: the scanner
+  # closes the tag at the first `%` + `>` it sees, whatever Ruby string it sits in.
+  # So assemble the markers: the raw template never contains one.
+  erb = ->(code) { "<" + "%= " + code + " %" + ">" }
+  erb_end = "<" + "% end %" + ">"
 %>
 <section id="tricks" class="space-y-12" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
   <div class="space-y-1">
     <h2 class="type-h3 text-heading">Tricks</h2>
-    <p class="text-muted text-sm max-w-2xl">
-      A board of style tricks you can see and hand to an agent to use out of the box.
-      Each specimen surfaces the rendered primitive, its <strong>class name (one-click
-      copy)</strong>, and a copyable usage snippet - the button, surface, scrim, motion,
-      effect, and leveling primitives. The color tokens live in <a href="#theme" class="underline">Theme</a>.
-    </p>
+    <p class="text-muted text-sm max-w-2xl">Buttons first, then what you can add to them.</p>
   </div>
 
   <!-- Buttons -->
   <section class="space-y-5">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Buttons</h3>
-      <p class="text-muted text-sm">
-        <code class="font-mono text-2xs">.btn</code> base plus one role variant, and the
-        <code class="font-mono text-2xs">.btn-sm</code> / <code class="font-mono text-2xs">.btn-lg</code> sizes.
-      </p>
+      <p class="text-muted text-sm"><code class="font-mono text-2xs">.btn</code> plus one role and one size.</p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <% button_variants.each do |name, label| %>
@@ -72,16 +60,117 @@
     </div>
   </section>
 
+  <!-- Button tricks -->
+  <section id="button-tricks" class="space-y-5" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
+    <div class="space-y-1">
+      <h3 class="type-h4 text-heading">Button tricks</h3>
+      <p class="text-muted text-sm">Add any of these to a <code class="font-mono text-2xs">.btn</code>.</p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <%# The CARD shape: the button carries its own background and the ring still
+          rings, because the primitive punches the host's box out of both wedge
+          layers. The WRAPPER shape (bare host + opaque child) is staged by the
+          Modals section's glow cards. engine-motion.css section 9b has both. %>
+      <%= render layout: "style/specimen",
+            locals: { klass: ".edge-rotate-glow  (knobs: --edge-rotate-glow-color / -color-b)",
+                      note: "Adds a glow that rotates around the button's edge.",
+                      usage: %(<button class="btn btn-primary edge-rotate-glow">Save</button>\n<button class="btn btn-primary edge-rotate-glow"\n        style="--edge-rotate-glow-color: #F08030; --edge-rotate-glow-color-b: #6890F0">Two colors</button>) } do %>
+        <button type="button" class="btn btn-primary edge-rotate-glow">Save</button>
+        <button type="button" class="btn btn-primary edge-rotate-glow"
+                style="--edge-rotate-glow-color: #F08030; --edge-rotate-glow-color-b: #6890F0">Two colors</button>
+      <% end %>
+
+      <%= render layout: "style/specimen",
+            locals: { klass: ".studio-border-glow",
+                      note: "Adds a moving rainbow border with a soft halo.",
+                      usage: %(<button class="btn btn-primary studio-border-glow">Save</button>) } do %>
+        <button type="button" class="btn btn-primary studio-border-glow">Save</button>
+      <% end %>
+
+      <%= render layout: "style/specimen",
+            locals: { klass: ".sheen .sheen--loop",
+                      note: "Adds a band of light that sweeps across the button.",
+                      usage: %(<button class="btn btn-primary sheen">Once</button>\n<button class="btn btn-primary sheen sheen--loop">Loop</button>) } do %>
+        <button type="button" class="btn btn-primary sheen">Once</button>
+        <button type="button" class="btn btn-primary sheen sheen--loop">Loop</button>
+      <% end %>
+
+      <%= render layout: "style/specimen",
+            locals: { klass: ".pulse-cta  (knobs: --pulse-cta-color / -speed / -scale)",
+                      note: "Adds a slow beat with a ring that spreads from the edge.",
+                      usage: %(<button class="btn btn-primary pulse-cta">Save</button>\n<button class="btn btn-success pulse-cta" style="--pulse-cta-color: var(--color-success)">Go</button>) } do %>
+        <button type="button" class="btn btn-primary pulse-cta">Save</button>
+        <button type="button" class="btn btn-success pulse-cta" style="--pulse-cta-color: var(--color-success)">Go</button>
+      <% end %>
+
+      <%= render layout: "style/specimen",
+            locals: { klass: ".fizz-stack  (studio/fizz)",
+                      note: "Adds bubbles that rise from behind the button.",
+                      usage: [erb.call(%(render layout: "studio/fizz", locals: { seed: "save" } do)),
+                              %(  <button class="btn btn-primary">Save</button>),
+                              erb_end].join("\n") } do %>
+        <%= render layout: "studio/fizz", locals: { seed: "style-fizz" } do %>
+          <button type="button" class="btn btn-primary">Save</button>
+        <% end %>
+        <%= render layout: "studio/fizz", locals: { seed: "style-fizz-colors", colors: %w[#8b5cf6 #8b5cf6 #8b5cf6 #22d3ee #22d3ee #22d3ee #f59e0b #f59e0b #f59e0b #ef4444 #ef4444 #ef4444 #10b981 #10b981 #10b981 #ec4899 #ec4899 #ec4899] } do %>
+          <button type="button" class="btn btn-neutral">Six colors</button>
+        <% end %>
+      <% end %>
+
+      <%# The live button: press and hold for two seconds. The card clips, so this one
+          sets fizz_portal and its bubbles rise past the card's edge. %>
+      <%= render layout: "style/specimen",
+            locals: { klass: ".hold-btn  (studio/hold_button)",
+                      note: "Makes the button confirm only after a two-second hold.",
+                      usage: %(render "studio/hold_button", hold_id: "confirm", duration: 2000, fizz_portal: true) } do %>
+        <div class="w-full max-w-xs" x-data="{ submitting: false }">
+          <%= render "studio/hold_button", hold_id: "style-hold", duration: 2000, fizz_portal: true,
+                default_text: "Hold to Confirm", hold_text: "Almost there…", success_text: "Confirmed!" %>
+          <button type="button" class="btn btn-neutral btn-sm mt-3 mx-auto block"
+                  @click="document.querySelector('.hold-btn[data-hold-id=style-hold]').classList.remove('process','success','error','loading')">Reset</button>
+        </div>
+      <% end %>
+
+      <%# The same button, re-themed from an ancestor: no new CSS. %>
+      <%= render layout: "style/specimen",
+            locals: { klass: ".hold-btn  (--hold-* overrides)",
+                      note: "Recolors a hold button from any parent element.",
+                      usage: %(<div style="--hold-bg-from:#f0abfc;--hold-success-to:#4c1d95">…</div>) } do %>
+        <div class="w-full max-w-xs" x-data="{ submitting: false }"
+             style="--hold-bg-from:#f0abfc;--hold-bg-mid:#a855f7;--hold-bg-to:#6b21a8;
+                    --hold-success-from:#c4b5fd;--hold-success-to:#4c1d95;--hold-success-glow-rgb:139 92 246">
+          <%= render "studio/hold_button", hold_id: "style-hold-custom", duration: 2000,
+                default_text: "Hold to Confirm", success_text: "Confirmed!",
+                fizz_colors: %w[#f0abfc #6b21a8 #a855f7 #a5b4fc #312e81 #6366f1 #fbcfe8 #831843 #ec4899
+                                #bae6fd #0c4a6e #0ea5e9 #ddd6fe #4c1d95 #8b5cf6 #fde68a #78350f #f59e0b] %>
+          <button type="button" class="btn btn-neutral btn-sm mt-3 mx-auto block"
+                  @click="document.querySelector('.hold-btn[data-hold-id=style-hold-custom]').classList.remove('process','success','error','loading')">Reset</button>
+        </div>
+      <% end %>
+
+      <%= render layout: "style/specimen",
+            locals: { klass: "window.studioConfetti.burst(el)",
+                      note: "Fires confetti out from behind the button.",
+                      usage: %(<button class="btn btn-primary" x-data @click="window.studioConfetti.burst($el)">Save</button>) } do %>
+        <button type="button" class="btn btn-primary" x-data
+                @click="window.studioConfetti && window.studioConfetti.burst($el)">Burst</button>
+      <% end %>
+
+      <%= render layout: "style/specimen",
+            locals: { klass: "window.studioConfetti.cannons()",
+                      note: "Fires confetti in from both sides of the screen.",
+                      usage: %(<button class="btn btn-success" x-data @click="window.studioConfetti.cannons()">Done</button>) } do %>
+        <button type="button" class="btn btn-success" x-data
+                @click="window.studioConfetti && window.studioConfetti.cannons()">Cannons</button>
+      <% end %>
+    </div>
+  </section>
+
   <!-- Page header -->
   <section class="space-y-5" data-page-header-specimen>
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Page header</h3>
-      <p class="text-muted text-sm">
-        <code class="font-mono text-2xs">studio/_page_header</code>: the title, optional meta beside
-        it and optional tabs on the right. This page's own title row is one: scroll to see it take the bar.
-        It joins the pinned stack, so a table's sticky header sits under it: navbar, page row, table
-        header, each below the last. The rule is in <code class="font-mono text-2xs">docs/PAGE_HEADER.md</code>.
-      </p>
+      <p class="text-muted text-sm"><code class="font-mono text-2xs">studio/_page_header</code> is the title row, with optional meta and tabs.</p>
     </div>
     <div class="grid gap-4 lg:grid-cols-2">
       <%# The classes alone, not the partial: the partial's row is sticky, joins the
@@ -111,7 +200,6 @@
   <section class="space-y-5">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Surfaces, text &amp; form</h3>
-      <p class="text-muted text-sm">Cards, badges, inputs, the empty state, and the uppercase meta label.</p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <%= render layout: "style/specimen",
@@ -160,17 +248,8 @@
   <section class="space-y-5">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Time stamps — the &ldquo;at&rdquo; format</h3>
-      <p class="text-muted text-sm">
-        <code class="font-mono text-2xs">at_time_tag</code> stamps WHEN something happened, on
-        the reader&rsquo;s own clock. The stamps below are live: the server rendered them in this
-        app&rsquo;s timezone and <code class="font-mono text-2xs">studio/at_time_script</code>
-        re-stamped them in yours. Hover one for the relative time and your zone.
-      </p>
+      <p class="text-muted text-sm"><code class="font-mono text-2xs">at_time_tag</code> stamps when something happened, on the reader&rsquo;s own clock.</p>
     </div>
-    <%# An ERB snippet cannot be written literally inside an ERB template: the
-        scanner closes the tag at the first `%` + `>` it sees, whatever Ruby string
-        it sits in. So assemble the markers — the raw template never contains one. %>
-    <% erb = ->(code) { "<" + "%= " + code + " %" + ">" } %>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <%= render layout: "style/specimen",
             locals: { klass: "at_time_tag(time)",
@@ -225,8 +304,6 @@
   <!-- Branded loader -->
   <%
     loader_config = Studio.loader
-    # An ERB tag as text, built so this file never holds a closing tag inside one.
-    erb_tag = ->(code) { "<" + "%= #{code} %" + ">" }
     loader_art_styles = Studio::Loader::ART_STYLES.keys.select do |style|
       loader_config[:art] && Studio::Loader.art(loader_config[:art], style)
     end
@@ -234,17 +311,12 @@
   <section id="loader" class="space-y-5" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Branded loader</h3>
-      <p class="text-muted text-sm max-w-2xl">
-        This app's own icon in its theme colours, in the style <code class="font-mono text-2xs">config.loader</code>
-        names (<strong><%= loader_config[:style].to_s.tr("_", " ") %></strong>). Page loads, long waits and pending
-        buttons all draw it. One class, <code class="font-mono text-2xs">.studio-loader</code>, sized by
-        <code class="font-mono text-2xs">--studio-loader-size</code>. studio-engine docs/LOADER.md.
-      </p>
+      <p class="text-muted text-sm max-w-2xl">This app's icon in its theme colors, in the <strong><%= loader_config[:style].to_s.tr("_", " ") %></strong> style.</p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <%= render layout: "style/specimen",
             locals: { klass: ".studio-loader (this app's style)",
-                      usage: [erb_tag.call("studio_loader"), erb_tag.call('studio_loader size: 20, label: "Saving"')].join("\n") } do %>
+                      usage: [erb.call("studio_loader"), erb.call('studio_loader size: 20, label: "Saving"')].join("\n") } do %>
         <%= studio_loader %>
         <%= studio_loader size: 32 %>
         <%= studio_loader size: 20 %>
@@ -252,7 +324,7 @@
 
       <%= render layout: "style/specimen",
             locals: { klass: "studio_loader_pending (inside a busy button)",
-                      usage: ["<button class=\"btn btn-primary\">", "  <span data-loader-idle>Save</span>", "  #{erb_tag.call('studio_loader_pending')}", "</button>"].join("\n") } do %>
+                      usage: ["<button class=\"btn btn-primary\">", "  <span data-loader-idle>Save</span>", "  #{erb.call('studio_loader_pending')}", "</button>"].join("\n") } do %>
         <button type="button" class="btn btn-primary" aria-busy="true">
           <%= studio_loader_pending %><span class="ml-2">Saving…</span>
         </button>
@@ -260,7 +332,7 @@
 
       <%= render layout: "style/specimen",
             locals: { klass: "studio_loader_overlay (the page-load overlay)",
-                      usage: ["#{erb_tag.call('studio_loader_overlay')}  (once, in the layout body)", 'window.StudioLoader.show("Caption") / .hide()'].join("\n") } do %>
+                      usage: ["#{erb.call('studio_loader_overlay')}  (once, in the layout body)", 'window.StudioLoader.show("Caption") / .hide()'].join("\n") } do %>
         <button type="button" class="btn btn-secondary" data-test="style-show-loader-overlay"
                 x-data x-on:click="window.StudioLoader && window.StudioLoader.show('Loading your page…'); setTimeout(() => window.StudioLoader && window.StudioLoader.hide(), 3000)">
           Show the overlay for 3 seconds
@@ -285,18 +357,9 @@
   <section class="space-y-5">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Motion primitives</h3>
-      <p class="text-muted text-sm">
-        The seven <code class="font-mono text-2xs">engine-motion.css</code> primitives. Each knob is a themeable
-        CSS variable - tune it inline with <code class="font-mono text-2xs">style="--knob: value"</code>.
-      </p>
+      <p class="text-muted text-sm">Tune any knob inline with <code class="font-mono text-2xs">style="--knob: value"</code>.</p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%= render layout: "style/specimen",
-            locals: { klass: ".studio-border-glow (rounded-xl wrapper)",
-                      usage: %(<div class="studio-border-glow rounded-xl">...</div>) } do %>
-        <div class="studio-border-glow rounded-xl p-5 bg-surface text-center text-sm text-heading">Border glow</div>
-      <% end %>
-
       <%= render layout: "style/specimen",
             locals: { klass: ".spinner  (knob: --spinner-size)",
                       usage: %(<span class="spinner"></span>\n<span class="spinner" style="--spinner-size: 2rem"></span>) } do %>
@@ -314,13 +377,6 @@
                       usage: %(<span class="loading-dots"><span></span><span></span><span></span></span>) } do %>
         <span class="loading-dots"><span></span><span></span><span></span></span>
         <span class="loading-dots" style="--loading-dots-size: 12px; --loading-dots-color: var(--color-cta)"><span></span><span></span><span></span></span>
-      <% end %>
-
-      <%= render layout: "style/specimen",
-            locals: { klass: ".sheen .sheen--loop",
-                      usage: %(<span class="sheen sheen--loop">...</span>) } do %>
-        <span class="sheen sheen--loop badge text-body">Level 5 unlocked</span>
-        <span class="sheen sheen--loop card px-4 py-2 text-sm text-body" style="--sheen-duration: 3s">Sheen sweep</span>
       <% end %>
 
       <%= render layout: "style/specimen",
@@ -372,12 +428,6 @@
   <section class="space-y-5">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Effects</h3>
-      <p class="text-muted text-sm">
-        The <code class="font-mono text-2xs">engine-motion.css</code> visual-effect primitives beyond motion -
-        gradient text, a soft glow halo, a one- or two-color rotating <strong>selection glow</strong>
-        (ported from Turf Monster's selected-team-card ring), frosted glass, and a conic wash. Each is
-        themed through the role tokens and tunable via CSS-var knobs.
-      </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <%= render layout: "style/specimen",
@@ -396,21 +446,6 @@
           <button type="button" class="btn btn-primary studio-glow">Launch</button>
           <span class="studio-glow studio-glow--pulse inline-flex h-12 w-12 items-center justify-center rounded-full text-white font-extrabold"
                 style="background: var(--color-cta); --studio-glow-color: var(--color-success)">10</span>
-        </div>
-      <% end %>
-
-      <%# The CARD shape: the host carries its own background and the ring still
-          rings, because the primitive punches the host's box out of both wedge
-          layers. The WRAPPER shape (bare host + opaque child) is staged by the
-          Modals section's glow cards — both are documented in engine-motion.css
-          §9b. Two wedges travel the edge, so a pair of colors reads as a pair. %>
-      <%= render layout: "style/specimen",
-            locals: { klass: ".studio-team-glow  (knobs: --studio-team-glow-color / -color-b)",
-                      usage: %(<div class="studio-team-glow rounded-xl bg-surface p-5">Selected</div>\n<div class="studio-team-glow rounded-xl bg-surface p-5"\n     style="--studio-team-glow-color: #F08030; --studio-team-glow-color-b: #6890F0">Fire / Flying</div>) } do %>
-        <div class="flex flex-wrap items-center justify-center gap-6">
-          <div class="studio-team-glow rounded-xl bg-surface border border-subtle px-5 py-4 text-sm font-semibold text-heading text-center">Selected</div>
-          <div class="studio-team-glow rounded-xl bg-surface border border-subtle px-5 py-4 text-sm font-semibold text-heading text-center"
-               style="--studio-team-glow-color: #F08030; --studio-team-glow-color-b: #6890F0">Fire / Flying</div>
         </div>
       <% end %>
 
@@ -433,115 +468,6 @@
     </div>
   </section>
 
-  <!-- Hold to confirm -->
-  <section class="space-y-5">
-    <div class="space-y-1">
-      <h3 class="type-h4 text-heading">Hold to confirm</h3>
-      <p class="text-muted text-sm max-w-2xl">
-        A press-and-hold CTA for an action you do not want taken by accident, and the
-        carbonation behind it. Ported from Turf Monster, where it confirms a contest entry.
-        The bubbles sit <em>behind</em> the button and show only where they escape its edges;
-        they simmer at rest, boil on hover and through the hold, then burst outward on
-        success. The whole thing themes off the primary role token, so it wears this app&rsquo;s
-        brand — and every color also reads a <code class="font-mono text-2xs">--hold-*</code>
-        input, so one instance can be re-themed from any ancestor.
-        <code class="font-mono text-2xs">prefers-reduced-motion</code> switches the bubbles off.
-        Inside a card that clips, pass <code class="font-mono text-2xs">fizz_portal: true</code>
-        and the bubbles rise past the card&rsquo;s edge instead of stopping at it.
-      </p>
-    </div>
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%# 1. The fizz on its own: no button, just the layers. %>
-      <%= render layout: "style/specimen",
-            locals: { klass: ".hold-stack > .hold-fizz  (.fizz-bit)",
-                      usage: %(render "studio/fizz_layer", seed: "demo") } do %>
-        <div class="w-full max-w-xs">
-          <span class="hold-stack fizz-lively" style="height:3rem;--fizz-c-1:#8b5cf6;--fizz-c-4:#22d3ee;--fizz-c-7:#f59e0b;--fizz-c-10:#ef4444;--fizz-c-13:#10b981;--fizz-c-16:#ec4899">
-            <%= render "studio/fizz_layer", seed: "style-fizz" %>
-            <%= render "studio/fizz_layer", seed: "style-fizz~extra", extra: true %>
-            <span class="flex items-center justify-center h-12 text-xs text-muted">six zones, six colors</span>
-          </span>
-        </div>
-      <% end %>
-
-      <%# 2. The button itself, live: press and hold for two seconds. The card
-          clips, so this one sets fizz_portal and its bubbles rise past the
-          card's edge. %>
-      <%= render layout: "style/specimen",
-            locals: { klass: ".hold-btn  (studio/hold_button)",
-                      usage: %(render "studio/hold_button", hold_id: "confirm", duration: 2000, fizz_portal: true) } do %>
-        <div class="w-full max-w-xs" x-data="{ submitting: false }">
-          <%= render "studio/hold_button", hold_id: "style-hold", duration: 2000, fizz_portal: true,
-                default_text: "Hold to Confirm", hold_text: "Almost there…", success_text: "Confirmed!" %>
-          <button type="button" class="btn btn-neutral btn-sm mt-3 mx-auto block"
-                  @click="document.querySelector('.hold-btn[data-hold-id=style-hold]').classList.remove('process','success','error','loading')">Reset</button>
-        </div>
-      <% end %>
-
-      <%# 3. The same button, re-themed from an ancestor — no new CSS. %>
-      <%= render layout: "style/specimen",
-            locals: { klass: ".hold-btn  (--hold-* overrides)",
-                      usage: %(<div style="--hold-bg-from:#f0abfc;--hold-success-to:#4c1d95">…</div>) } do %>
-        <div class="w-full max-w-xs" x-data="{ submitting: false }"
-             style="--hold-bg-from:#f0abfc;--hold-bg-mid:#a855f7;--hold-bg-to:#6b21a8;
-                    --hold-success-from:#c4b5fd;--hold-success-to:#4c1d95;--hold-success-glow-rgb:139 92 246">
-          <%= render "studio/hold_button", hold_id: "style-hold-custom", duration: 2000,
-                default_text: "Hold to Confirm", success_text: "Confirmed!",
-                fizz_colors: %w[#f0abfc #6b21a8 #a855f7 #a5b4fc #312e81 #6366f1 #fbcfe8 #831843 #ec4899
-                                #bae6fd #0c4a6e #0ea5e9 #ddd6fe #4c1d95 #8b5cf6 #fde68a #78350f #f59e0b] %>
-          <button type="button" class="btn btn-neutral btn-sm mt-3 mx-auto block"
-                  @click="document.querySelector('.hold-btn[data-hold-id=style-hold-custom]').classList.remove('process','success','error','loading')">Reset</button>
-        </div>
-      <% end %>
-    </div>
-  </section>
-
-  <!-- Confetti & pulse -->
-  <section class="space-y-5">
-    <div class="space-y-1">
-      <h3 class="type-h4 text-heading">Confetti &amp; pulse</h3>
-      <p class="text-muted text-sm max-w-2xl">
-        Celebration effects lifted from Turf Monster into the engine. Confetti is
-        <code class="font-mono text-2xs">window.studioConfetti</code> - a zero-dependency,
-        no-CDN effect (canvas-confetti is vendored into the engine and shipped through the
-        asset pipeline). Two callable variants, both honoring
-        <code class="font-mono text-2xs">prefers-reduced-motion</code>. The pulse is the
-        <code class="font-mono text-2xs">.pulse-cta</code> attention beat. Fire the confetti
-        with the buttons below.
-      </p>
-    </div>
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%= render layout: "style/specimen",
-            locals: { klass: "window.studioConfetti.burst(el)",
-                      usage: %(window.studioConfetti.burst(cardEl)\n// radial burst from behind a card/modal, from its center) } do %>
-        <div x-data="{}" class="flex flex-col items-center gap-3 py-2">
-          <div x-ref="burstCard" class="card px-5 py-4 text-sm font-semibold text-heading text-center">Success!</div>
-          <button type="button" class="btn btn-primary btn-sm"
-                  @click="window.studioConfetti && window.studioConfetti.burst($refs.burstCard)">Fire burst</button>
-        </div>
-      <% end %>
-
-      <%= render layout: "style/specimen",
-            locals: { klass: "window.studioConfetti.cannons()",
-                      usage: %(window.studioConfetti.cannons()\n// left + right side-cannons, full-screen celebration) } do %>
-        <div x-data="{}" class="flex flex-col items-center gap-3 py-2">
-          <p class="text-sm font-semibold text-heading text-center">You joined a contest!</p>
-          <button type="button" class="btn btn-success btn-sm"
-                  @click="window.studioConfetti && window.studioConfetti.cannons()">Fire cannons</button>
-        </div>
-      <% end %>
-
-      <%= render layout: "style/specimen",
-            locals: { klass: ".pulse-cta  (knobs: --pulse-cta-color / -speed / -scale)",
-                      usage: %(<button class="btn btn-primary pulse-cta">Change Username</button>\n<button class="btn btn-success pulse-cta" style="--pulse-cta-color: var(--color-success)">Go</button>) } do %>
-        <div class="flex flex-wrap items-center justify-center gap-4">
-          <button type="button" class="btn btn-primary pulse-cta">Change Username</button>
-          <button type="button" class="btn btn-success pulse-cta" style="--pulse-cta-color: var(--color-success)">Go</button>
-        </div>
-      <% end %>
-    </div>
-  </section>
-
   <!-- Leveling (capability-gated: Studio.feature?(:leveling)) -->
   <section class="space-y-5">
     <div class="space-y-1">
@@ -553,15 +479,7 @@
           <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">disabled on this app</span>
         <% end %>
       </div>
-      <p class="text-muted text-sm max-w-2xl">
-        The real <code class="font-mono text-2xs">.level-badge</code> tiers, gated by
-        <code class="font-mono text-2xs">Studio.feature?(:leveling)</code>. Ported into the engine
-        (<code class="font-mono text-2xs">engine-motion.css</code>) from Turf Monster's leveling - the
-        outline starter through the holographic Level 10 - so any consumer with leveling on ships the
-        polished ladder. The tiers theme off <code class="font-mono text-2xs">--color-primary-*</code>, so
-        they restyle per app. Leveling is <strong><%= leveling_on ? "on" : "off" %></strong> here, so these
-        render <%= leveling_on ? "live" : "disabled-but-present - visible and previewable, but greyed and flagged" %>.
-      </p>
+      <p class="text-muted text-sm max-w-2xl">Level pills, gated by <code class="font-mono text-2xs">Studio.feature?(:leveling)</code>.</p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <%= render layout: "style/specimen",

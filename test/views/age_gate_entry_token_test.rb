@@ -191,12 +191,12 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
   end
 
   # --- D. the new specimen cards wire the active-card glow --------------------
-  # Each new card must light (studio-team-glow) when ITS modal is current, like
+  # Each new card must light (edge-rotate-glow) when ITS modal is current, like
   # the Auth / Profile specimens — the age-gate card was the odd one out.
 
   test "the age-gate + entry-token specimen cards wire the active-card glow" do
     html = render_index
-    assert_includes html, "--studio-team-glow-opacity",
+    assert_includes html, "--edge-rotate-glow-opacity",
       "the specimens carry the active-card glow opacity var"
     # entry-tokens left this list on 2026-09-09 with its specimen. The two that
     # remain are ENGINE primitives (studio/modals/blocks/_birthday and _age_gate),
@@ -206,7 +206,7 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
       assert_includes html, "$store.dsModals.current() && $store.dsModals.current().id === '#{id}'",
         "the #{id} specimen card must glow when its modal is the current one"
     end
-    assert_includes html, "studio-team-glow rounded-xl",
+    assert_includes html, "edge-rotate-glow rounded-xl",
       "the glow rides the un-clipped wrapper, as on the other specimens"
   end
 

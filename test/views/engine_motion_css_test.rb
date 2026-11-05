@@ -38,6 +38,12 @@ class EngineMotionCssTest < Minitest::Test
     "fizz-bit"           => "fizz-boil"
   }.freeze
 
+  # The ring's two shared rules, as they are written: the new name, then the
+  # deprecated alias.
+  WEDGES = ".edge-rotate-glow::before,\n.edge-rotate-glow::after,\n" \
+           ".studio-team-glow::before,\n.studio-team-glow::after"
+  BLOOM  = ".edge-rotate-glow::after,\n.studio-team-glow::after"
+
   def css
     @css ||= File.read(CSS_PATH)
   end
@@ -46,7 +52,7 @@ class EngineMotionCssTest < Minitest::Test
   # non-greedy scan to the first `}` is exact — and anchoring the selector to the
   # start of a line followed by `{` keeps `.conic-surface` from matching
   # `.conic-surface::before`. The lookbehind is what makes a selector that also
-  # appears as the TAIL of a list resolve to its own rule: `.studio-team-glow::after`
+  # appears as the TAIL of a list resolve to its own rule: `.edge-rotate-glow::after`
   # closes the shared `::before, ::after` list too, and without this it would hand
   # back the shared block instead of the bloom's own.
   def rule_body(selector)
@@ -231,9 +237,9 @@ class EngineMotionCssTest < Minitest::Test
   # hole is there, on BOTH layers, because losing it on either one silently returns
   # the wash (the ::after alone would haze the whole face through its blur).
   def test_selection_glow_cuts_the_host_box_out_of_both_wedge_layers
-    wedges = rule_body(".studio-team-glow::before,\n.studio-team-glow::after")
+    wedges = rule_body(WEDGES)
 
-    assert_match(/padding:\s*var\(--studio-team-glow-thickness\)/, wedges,
+    assert_match(/padding:\s*var\(--edge-rotate-glow-thickness\)/, wedges,
       "each wedge layer needs padding equal to the ring thickness — that is what makes " \
       "its content box the host's own box, the thing being punched out")
     assert_match(/mask-composite:\s*exclude/, wedges,
@@ -245,8 +251,8 @@ class EngineMotionCssTest < Minitest::Test
 
     # The bloom twin blurs BEFORE the mask applies, so its box has to out-measure
     # the blur or the halo ends on a hard line at its own edge.
-    bloom = rule_body(".studio-team-glow::after")
-    assert_match(/border:\s*calc\(var\(--studio-team-glow-bloom\) \* 2\) solid transparent/, bloom,
+    bloom = rule_body(BLOOM)
+    assert_match(/border:\s*calc\(var\(--edge-rotate-glow-bloom\) \* 2\) solid transparent/, bloom,
       "the bloom layer needs transparent border room for the blur to fade into")
     assert_match(/background-clip:\s*padding-box/, bloom,
       "the bloom's wedges must stop at the padding box, leaving that border room empty")
@@ -254,7 +260,7 @@ class EngineMotionCssTest < Minitest::Test
     # ...and that padding box must reach 4px PAST the ring — the "a touch larger"
     # the bloom always had, respelled as padding once the hole landed. At the bare
     # ring thickness the bloom shrinks and every WRAPPER consumer's ring lightens.
-    assert_match(/padding:\s*calc\(var\(--studio-team-glow-thickness\) \+ 4px\)/, bloom,
+    assert_match(/padding:\s*calc\(var\(--edge-rotate-glow-thickness\) \+ 4px\)/, bloom,
       "the bloom's own padding must out-measure the ring by 4px, or its source box " \
       "collapses onto the ring and every wrapper consumer's halo goes thin")
   end
@@ -263,15 +269,73 @@ class EngineMotionCssTest < Minitest::Test
   # one per wedge. The default aliases the first color, which is what keeps every
   # existing one-color consumer rendering exactly as before.
   def test_selection_glow_second_wedge_takes_its_own_color
-    assert_match(/--studio-team-glow-color-b:\s*var\(--studio-team-glow-color\)/, css,
-      "--studio-team-glow-color-b must default to the first color (no change for one-color callers)")
+    assert_match(/--edge-rotate-glow-color-b:\s*var\(--studio-team-glow-color-b, var\(--edge-rotate-glow-color\)\)/, css,
+      "--edge-rotate-glow-color-b must default to the first color (no change for one-color callers)")
 
-    wedges = rule_body(".studio-team-glow::before,\n.studio-team-glow::after")
-    assert_match(/var\(--studio-team-glow-color\)\s+12%/, wedges,
-      "the first wedge reads --studio-team-glow-color")
-    assert_match(/var\(--studio-team-glow-color-b\)\s+62%/, wedges,
-      "the SECOND wedge must read --studio-team-glow-color-b, or a two-color caller " \
+    wedges = rule_body(WEDGES)
+    assert_match(/var\(--edge-rotate-glow-color\)\s+12%/, wedges,
+      "the first wedge reads --edge-rotate-glow-color")
+    assert_match(/var\(--edge-rotate-glow-color-b\)\s+62%/, wedges,
+      "the SECOND wedge must read --edge-rotate-glow-color-b, or a two-color caller " \
       "gets one color twice")
+  end
+
+  # THE OLD NAME IS A DEPRECATED ALIAS, AND HUB AND TURF STILL USE IT. They set old
+  # knobs inline, from JS and in their own class rules, so each old knob must keep
+  # its default on the old class, at the old specificity, and the new knob must read
+  # it. e2e/button_tricks.spec.js proves the same thing in a browser.
+  def test_the_old_glow_name_stays_a_working_alias
+    alias_rule = rule_body(".studio-team-glow")
+    {
+      "color" => "var(--color-cta)", "color-b" => "var(--studio-team-glow-color)",
+      "opacity" => "1", "speed" => "4s", "thickness" => "4px", "bloom" => "10px"
+    }.each do |knob, default|
+      assert_includes alias_rule, "--studio-team-glow-#{knob}: #{default};",
+        "the old knob #{knob} keeps its old default on the old class"
+      assert_includes alias_rule, "--edge-rotate-glow-#{knob}: var(--studio-team-glow-#{knob});",
+        "the new knob #{knob} must read the old one, or an inline old knob does nothing"
+    end
+
+    # A host that moves the class and leaves its old inline knob keeps its value.
+    new_rule = rule_body(".edge-rotate-glow")
+    %w[color color-b opacity speed thickness bloom].each do |knob|
+      assert_match(/--edge-rotate-glow-#{knob}: var\(--studio-team-glow-#{knob},/, new_rule,
+        "the new class must still honor the old #{knob} knob")
+    end
+
+    assert_match(/DEPRECATED ALIAS/, css, "the old name is marked deprecated")
+    refute_match(/^\.studio-team-glow[^{]*\{[^}]*conic-gradient\(\s*from var\(--studio-team/m, css,
+      "the alias paints with the one shared rule, not a second copy of it")
+  end
+
+  # A LIT BUTTON ALREADY USES ITS ::after AND ITS BOX-SHADOW. Its rule outranks a
+  # trick's, and inset: -1px on the bloom closes the hole, so the bloom washes the
+  # whole face. The lit rules sit in the later utilities layer, so the room is made
+  # there, in engine.css. Asserted in a browser by e2e/button_tricks.spec.js too.
+  def test_button_tricks_make_room_on_a_lit_button
+    lit = File.read(ENGINE_CSS_PATH)
+    assert_match(/html\[data-surface-style="glass"\] \.btn:is\(\.edge-rotate-glow, \.studio-team-glow\)[^{]*::after \{\s*inset: calc/m, lit,
+      "the glow's bloom needs its own box back on a lit button")
+    assert_match(/html\[data-surface-style="glass"\] \.btn\.sheen[^{]*\{\s*overflow: visible/m, lit,
+      "the sheen must not clip the lit button's top highlight")
+    assert_includes lit, "--btn-lit-rest: var(--lit-contact)", "the lit rest shadow has a name"
+    assert_includes css, "box-shadow: var(--btn-lit-rest, 0 0 #0000), 0 0 0 0",
+      "the pulse's keyframes must keep the lit button's rest shadow"
+  end
+
+  # Fizz has no tie to the hold: the neutral stack carries the same bubbles, and the
+  # reduced-motion off switch covers it.
+  def test_fizz_stack_is_a_neutral_home_for_the_bubbles
+    assert_includes rule_body(".fizz-stack"), "isolation: isolate", "the stack keeps its z-order private"
+    assert_includes rule_body(".fizz-stack > :not(.fizz-layer)"), "z-index: 1", "the button paints over the bubbles"
+    assert_includes rule_body(".fizz-stack > .fizz-layer"), "pointer-events: none", "the bubbles never take a click"
+    assert_includes rule_body(".fizz-stack .fizz-bit"), "animation: fizz-simmer", "a bubble runs off the shared keyframes"
+
+    guard = css[/@media \(prefers-reduced-motion: reduce\) \{\s*\.hold-stack.*?\n\}/m]
+    assert_includes guard, ".fizz-stack .fizz-bit", "the off switch covers the neutral stack"
+    assert_includes guard, ".fizz-stack .fizz-layer-extra", "and its hover layer"
+
+    assert_match(/\.hold-stack \.fizz-bit,\n\.hold-fizz-portal \.fizz-bit \{/, css, "the hold's own selectors stay")
   end
 
   # THE IMPLICIT-FROM TRAP. A keyframe that declares only `to` takes its `from`
