@@ -58,11 +58,7 @@
   <div class="flex flex-wrap items-start justify-between gap-3">
     <div class="space-y-1">
       <h2 class="type-h3 text-heading">Theme</h2>
-      <p class="text-muted text-sm max-w-2xl">
-        The color foundation. The 7-role system, editable here. Edits preview live; Save writes them
-        and Regenerate clears the theme cache. Both persist <strong>in place</strong> — the page never
-        leaves. Every specimen on this page restyles from these roles.
-      </p>
+      <p class="text-muted text-sm max-w-2xl">Every specimen on this page restyles from these 7 color roles.</p>
     </div>
     <form action="/admin/theme/regenerate" method="post" accept-charset="UTF-8" @submit.prevent="regenerate($event)">
       <% if csrf_ok %>
@@ -108,7 +104,6 @@
         <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>" autocomplete="off">
       <% end %>
       <h3 class="type-h4 text-heading">Role colors</h3>
-      <p class="text-muted text-sm">Every specimen on this page reads these through its CSS variable, so it follows the app and its light or dark mode.</p>
 
       <% roles.each do |role| %>
         <% db_col = db_col_for.call(role) %>
@@ -164,7 +159,6 @@
       <%= render "style/type_ladder" %>
     <div class="space-y-3" x-show="edited" x-cloak data-test="style-theme-preview">
       <p class="label-upper">Preview</p>
-      <p class="text-muted text-sm">A live dark/light mock — it tracks the editor as you type, before you save.</p>
       <div class="grid gap-3 sm:grid-cols-2">
         <div class="rounded-xl border border-subtle overflow-hidden">
           <div class="px-3 py-1.5 bg-surface-alt"><span class="text-2xs font-bold uppercase tracking-wider text-secondary">Dark</span></div>
