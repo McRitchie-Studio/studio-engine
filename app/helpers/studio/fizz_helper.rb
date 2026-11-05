@@ -74,7 +74,7 @@ module Studio
     end
 
     # A fixed palette as the inline style a stack carries: `--fizz-c-1:red;...`.
-    def fizz_palette_style(colors)
+    def fizz_stack_style(colors)
       Array(colors).first(SLOTS).each_with_index.map { |c, i| "--fizz-c-#{i + 1}:#{c}" }.join(";")
     end
 

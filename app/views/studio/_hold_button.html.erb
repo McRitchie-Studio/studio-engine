@@ -74,7 +74,7 @@
 <% fizz_portal = fizz && local_assigns[:fizz_portal] %>
 <%# Static palette (gallery, or any call site with fixed colors). A runtime
     palette rides fizz_bind instead. %>
-<% fizz_style = fizz_palette_style(fizz_colors) %>
+<% fizz_style = fizz_stack_style(fizz_colors) %>
 
 <%# The stack exists so the fizz can sit BEHIND the button. Inside the button
     a negative z-index still paints above its own background (the button's

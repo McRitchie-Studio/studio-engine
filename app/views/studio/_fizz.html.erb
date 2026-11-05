@@ -16,7 +16,7 @@
   Decoration only. The hold button keeps its own stack (studio/_hold_button).
 %>
 <% lively = local_assigns.fetch(:level, :lively).to_s == "lively" %>
-<% fizz_style = fizz_palette_style(local_assigns[:colors]) %>
+<% fizz_style = fizz_stack_style(local_assigns[:colors]) %>
 <span class="fizz-stack<%= " fizz-lively" if lively %>"<% if fizz_style.present? %> style="<%= fizz_style %>"<% end %>>
   <%= render "studio/fizz_layer", seed: seed, neutral: true %>
   <% if lively %>
