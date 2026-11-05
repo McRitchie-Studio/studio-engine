@@ -109,9 +109,11 @@ Studio.configure do |config|
   # loads too, under a strict policy as well. Mark any inline view-transition-name
   # with data-vt-morph.
   # config.page_transition_direction = :left
+  # config.page_transition_style = :unfold      # default :slide; one style, never a draw
   # Branded loader (docs/LOADER.md): the app's own icon in its theme colours
-  # for page loads, long waits and pending buttons. Breathe by default; put
-  # `<%= studio_loader_overlay %>` once in the layout body to get page loads.
+  # for page loads, long waits and pending buttons. Breathe by default. Page loads
+  # come with the engine's head: none under 350ms, then at least 750ms.
+  # config.loader_overlay = false               # opt out of the page-load overlay
   # config.loader = :orbit                      # breathe | liquid | orbit | steel
   # Out-of-the-box navigation (default OFF — empty sections render nothing):
   # declare link sections and the engine navbar mounts a link-sidebar trigger

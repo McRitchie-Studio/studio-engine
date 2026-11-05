@@ -25,8 +25,28 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **`Studio.sidebar_geo_signpost`: a host may take the Geo row out of the link sidebar.** It
   defaults to true, so no app changes. False draws no Geo row in the panel. The partial
   `components/_geo_signpost` stays, so a host that moves Geo renders it on its own page.
+- **One loader pace for every app.** Under 350ms no loader and no added wait; once shown, at
+  least 750ms (`Studio::Loader::OVERLAY_DELAY_MS`, `OVERLAY_MIN_SHOW_MS`; `min_show:` beside
+  `delay:` on `studio_loader_overlay`). `layouts/studio/_head` now carries the overlay in a
+  `<template>`, and `studio/loader` adds it to the body, so an app with no overlay of its own gets
+  one on this bump. `config.loader_overlay = false` opts out. A slow visit in such an app now shows
+  the overlay, and a visit that answers between 350ms and 1100ms lands later than it did. The wait
+  holds a visit's good HTML response ahead of the view transition's old picture, so the move plays
+  after the loader goes. Failures, downloads, frames, forms, a full-load answer and
+  `StudioLoader.hide()` never wait. See `docs/LOADER.md`, *The standard pace*.
+- **`config.page_transition_style`,** `:slide` (the default) or `:unfold`: one app plays one move.
 
 ### Changed
+
+- **Page transitions draw nothing at random.** Alex McRitchie's ruling of 2026-11-04 replaces
+  the random draw per page change of 2026-11-03. Every page change and full load plays the app's
+  one move, and with no style set that move is the slide. A consumer that reads
+  `data-page-transition` or `Math.random` around a visit must change: `fade-*` is now `slide-*`,
+  and `pickStyle` and `DIRECTIONS` are gone.
+- **Page transitions paint the app's page color behind the move, and pages stay opaque.** The
+  black backdrop and the 0.3 opacity are gone, so blank areas no longer darken, a full-width hero
+  has no dark strip beside it, a light theme no longer greys, and an unfold has no black wedges. The
+  leaving page of an unfold stays opaque too.
 
 - **The browser lane counts its own specs.** `bin/lib/e2e_spec_census.rb` computes the spec count
   from `e2e/`, as the hub does, and `bin/e2e-executed-set-check` reads it. `config/e2e_lane.yml`
