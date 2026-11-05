@@ -40,9 +40,9 @@ class EngineMotionCssTest < Minitest::Test
 
   # The ring's two shared rules, as they are written: the new name, then the
   # deprecated alias.
-  WEDGES = ".studio-corner-glow::before,\n.studio-corner-glow::after,\n" \
+  WEDGES = ".edge-rotate-glow::before,\n.edge-rotate-glow::after,\n" \
            ".studio-team-glow::before,\n.studio-team-glow::after"
-  BLOOM  = ".studio-corner-glow::after,\n.studio-team-glow::after"
+  BLOOM  = ".edge-rotate-glow::after,\n.studio-team-glow::after"
 
   def css
     @css ||= File.read(CSS_PATH)
@@ -52,7 +52,7 @@ class EngineMotionCssTest < Minitest::Test
   # non-greedy scan to the first `}` is exact — and anchoring the selector to the
   # start of a line followed by `{` keeps `.conic-surface` from matching
   # `.conic-surface::before`. The lookbehind is what makes a selector that also
-  # appears as the TAIL of a list resolve to its own rule: `.studio-corner-glow::after`
+  # appears as the TAIL of a list resolve to its own rule: `.edge-rotate-glow::after`
   # closes the shared `::before, ::after` list too, and without this it would hand
   # back the shared block instead of the bloom's own.
   def rule_body(selector)
@@ -239,7 +239,7 @@ class EngineMotionCssTest < Minitest::Test
   def test_selection_glow_cuts_the_host_box_out_of_both_wedge_layers
     wedges = rule_body(WEDGES)
 
-    assert_match(/padding:\s*var\(--studio-corner-glow-thickness\)/, wedges,
+    assert_match(/padding:\s*var\(--edge-rotate-glow-thickness\)/, wedges,
       "each wedge layer needs padding equal to the ring thickness — that is what makes " \
       "its content box the host's own box, the thing being punched out")
     assert_match(/mask-composite:\s*exclude/, wedges,
@@ -252,7 +252,7 @@ class EngineMotionCssTest < Minitest::Test
     # The bloom twin blurs BEFORE the mask applies, so its box has to out-measure
     # the blur or the halo ends on a hard line at its own edge.
     bloom = rule_body(BLOOM)
-    assert_match(/border:\s*calc\(var\(--studio-corner-glow-bloom\) \* 2\) solid transparent/, bloom,
+    assert_match(/border:\s*calc\(var\(--edge-rotate-glow-bloom\) \* 2\) solid transparent/, bloom,
       "the bloom layer needs transparent border room for the blur to fade into")
     assert_match(/background-clip:\s*padding-box/, bloom,
       "the bloom's wedges must stop at the padding box, leaving that border room empty")
@@ -260,7 +260,7 @@ class EngineMotionCssTest < Minitest::Test
     # ...and that padding box must reach 4px PAST the ring — the "a touch larger"
     # the bloom always had, respelled as padding once the hole landed. At the bare
     # ring thickness the bloom shrinks and every WRAPPER consumer's ring lightens.
-    assert_match(/padding:\s*calc\(var\(--studio-corner-glow-thickness\) \+ 4px\)/, bloom,
+    assert_match(/padding:\s*calc\(var\(--edge-rotate-glow-thickness\) \+ 4px\)/, bloom,
       "the bloom's own padding must out-measure the ring by 4px, or its source box " \
       "collapses onto the ring and every wrapper consumer's halo goes thin")
   end
@@ -269,14 +269,14 @@ class EngineMotionCssTest < Minitest::Test
   # one per wedge. The default aliases the first color, which is what keeps every
   # existing one-color consumer rendering exactly as before.
   def test_selection_glow_second_wedge_takes_its_own_color
-    assert_match(/--studio-corner-glow-color-b:\s*var\(--studio-team-glow-color-b, var\(--studio-corner-glow-color\)\)/, css,
-      "--studio-corner-glow-color-b must default to the first color (no change for one-color callers)")
+    assert_match(/--edge-rotate-glow-color-b:\s*var\(--studio-team-glow-color-b, var\(--edge-rotate-glow-color\)\)/, css,
+      "--edge-rotate-glow-color-b must default to the first color (no change for one-color callers)")
 
     wedges = rule_body(WEDGES)
-    assert_match(/var\(--studio-corner-glow-color\)\s+12%/, wedges,
-      "the first wedge reads --studio-corner-glow-color")
-    assert_match(/var\(--studio-corner-glow-color-b\)\s+62%/, wedges,
-      "the SECOND wedge must read --studio-corner-glow-color-b, or a two-color caller " \
+    assert_match(/var\(--edge-rotate-glow-color\)\s+12%/, wedges,
+      "the first wedge reads --edge-rotate-glow-color")
+    assert_match(/var\(--edge-rotate-glow-color-b\)\s+62%/, wedges,
+      "the SECOND wedge must read --edge-rotate-glow-color-b, or a two-color caller " \
       "gets one color twice")
   end
 
@@ -292,14 +292,14 @@ class EngineMotionCssTest < Minitest::Test
     }.each do |knob, default|
       assert_includes alias_rule, "--studio-team-glow-#{knob}: #{default};",
         "the old knob #{knob} keeps its old default on the old class"
-      assert_includes alias_rule, "--studio-corner-glow-#{knob}: var(--studio-team-glow-#{knob});",
+      assert_includes alias_rule, "--edge-rotate-glow-#{knob}: var(--studio-team-glow-#{knob});",
         "the new knob #{knob} must read the old one, or an inline old knob does nothing"
     end
 
     # A host that moves the class and leaves its old inline knob keeps its value.
-    new_rule = rule_body(".studio-corner-glow")
+    new_rule = rule_body(".edge-rotate-glow")
     %w[color color-b opacity speed thickness bloom].each do |knob|
-      assert_match(/--studio-corner-glow-#{knob}: var\(--studio-team-glow-#{knob},/, new_rule,
+      assert_match(/--edge-rotate-glow-#{knob}: var\(--studio-team-glow-#{knob},/, new_rule,
         "the new class must still honor the old #{knob} knob")
     end
 
@@ -312,7 +312,7 @@ class EngineMotionCssTest < Minitest::Test
   # trick's, and inset: -1px on the bloom closes the hole, so the bloom washes the
   # whole face. Asserted in a browser by e2e/button_tricks.spec.js too.
   def test_button_tricks_make_room_on_a_lit_button
-    assert_match(/html\[data-surface-style="glass"\] \.btn:is\(\.studio-corner-glow, \.studio-team-glow\)[^{]*::after \{\s*inset: calc/m, css,
+    assert_match(/html\[data-surface-style="glass"\] \.btn:is\(\.edge-rotate-glow, \.studio-team-glow\)[^{]*::after \{\s*inset: calc/m, css,
       "the glow's bloom needs its own box back on a lit button")
     assert_match(/html\[data-surface-style="glass"\] \.btn\.sheen[^{]*\{\s*overflow: visible/m, css,
       "the sheen must not clip the lit button's top highlight")

@@ -21,7 +21,7 @@ require "json"
 # on alpine:init is undefined after the visit: every specimen card's @click,
 # :style and <template x-if> that reads $store.dsModals throws, modals do not
 # open, and the throwing :style wipes each card's static
-# --studio-corner-glow-opacity: 0 so every glow lights.
+# --edge-rotate-glow-opacity: 0 so every glow lights.
 #
 # HOW THE STORE REGISTERS. The guide's overlay declares itself a modal host
 # (data-studio-controller="modal-host", data-modal-host-store-value="dsModals"),

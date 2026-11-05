@@ -42,7 +42,7 @@ test("Tricks opens with Buttons, then Button tricks", async ({ page }) => {
 
   const names = await page.locator("section#button-tricks article code[x-ref=klass]").allInnerTexts();
   expect(names).toEqual([
-    expect.stringContaining(".studio-corner-glow"),
+    expect.stringContaining(".edge-rotate-glow"),
     expect.stringContaining(".studio-border-glow"),
     expect.stringContaining(".sheen"),
     expect.stringContaining(".pulse-cta"),
@@ -61,13 +61,13 @@ test("the old glow class and old knobs paint exactly as the new names do", async
   await page.goto(LAB);
 
   await stage(page, `
-    <div id="new-plain" class="studio-corner-glow bg-surface rounded-xl">a</div>
+    <div id="new-plain" class="edge-rotate-glow bg-surface rounded-xl">a</div>
     <div id="old-plain" class="studio-team-glow bg-surface rounded-xl">a</div>
-    <div id="new-knobs" class="studio-corner-glow bg-surface rounded-xl"
-         style="--studio-corner-glow-color: rgb(255, 0, 0); --studio-corner-glow-color-b: rgb(0, 0, 255); --studio-corner-glow-thickness: 2px; --studio-corner-glow-bloom: 3px; --studio-corner-glow-opacity: 0.5">a</div>
+    <div id="new-knobs" class="edge-rotate-glow bg-surface rounded-xl"
+         style="--edge-rotate-glow-color: rgb(255, 0, 0); --edge-rotate-glow-color-b: rgb(0, 0, 255); --edge-rotate-glow-thickness: 2px; --edge-rotate-glow-bloom: 3px; --edge-rotate-glow-opacity: 0.5">a</div>
     <div id="old-knobs" class="studio-team-glow bg-surface rounded-xl"
          style="--studio-team-glow-color: rgb(255, 0, 0); --studio-team-glow-color-b: rgb(0, 0, 255); --studio-team-glow-thickness: 2px; --studio-team-glow-bloom: 3px; --studio-team-glow-opacity: 0.5">a</div>
-    <div id="moved-class" class="studio-corner-glow bg-surface rounded-xl"
+    <div id="moved-class" class="edge-rotate-glow bg-surface rounded-xl"
          style="--studio-team-glow-color: rgb(255, 0, 0); --studio-team-glow-color-b: rgb(0, 0, 255); --studio-team-glow-thickness: 2px; --studio-team-glow-bloom: 3px; --studio-team-glow-opacity: 0.5">a</div>
     <div id="one-old-knob" class="studio-team-glow bg-surface rounded-xl" style="--studio-team-glow-color: rgb(255, 0, 0)">a</div>
   `);
@@ -152,7 +152,7 @@ test("the tricks keep a lit button lit", async ({ page }) => {
 
   // The bloom's box stays clear of the lit rule's inset, or its hole closes and it
   // washes the whole face: 4px ring + 4px + 2 * 10px bloom.
-  const glow = "section#button-tricks button.studio-corner-glow";
+  const glow = "section#button-tricks button.edge-rotate-glow";
   expect(await after(glow, "top")).toBe("-28px");
   expect(await after(glow, "boxShadow")).toBe("none");
   expect(await host(glow, "boxShadow")).toContain("inset");
@@ -165,7 +165,7 @@ test("the tricks keep a lit button lit", async ({ page }) => {
   expect(await after(sheen, "top")).toBe("-1px");
 
   // A plain lit button is unchanged by any of it.
-  const plain = "section#tricks button.btn-primary:not(.studio-corner-glow, .studio-border-glow, .sheen, .pulse-cta)";
+  const plain = "section#tricks button.btn-primary:not(.edge-rotate-glow, .studio-border-glow, .sheen, .pulse-cta)";
   expect(await after(plain, "top")).toBe("-1px");
   expect(await after(plain, "boxShadow")).toContain("inset");
   expect(await host(plain, "boxShadow")).not.toContain("inset");

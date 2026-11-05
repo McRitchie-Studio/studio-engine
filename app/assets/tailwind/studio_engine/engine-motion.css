@@ -19,7 +19,7 @@
   Effect:
     .text-gradient        gradient-clipped text fill          (authored fresh)
     .studio-glow          soft themed glow halo               (authored fresh)
-    .studio-corner-glow   two lights around the edge          (ported, TM)
+    .edge-rotate-glow     a glow rotating around the edge     (ported, TM)
     .surface-glass        frosted translucent glass panel     (authored fresh)
     .conic-surface        slow rotating conic-gradient wash   (authored fresh)
     .pulse-cta            attention pulse/glow for a CTA       (ported, TM)
@@ -523,14 +523,14 @@
 }
 
 /* =============================================================================
-   9b. studio-corner-glow — two lights that travel around an element's edge
+   9b. edge-rotate-glow — a glow that rotates around an element's edge
    Ported from turf-monster's selected-card glow (.holo-border-glow): a conic
    gradient rotates around the element's edge, with a blurred bloom twin behind it.
    DISTINCT from .studio-border-glow (an animated RAINBOW border) and .studio-glow
    (a static soft box-shadow halo).
 
    The color is a CSS var, default the CTA role. TWO opposed wedges travel the
-   edge: --studio-corner-glow-color-b defaults to the first color, so a one-color
+   edge: --edge-rotate-glow-color-b defaults to the first color, so a one-color
    caller sees one color and a caller with a pair gets one per wedge. The wedges
    are swept by animating a registered @property angle (rotating the GRADIENT, not
    the element, so no oversized-child clipping trick is needed). Opacity is a var
@@ -560,15 +560,15 @@
    The host must still NOT be clipped by an overflow-hidden ancestor near its
    border, or the ring is cut off with it.
 
-   Usage:  <button class="btn btn-primary studio-corner-glow">Save</button>
+   Usage:  <button class="btn btn-primary edge-rotate-glow">Save</button>
            wrapper shape, when the face is its own element:
-             <div class="studio-corner-glow rounded-xl">
+             <div class="edge-rotate-glow rounded-xl">
                <div class="rounded-xl bg-surface p-5">Selected</div>
              </div>
-           one color:  style="--studio-corner-glow-color: #E11D48"
-           two colors: style="--studio-corner-glow-color: #F08030;
-                              --studio-corner-glow-color-b: #6890F0"
-   Tune:   --studio-corner-glow-color / -color-b / -opacity / -speed / -thickness /
+           one color:  style="--edge-rotate-glow-color: #E11D48"
+           two colors: style="--edge-rotate-glow-color: #F08030;
+                              --edge-rotate-glow-color-b: #6890F0"
+   Tune:   --edge-rotate-glow-color / -color-b / -opacity / -speed / -thickness /
            -bloom
 
    DEPRECATED ALIAS: .studio-team-glow and its --studio-team-glow-* knobs. Every
@@ -578,23 +578,23 @@
    supported, so move the class and its knobs together.
    ========================================================================== */
 }
-@property --studio-corner-glow-angle {
+@property --edge-rotate-glow-angle {
   syntax: "<angle>";
   inherits: false;
   initial-value: 0deg;
 }
 @layer components {
-.studio-corner-glow {
+.edge-rotate-glow {
   /* Each default reads the old knob first, so a host that moves the class name
      and leaves an old knob in its inline style keeps its value. */
-  --studio-corner-glow-color: var(--studio-team-glow-color, var(--color-cta));
+  --edge-rotate-glow-color: var(--studio-team-glow-color, var(--color-cta));
   /* The SECOND wedge's color. Defaults to the first. Resolved on this element, so
-     an inline --studio-corner-glow-color override feeds this default too. */
-  --studio-corner-glow-color-b: var(--studio-team-glow-color-b, var(--studio-corner-glow-color));
-  --studio-corner-glow-opacity: var(--studio-team-glow-opacity, 1);
-  --studio-corner-glow-speed: var(--studio-team-glow-speed, 4s);
-  --studio-corner-glow-thickness: var(--studio-team-glow-thickness, 4px);
-  --studio-corner-glow-bloom: var(--studio-team-glow-bloom, 10px);
+     an inline --edge-rotate-glow-color override feeds this default too. */
+  --edge-rotate-glow-color-b: var(--studio-team-glow-color-b, var(--edge-rotate-glow-color));
+  --edge-rotate-glow-opacity: var(--studio-team-glow-opacity, 1);
+  --edge-rotate-glow-speed: var(--studio-team-glow-speed, 4s);
+  --edge-rotate-glow-thickness: var(--studio-team-glow-thickness, 4px);
+  --edge-rotate-glow-bloom: var(--studio-team-glow-bloom, 10px);
 }
 /* DEPRECATED ALIAS. See the note above. The old knobs keep their old defaults on
    the old class, at the old specificity, so a consumer's own rule or inline style
@@ -606,41 +606,41 @@
   --studio-team-glow-speed: 4s;
   --studio-team-glow-thickness: 4px;
   --studio-team-glow-bloom: 10px;
-  --studio-corner-glow-color: var(--studio-team-glow-color);
-  --studio-corner-glow-color-b: var(--studio-team-glow-color-b);
-  --studio-corner-glow-opacity: var(--studio-team-glow-opacity);
-  --studio-corner-glow-speed: var(--studio-team-glow-speed);
-  --studio-corner-glow-thickness: var(--studio-team-glow-thickness);
-  --studio-corner-glow-bloom: var(--studio-team-glow-bloom);
+  --edge-rotate-glow-color: var(--studio-team-glow-color);
+  --edge-rotate-glow-color-b: var(--studio-team-glow-color-b);
+  --edge-rotate-glow-opacity: var(--studio-team-glow-opacity);
+  --edge-rotate-glow-speed: var(--studio-team-glow-speed);
+  --edge-rotate-glow-thickness: var(--studio-team-glow-thickness);
+  --edge-rotate-glow-bloom: var(--studio-team-glow-bloom);
 }
-.studio-corner-glow,
+.edge-rotate-glow,
 .studio-team-glow {
   position: relative;
   isolation: isolate;
 }
-.studio-corner-glow::before,
-.studio-corner-glow::after,
+.edge-rotate-glow::before,
+.edge-rotate-glow::after,
 .studio-team-glow::before,
 .studio-team-glow::after {
   content: "";
   position: absolute;
-  inset: calc(-1 * var(--studio-corner-glow-thickness));
+  inset: calc(-1 * var(--edge-rotate-glow-thickness));
   border-radius: inherit;
   z-index: -1;
   pointer-events: none;
-  opacity: var(--studio-corner-glow-opacity);
+  opacity: var(--edge-rotate-glow-opacity);
   transition: opacity 0.4s ease;
   /* Two opposed wedges so two stretches of the ring glow at once. */
   background: conic-gradient(
-    from var(--studio-corner-glow-angle),
+    from var(--edge-rotate-glow-angle),
     transparent 0%,
-    var(--studio-corner-glow-color) 12%,
+    var(--edge-rotate-glow-color) 12%,
     transparent 33%,
     transparent 50%,
-    var(--studio-corner-glow-color-b) 62%,
+    var(--edge-rotate-glow-color-b) 62%,
     transparent 83%
   );
-  animation: studio-corner-glow-spin var(--studio-corner-glow-speed) linear infinite;
+  animation: edge-rotate-glow-spin var(--edge-rotate-glow-speed) linear infinite;
   /* THE HOST'S OWN BOX IS PUNCHED OUT of both wedge layers, so what paints is the
      band around the edge and nothing else. `padding` makes each layer's CONTENT
      box exactly the host's box; mask-composite then removes that box from the
@@ -650,7 +650,7 @@
      itself for replace and remove, so a wrapper is orphaned on every remove. With
      the hole cut here the ring rides the card directly. For a wrapper host this
      changes nothing visible: the child was already covering that interior. */
-  padding: var(--studio-corner-glow-thickness);
+  padding: var(--edge-rotate-glow-thickness);
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
@@ -660,7 +660,7 @@
     linear-gradient(#000 0 0);
   mask-composite: exclude;
 }
-.studio-corner-glow::after,
+.edge-rotate-glow::after,
 .studio-team-glow::after {
   /* Blurred bloom twin, a touch larger: its wedges reach 4px PAST the ring, which
      is what makes the bloom read as a halo, not a soft edge on the ring. Drop the
@@ -673,21 +673,21 @@
      card's own or the wrapper child's). Mask applies AFTER filter, which is why
      the reach has to out-measure the blur — without it the halo ends on a hard
      line at the layer's own box. */
-  inset: calc(-1 * (var(--studio-corner-glow-thickness) + 4px + var(--studio-corner-glow-bloom) * 2));
-  padding: calc(var(--studio-corner-glow-thickness) + 4px);
-  border: calc(var(--studio-corner-glow-bloom) * 2) solid transparent;
+  inset: calc(-1 * (var(--edge-rotate-glow-thickness) + 4px + var(--edge-rotate-glow-bloom) * 2));
+  padding: calc(var(--edge-rotate-glow-thickness) + 4px);
+  border: calc(var(--edge-rotate-glow-bloom) * 2) solid transparent;
   /* The wedges stop at the padding box (host + ring + the 4px); the border is empty
      room the blur is allowed to spread into. */
   background-clip: padding-box;
   z-index: -2;
-  filter: blur(var(--studio-corner-glow-bloom)) saturate(1.35);
+  filter: blur(var(--edge-rotate-glow-bloom)) saturate(1.35);
 }
-@keyframes studio-corner-glow-spin {
-  to { --studio-corner-glow-angle: 360deg; }
+@keyframes edge-rotate-glow-spin {
+  to { --edge-rotate-glow-angle: 360deg; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .studio-corner-glow::before,
-  .studio-corner-glow::after,
+  .edge-rotate-glow::before,
+  .edge-rotate-glow::after,
   .studio-team-glow::before,
   .studio-team-glow::after { animation: none; }
 }
@@ -1343,14 +1343,14 @@ html[data-surface-style="glass"] .btn:is(.btn-primary, .btn-secondary, .btn-dang
 /* The glows need ::after for their bloom, so the inset light moves to the host and
    the bloom gets its own box back. Without this the lit rule's inset: -1px closes
    the bloom's hole and it washes the whole face. .btn-outline has no lit ::after. */
-html[data-surface-style="glass"] .btn:is(.studio-corner-glow, .studio-team-glow, .studio-border-glow):not(.btn-outline, :disabled, [aria-disabled="true"]) {
+html[data-surface-style="glass"] .btn:is(.edge-rotate-glow, .studio-team-glow, .studio-border-glow):not(.btn-outline, :disabled, [aria-disabled="true"]) {
   box-shadow: var(--lit-inset), var(--btn-lit-rest);
 }
-html[data-surface-style="glass"] .btn:is(.studio-corner-glow, .studio-team-glow, .studio-border-glow):not(.btn-outline, :disabled, [aria-disabled="true"]):active {
+html[data-surface-style="glass"] .btn:is(.edge-rotate-glow, .studio-team-glow, .studio-border-glow):not(.btn-outline, :disabled, [aria-disabled="true"]):active {
   box-shadow: var(--lit-inset-pressed);
 }
-html[data-surface-style="glass"] .btn:is(.studio-corner-glow, .studio-team-glow):not(.btn-outline, :disabled, [aria-disabled="true"])::after {
-  inset: calc(-1 * (var(--studio-corner-glow-thickness) + 4px + var(--studio-corner-glow-bloom) * 2));
+html[data-surface-style="glass"] .btn:is(.edge-rotate-glow, .studio-team-glow):not(.btn-outline, :disabled, [aria-disabled="true"])::after {
+  inset: calc(-1 * (var(--edge-rotate-glow-thickness) + 4px + var(--edge-rotate-glow-bloom) * 2));
   box-shadow: none;
 }
 html[data-surface-style="glass"] .btn.studio-border-glow:not(.btn-outline, :disabled, [aria-disabled="true"])::after {

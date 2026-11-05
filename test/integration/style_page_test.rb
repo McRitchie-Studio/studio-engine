@@ -410,7 +410,7 @@ class StylePageTest < ActiveSupport::TestCase
 
     # In the owner's order. Each entry: what the stage must hold.
     expected = [
-      [".studio-corner-glow", "button.btn.studio-corner-glow"],
+      [".edge-rotate-glow", "button.btn.edge-rotate-glow"],
       [".studio-border-glow", "button.btn.studio-border-glow"],
       [".sheen", "button.btn.sheen"],
       [".pulse-cta", "button.btn.pulse-cta"],
@@ -440,7 +440,7 @@ class StylePageTest < ActiveSupport::TestCase
     ["Fire / Flying", "You joined a contest", "Change Username", "Level 5"].each do |game|
       refute_includes text, game, "no game wording in the button tricks"
     end
-    assert_includes group.at_css("code[x-ref=klass]").text, "corner-glow"
+    assert_includes group.at_css("code[x-ref=klass]").text, "edge-rotate-glow"
     assert_nil doc.at_css("section#tricks button.studio-team-glow"), "the board teaches the new name"
   end
 
@@ -869,7 +869,7 @@ class StylePageTest < ActiveSupport::TestCase
   # Profile lists Image upload BEFORE Crop photo.
   test "the active-card glow is wired off the store, and Profile orders upload before crop" do
     html = render_index
-    assert_includes html, "--studio-corner-glow-opacity",
+    assert_includes html, "--edge-rotate-glow-opacity",
       "cards fade the ported glow via the opacity var"
     # WAS the auth step machine's discriminator ("props.step || 'credentials'"),
     # retired 2026-09-09 with style/modals/_auth. ds_glow dropped step:/state:
@@ -887,63 +887,63 @@ class StylePageTest < ActiveSupport::TestCase
   end
 
   # Regression — the glow must FAIL CLOSED. Every glow-capable specimen card
-  # carries .studio-corner-glow statically, and the primitive's CSS default is
-  # --studio-corner-glow-opacity: 1 (visible). So the "only the active card glows"
+  # carries .edge-rotate-glow statically, and the primitive's CSS default is
+  # --edge-rotate-glow-opacity: 1 (visible). So the "only the active card glows"
   # behavior rode entirely on the reactive Alpine :style dimming inactive cards to
   # 0 — which means before Alpine hydrates (or if it never loads) ALL reactive-glow
   # cards paint their ring at once (the fail-open flash). The fix renders a STATIC
-  # inline --studio-corner-glow-opacity: 0 beside the reactive :style so the ring is
+  # inline --edge-rotate-glow-opacity: 0 beside the reactive :style so the ring is
   # OFF at first paint. Assert the RENDERED attributes on real glow-card elements
   # (not a source substring), and that the reactive 0<->0.95 fade still drives.
   test "specimen glow cards default to opacity 0 (fail-closed) and keep the reactive fade" do
     doc = Nokogiri::HTML.fragment(render_index)
-    # A specimen glow card = .studio-corner-glow that ALSO carries the reactive
+    # A specimen glow card = .edge-rotate-glow that ALSO carries the reactive
     # :style binding (this is what distinguishes it from the always-on Tricks demos).
-    glow_cards = doc.css(".studio-corner-glow").select do |el|
-      el[":style"].to_s.include?("--studio-corner-glow-opacity")
+    glow_cards = doc.css(".edge-rotate-glow").select do |el|
+      el[":style"].to_s.include?("--edge-rotate-glow-opacity")
     end
     refute_empty glow_cards,
       "expected specimen glow cards wired with the reactive :style binding"
 
     glow_cards.each do |card|
-      assert_equal "--studio-corner-glow-opacity: 0", card["style"].to_s.strip,
-        "a specimen glow card must render a STATIC inline --studio-corner-glow-opacity: 0 " \
+      assert_equal "--edge-rotate-glow-opacity: 0", card["style"].to_s.strip,
+        "a specimen glow card must render a STATIC inline --edge-rotate-glow-opacity: 0 " \
         "so the ring is OFF at first paint (fail-closed, before Alpine hydrates)"
       assert_match(/\?\s*'0\.95'\s*:\s*'0'/, card[":style"].to_s,
         "the reactive :style must still drive the glow 0.95 (active) / 0 (inactive) for the cross-fade")
     end
 
-    # The always-on Tricks demos (.studio-corner-glow WITHOUT the reactive binding)
+    # The always-on Tricks demos (.edge-rotate-glow WITHOUT the reactive binding)
     # must NOT get the fail-closed override — they are meant to glow on sight.
-    always_on = doc.css(".studio-corner-glow").reject do |el|
-      el[":style"].to_s.include?("--studio-corner-glow-opacity")
+    always_on = doc.css(".edge-rotate-glow").reject do |el|
+      el[":style"].to_s.include?("--edge-rotate-glow-opacity")
     end
     always_on.each do |demo|
-      refute_includes demo["style"].to_s, "--studio-corner-glow-opacity: 0",
+      refute_includes demo["style"].to_s, "--edge-rotate-glow-opacity: 0",
         "the always-on Tricks glow demos must stay visible (no fail-closed override)"
     end
   end
 
   # Item 7 — the corner glow ships in engine-motion.css and renders as
   # its own Tricks specimen, alongside the rainbow border glow (both in the bag).
-  test "the studio-corner-glow primitive ships in engine-motion.css and Tricks" do
+  test "the edge-rotate-glow primitive ships in engine-motion.css and Tricks" do
     css = File.read("app/assets/tailwind/studio_engine/engine-motion.css")
-    assert_includes css, ".studio-corner-glow", "the corner glow class ships"
-    assert_includes css, "--studio-corner-glow-color", "the glow color is a CSS var (default CTA)"
-    assert_includes css, "@keyframes studio-corner-glow-spin", "the single-color ring rotation ships"
+    assert_includes css, ".edge-rotate-glow", "the corner glow class ships"
+    assert_includes css, "--edge-rotate-glow-color", "the glow color is a CSS var (default CTA)"
+    assert_includes css, "@keyframes edge-rotate-glow-spin", "the single-color ring rotation ships"
     refute_match(/rgba\(var\(--color-[^)]+-rgb\)/, css,
       "the port keeps the modern slash-rgb form, never legacy rgba(var(--*-rgb))")
 
     html = render_index
-    assert_includes html, "studio-corner-glow rounded-xl",
-      "Tricks renders a studio-corner-glow specimen"
+    assert_includes html, "edge-rotate-glow rounded-xl",
+      "Tricks renders a edge-rotate-glow specimen"
     assert_includes html, "studio-border-glow",
       "the rainbow border glow specimen is still in the bag"
   end
 
   # THE PAGE MUST STAGE BOTH SHAPES THE RING SUPPORTS, BECAUSE IT SUPPORTS TWO.
   #
-  # .studio-corner-glow paints its wedges on pseudos at z-index -1 / -2, and CSS
+  # .edge-rotate-glow paints its wedges on pseudos at z-index -1 / -2, and CSS
   # paints an element's background FIRST and its negative-z descendants ON TOP of
   # it (CSS 2.1 Appendix E, steps 1 and 2). Something has to cover the middle or
   # the "ring" washes the whole face. Two things can:
@@ -962,8 +962,8 @@ class StylePageTest < ActiveSupport::TestCase
   # asserted in CSS by EngineMotionCssTest.
   test "the selection glow is staged in both of its documented shapes" do
     doc   = Nokogiri::HTML.fragment(render_index)
-    hosts = doc.css(".studio-corner-glow")
-    refute_empty hosts, "expected the page to stage .studio-corner-glow"
+    hosts = doc.css(".edge-rotate-glow")
+    refute_empty hosts, "expected the page to stage .edge-rotate-glow"
 
     card_shape, wrapper_shape = hosts.partition do |host|
       host["class"].to_s.split.grep(/\A(bg|btn)-/).any?
@@ -988,14 +988,14 @@ class StylePageTest < ActiveSupport::TestCase
   test "the selection-glow snippet teaches the card shape and the second color" do
     doc = Nokogiri::HTML.fragment(render_index)
 
-    snippet = doc.css("code[x-ref=snippet]").map(&:text).find { |t| t.include?("studio-corner-glow") }
+    snippet = doc.css("code[x-ref=snippet]").map(&:text).find { |t| t.include?("edge-rotate-glow") }
     refute_nil snippet, "the selection-glow specimen must ship a copyable usage snippet"
 
-    host_lines = snippet.lines.select { |l| l.include?("studio-corner-glow") }
+    host_lines = snippet.lines.select { |l| l.include?("edge-rotate-glow") }
     assert host_lines.any? { |l| l.match?(/\bbtn-/) },
       "the recipe must show the glow class and a filled button on the SAME element — the " \
       "card shape. Saw: #{host_lines.join.strip.inspect}"
-    assert_includes snippet, "--studio-corner-glow-color-b",
+    assert_includes snippet, "--edge-rotate-glow-color-b",
       "the recipe must show the second wedge's color knob, or a two-color caller has " \
       "no way to discover it"
   end
