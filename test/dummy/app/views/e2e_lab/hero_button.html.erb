@@ -1,8 +1,18 @@
-<%# The hub home's hero button, on the same photo. Open with ?surface=glass. %>
-<div class="min-h-screen flex items-center justify-center bg-cover bg-center" data-test="hero-photo"
+<%# The hub home's hero button, on the same photo. Open with ?surface=glass.
+    The text-primary word beside it is the hub hero's brand word: the lit primary centers on
+    that violet, so the two should read as one purple. hero-solid holds alpha at 1, so its
+    painted midpoint is the token itself (e2e/lit_button_centered.spec.js). %>
+<div class="min-h-screen flex flex-col items-center justify-center bg-cover bg-center" data-test="hero-photo"
      style="background-image: url('/e2e/img/lab-photo.avif')">
   <div class="flex flex-wrap items-center justify-center gap-6">
+    <span class="text-5xl font-bold text-primary" data-test="hero-word">Websites</span>
     <button type="button" class="btn btn-primary btn-lg" data-test="hero-trial">Launch Your Website</button>
     <button type="button" class="btn btn-primary btn-lg" style="--lit-fill-alpha: 0.94" data-test="hero-was">At 0.94</button>
+    <button type="button" class="btn btn-primary btn-lg" style="--lit-fill-alpha: 1" data-test="hero-solid">Solid</button>
+  </div>
+  <div class="mt-8 flex flex-wrap items-center justify-center gap-3" data-test="lit-variants">
+    <% %w[primary secondary success danger warning].each do |v| %>
+      <button type="button" class="btn btn-<%= v %>" data-test="lit-<%= v %>"><%= v.capitalize %></button>
+    <% end %>
   </div>
 </div>

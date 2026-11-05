@@ -1569,16 +1569,17 @@ html[data-theme-flip]::view-transition-new(*) {
       --lit-badge: inset 0 1px 0 rgb(255 255 255 / 0.14), 0 1px 1px rgb(0 0 0 / 0.35);
       --lit-input: inset 0 1px 2px rgb(0 0 0 / 0.4), inset 0 -1px 0 rgb(255 255 255 / 0.06);
     }
-    /* Stops: the app's primary is often too light for white, so it steps down its own lightness;
-       the semantic fills already hold 4.5:1, so the midpoint stays on the fill. */
-    html[data-surface-style="glass"] .btn-primary {
-      --lit-top-stop: oklch(from var(--color-cta) calc(l - 0.03) calc(c + 0.03) h / var(--lit-fill-alpha, 1));
-      --lit-low-stop: oklch(from var(--color-cta) calc(l - 0.18) calc(c + 0.05) h / var(--lit-fill-alpha, 1));
+    /* Stops: CENTERED ON THE FILL. Each stop moves lightness the same step up and down, with
+       chroma and hue unchanged, so the gradient's midpoint (oklab interpolation) is the token
+       itself. The primary centers on --color-cta, the brand violet a text-primary word paints,
+       so the button and the word read as one purple. Alex McRitchie accepted white near 3:1 on
+       the default primary for that; the semantic fills hold 4.5:1 at the midpoint. A top stop
+       past sRGB clips only the top edge: the midpoint is interpolated before it is clipped. */
+    html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success) {
+      --lit-top-stop: oklch(from var(--lit-fill) calc(l + 0.06) c h / var(--lit-fill-alpha, 1));
+      --lit-low-stop: oklch(from var(--lit-fill) calc(l - 0.06) c h / var(--lit-fill-alpha, 1));
     }
-    html[data-surface-style="glass"] :is(.btn-secondary, .btn-danger, .btn-warning, .btn-success) {
-      --lit-top-stop: oklch(from var(--lit-fill) calc(l + 0.075) calc(c + 0.03) h / var(--lit-fill-alpha, 1));
-      --lit-low-stop: oklch(from var(--lit-fill) calc(l - 0.075) calc(c + 0.03) h / var(--lit-fill-alpha, 1));
-    }
+    html[data-surface-style="glass"] .btn-primary { --lit-fill: var(--color-cta); }
     html[data-surface-style="glass"] .btn-secondary { --lit-fill: var(--btn-secondary-bg, var(--color-success)); }
     html[data-surface-style="glass"] .btn-danger { --lit-fill: var(--color-danger-fill, var(--color-danger)); }
     html[data-surface-style="glass"] .btn-warning { --lit-fill: var(--color-warning-fill, var(--color-warning)); }
@@ -1601,7 +1602,7 @@ html[data-theme-flip]::view-transition-new(*) {
        stop. The violet is already bright enough at its low stop. */
     html.dark[data-surface-style="glass"] :is(.btn-secondary, .btn-danger, .btn-warning, .btn-success) { --lit-glow-stop: var(--lit-top-stop); }
     /* A TOUCH OF TRANSPARENCY on a full-size filled button, dark theme only: a photo behind it
-       shows subtly, and white text holds 4.5:1 at the midpoint. An outer shadow is not painted
+       shows subtly, and white text holds its contrast at the midpoint. An outer shadow is not painted
        under its own box, so the glow never brightens the fill. On a light page the backdrop would
        lift the fill and cost contrast, so it stays solid there. Without a blur, or without relative
        oklch (the gradient would drop out and leave white text on nothing), it stays solid. */
