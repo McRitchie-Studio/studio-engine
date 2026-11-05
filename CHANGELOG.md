@@ -22,8 +22,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   flip at once, and the visit's motion plays on. Under the crossfade the class, the store value
   and localStorage change together in the transition's callback, so all three still read the old
   theme for up to a frame after the call: a caller that reads them in the same tick must wait.
-  `toggleTheme` is no longer exported. `$store.theme.set("dark" | "light")` is the one setter, and
-  `toggle()` stays. The `theme-transition` rule in a host is now dead.
+  `toggleTheme` and `storedTheme` are no longer exported, and the store starts from the root's
+  class. `$store.theme.set("dark" | "light")` is the one setter, and `toggle()` stays. The
+  `theme-transition` rule in a host is now dead. Measured on the hub's `/deployments`, signed in,
+  2100 elements, Metal GPU: the largest step between frames fell from 35-65% of the brightness
+  change to 11%, and element transitions started by one toggle from about 1170 to 0.
 
 - **The agent chat at phone width.** Measured at 390x844 and 320x568, light and dark:
   - No blank tail. A turn's `sr-only` name escaped the log, which had no positioned ancestor,
