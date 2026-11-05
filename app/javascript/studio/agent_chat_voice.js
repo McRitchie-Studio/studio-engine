@@ -50,6 +50,8 @@ export const MESSAGES = {
   notConfigured: "Voice isn't set up on this app yet, so I can't hear recordings. Type instead for now.",
   rateLimited: "That's a lot of voice messages in a row. Wait a moment, then hold to talk again.",
   signedOut: "Sign in again to talk.",
+  expired: "This page has expired. Reload it, then hold to talk again.",
+  expiredSend: "This page has expired. Copy your words from the box, then reload the page to send them.",
   unavailable: "I couldn't transcribe that just now. Try again in a moment.",
   failed: "That recording didn't go through. Try again.",
   offline: "Can't reach the server right now. Try again in a moment.",
@@ -65,11 +67,19 @@ export function retryHint(seconds) {
   return ` Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`
 }
 
+// A refused CSRF token: the engine's own answer (Studio::ErrorHandling), or Rails'
+// {status: 422, error: "Unprocessable Content"} from a host that re-raises it. Retrying
+// on this page can never pass, and Rails' words mean nothing to a person.
+export function tokenRefused(status, body = {}) {
+  return status === 422 && !!body && (body.reason === "invalid_token" || body.status === 422)
+}
+
 // What POST /voice/takes's refusal means on the page: {state, message}.
 // `body` is the parsed JSON (or {}); `retryAfter` the header, if any.
 export function refusalFor(status, body = {}, retryAfter = null) {
   const said = body && typeof body.error === "string" && body.error.trim() ? body.error.trim() : null
   if (status === 401) return { state: "refused", message: MESSAGES.signedOut }
+  if (tokenRefused(status, body)) return { state: "refused", message: MESSAGES.expired }
   if (status === 429) {
     return { state: "rate_limited", message: MESSAGES.rateLimited + retryHint(retryAfter ?? (body && body.retry_after)) }
   }
@@ -235,6 +245,10 @@ export function mountAgentChatVoice(root, {
       return
     }
     keepWords(answer.text)
+    if (tokenRefused(response.status, data)) {
+      say("refused", MESSAGES.expiredSend)
+      return
+    }
     const reason = typeof data.error === "string" && data.error ? `${data.error} ` : ""
     say(response.status === 429 ? "rate_limited" : "failed", `${reason}${MESSAGES.notSent(name)}`)
   }

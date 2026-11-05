@@ -49,6 +49,18 @@ const { blockOffsiteRequests, watchPageErrors } = require("./helpers");
 //   - hide no held line (`held.hidden = true`): the held spec fails.
 //   - drop the picker's max-height in _voice: the short-window spec fails at the chip.
 //   - put .studio-recorder's flex-basis back to 10rem in _voice: the timer spec fails at 450px.
+//   - drop `relative` from the log in _chat: the long-thread specs fail at the document's
+//     height (1933px against main's 977px at 390x844).
+//   - drop the revealEnd call in render (studio/agent_chat): the long-thread and new-turn
+//     specs fail at the newest turn, under the composer.
+//   - drop `state.revealFollowing` from render's test: the scrolled-up-page spec fails at scrollY.
+//   - drop the target check in onPageScroll: the during-a-hold spec fails at the end, the
+//     log's own scroll having said the reader left.
+//   - drop the HOLDING check in revealEnd: the during-a-hold spec fails at scrollY. Drop
+//     onRecorderState's listener: it fails at the end, the turn still under the composer.
+//   - drop `!state.turns.length` in revealEnd: the empty-thread spec fails at scrollY.
+//   - drop the InvalidAuthenticityToken rescue_from (Studio::ErrorHandling), or the
+//     tokenRefused check: the stale-page specs fail at the line.
 
 const PAGE = "/agent_chat_voice_lab";
 const SIGN_IN = "/agent_chat_voice_lab/sign_in";
@@ -714,4 +726,193 @@ test("a footer with no chat configured has no Chat link", async ({ page }) => {
   await page.goto("/lab/site_footer");
   await expect(page.locator("footer[data-site-footer] nav[aria-label='Contact'] a", { hasText: /^Chat$/ })).toHaveCount(0);
   await expect(page.locator("footer[data-site-footer] nav[aria-label='Contact'] a", { hasText: /^Contact$/ })).toHaveCount(1);
+});
+
+// ---- A long thread on a phone ----------------------------------------------------
+//
+// The hub's turns come through page.route here: twenty turns, as a real thread holds,
+// and later ones when a spec says so. What is measured is the page's own layout and
+// scroll, which no response bytes show.
+
+const LOG = '[data-test="agent-chat-messages"]';
+const FORM = 'form[data-test="agent-chat-form"]';
+
+function threadOf(count) {
+  const turns = [];
+  for (let id = 1; id <= count / 2; id += 1) {
+    turns.push({ id, role: "user", status: "answered", text: `Question ${id}` });
+    turns.push({ id, role: "agent", status: "answered", text: `Answer ${id}. ${"Words that wrap across a phone's width. ".repeat(4)}` });
+  }
+  return turns;
+}
+
+async function openLongThread(page, { width = 390, height = 844, theme = "dark", turns = threadOf(20), url = null } = {}) {
+  await page.setViewportSize({ width, height });
+  await blockOffsiteRequests(page);
+  await stubMicrophone(page);
+  const thread = { turns };
+  await page.route("**/agent_chat/turns*", (route) => route.fulfill({ json: { turns: thread.turns, pending: false } }));
+  await page.goto(url || `${SIGN_IN}?as=${Date.now()}${Math.floor(Math.random() * 1e6)}`);
+  // The lab's layout hard-codes dark; light has to strip it.
+  if (theme === "light") await page.evaluate(() => document.documentElement.classList.remove("dark"));
+  await expect(page.locator(CHAT)).toHaveAttribute("data-agent-chat-ready", "true");
+  if (turns.length) await expect(page.locator(`${LOG} [data-agent-chat-turn]`)).toHaveCount(turns.length);
+  return thread;
+}
+
+const layout = (page) => page.evaluate(([log, form]) => {
+  const turns = document.querySelectorAll(`${log} [data-agent-chat-turn]`);
+  const newest = turns[turns.length - 1];
+  const box = (el) => el.getBoundingClientRect();
+  const logBox = box(document.querySelector(log));
+  const formBox = box(document.querySelector(form));
+  return {
+    document: document.documentElement.scrollHeight,
+    mainEnd: Math.ceil(box(document.querySelector("main")).bottom + window.scrollY),
+    window: window.innerHeight,
+    scrollY: window.scrollY,
+    logScroll: document.querySelector(log).scrollTop,
+    newestBottom: newest ? box(newest).bottom : 0,
+    formTop: formBox.top,
+    threadShown: Math.min(logBox.bottom, formBox.top) - Math.max(logBox.top, 0)
+  };
+}, [LOG, FORM]);
+
+async function expectNewestInView(page) {
+  const at = await layout(page);
+  expect(at.newestBottom, `the newest turn's end clears the composer at ${at.formTop}`).toBeLessThanOrEqual(at.formTop);
+  expect(at.newestBottom, "and it is on the screen").toBeGreaterThan(0);
+  return at;
+}
+
+for (const [width, height] of [[390, 844], [320, 568]]) {
+  for (const theme of ["light", "dark"]) {
+    test(`a long thread at ${width}x${height} in ${theme}: no blank tail, and the newest turn shows above the composer`, async ({ page }) => {
+      const errors = watchPageErrors(page);
+      await openLongThread(page, { width, height, theme });
+      expect(await page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(theme === "dark");
+
+      const before = await layout(page);
+      expect(before.document, "the document ends where main ends").toBeLessThanOrEqual(Math.max(before.mainEnd, before.window));
+      const at = await expectNewestInView(page);
+      expect(at.threadShown, "the thread is on show, not only its last line").toBeGreaterThan(100);
+      expect(await sideways(page)).toBeLessThanOrEqual(0);
+      expect(errors).toEqual([]);
+    });
+  }
+}
+
+test("the typed chat at 320x568: no blank tail, and the newest turn shows above the composer", async ({ page }) => {
+  await openLongThread(page, { width: 320, height: 568, url: "/agent_chat_lab" });
+  const at = await layout(page);
+  expect(at.document).toBeLessThanOrEqual(Math.max(at.mainEnd, at.window));
+  await expectNewestInView(page);
+});
+
+test("a new turn is shown above the composer: an agent's reply, and the person's own send", async ({ page }) => {
+  const thread = await openLongThread(page, { width: 320, height: 568 });
+  thread.turns = [...thread.turns, { id: 11, role: "agent", status: "answered", text: "The newest reply." }];
+  await page.locator(CHAT).evaluate((chat) => chat.dispatchEvent(new CustomEvent("studio:agent-chat:refresh")));
+  await expect(page.locator(`${LOG} [data-agent-chat-turn]`)).toHaveCount(21);
+  await expectNewestInView(page);
+
+  const input = page.locator('[data-test="agent-chat-input"]');
+  await input.fill("My own words");
+  await input.press("Enter");
+  await expect(page.locator('[data-test="agent-chat-sent"]').filter({ hasText: "My own words" })).toBeVisible();
+  await expectNewestInView(page);
+});
+
+test("a reader who scrolled the page up is left there when a reply lands, and followed again after their own send", async ({ page }) => {
+  const thread = await openLongThread(page, { width: 320, height: 568 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForFunction(() => window.scrollY === 0);
+  await page.waitForTimeout(100);
+
+  thread.turns = [...thread.turns, { id: 11, role: "agent", status: "answered", text: "A reply they did not ask to jump to." }];
+  await page.locator(CHAT).evaluate((chat) => chat.dispatchEvent(new CustomEvent("studio:agent-chat:refresh")));
+  await expect(page.locator(`${LOG} [data-agent-chat-turn]`)).toHaveCount(21);
+  expect((await layout(page)).scrollY, "the page stays where they read").toBe(0);
+
+  const input = page.locator('[data-test="agent-chat-input"]');
+  await input.fill("Now I am back");
+  await input.press("Enter");
+  await expect(page.locator('[data-test="agent-chat-sent"]').filter({ hasText: "Now I am back" })).toBeVisible();
+  await expectNewestInView(page);
+});
+
+test("a reader who scrolled up inside the thread is left there when a reply lands", async ({ page }) => {
+  const thread = await openLongThread(page, { width: 320, height: 568 });
+  await page.locator(LOG).evaluate((log) => { log.scrollTop = 0; });
+  await page.waitForTimeout(100);
+  const before = await layout(page);
+
+  thread.turns = [...thread.turns, { id: 11, role: "agent", status: "answered", text: "A reply they did not ask to jump to." }];
+  await page.locator(CHAT).evaluate((chat) => chat.dispatchEvent(new CustomEvent("studio:agent-chat:refresh")));
+  await expect(page.locator(`${LOG} [data-agent-chat-turn]`)).toHaveCount(21);
+  const after = await layout(page);
+  expect(after.logScroll).toBe(0);
+  expect(after.scrollY).toBe(before.scrollY);
+});
+
+test("a spoken turn landing during the next hold moves nothing; it shows once the button is let go", async ({ page }) => {
+  const thread = await openLongThread(page, { width: 390, height: 844 });
+  // Away from the thread's end, so the turn below has a reveal to do.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForFunction(() => window.scrollY === 0);
+
+  const recorder = page.locator(RECORDER);
+  const button = recorder.locator("[data-voice-recorder-button]");
+  const before = await button.boundingBox();
+  await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+  await page.mouse.down();
+  await expect(recorder).toHaveAttribute("data-voice-recorder-state", "recording");
+
+  // The turn the last take sent, answered while this hold is on.
+  const landed = { id: 11, role: "user", status: "answered", text: "A turn landing under the finger." };
+  thread.turns = [...thread.turns, landed];
+  await page.locator(CHAT).evaluate((chat, turn) => chat.dispatchEvent(new CustomEvent("studio:agent-chat:refresh", { detail: { turn } })), landed);
+  await expect(page.locator(`${LOG} [data-agent-chat-turn]`)).toHaveCount(21);
+  const held = await button.boundingBox();
+  expect(Math.abs(held.y - before.y), "the button stays under the finger").toBeLessThan(1);
+  expect((await layout(page)).scrollY, "and the page does not move under it").toBe(0);
+
+  await page.mouse.up();
+  await expect(recorder).not.toHaveAttribute("data-voice-recorder-state", /recording|starting/);
+  await expect.poll(async () => (await layout(page)).newestBottom <= (await layout(page)).formTop).toBe(true);
+});
+
+test("an empty thread does not scroll the page: the card slot and the header stay in view", async ({ page }) => {
+  await openLongThread(page, { width: 320, height: 568, turns: [], url: "/agent_chat_lab" });
+  await expect(page.locator('[data-test="agent-chat-empty"]')).toBeVisible();
+  await page.waitForTimeout(200);
+  expect((await layout(page)).scrollY).toBe(0);
+});
+
+// ---- A stale page ------------------------------------------------------------------
+
+test("a take on a stale page is refused with a reload hint, and writes no failure line", async ({ page }) => {
+  await openSignedIn(page);
+  await page.evaluate(() => document.querySelector("meta[name='csrf-token']").setAttribute("content", "a-stale-token"));
+  const answers = [];
+  page.on("response", (response) => { if (response.url().endsWith("/voice/takes")) answers.push(response.status()); });
+
+  await holdToTalk(page);
+
+  await expect(page.locator(MIC)).toHaveAttribute("data-agent-chat-voice-state", "refused");
+  await expect(page.locator(STATUS)).toHaveText("This page has expired. Reload it, then hold to talk again.");
+  expect(answers).toEqual([422]);
+});
+
+test("a typed send on a stale page keeps the words and says to reload", async ({ page }) => {
+  await openSignedIn(page);
+  await page.evaluate(() => {
+    document.querySelector("meta[name='csrf-token']").setAttribute("content", "a-stale-token");
+    document.querySelector("form[data-test='agent-chat-form'] input[name='authenticity_token']").value = "a-stale-token";
+  });
+  const input = page.locator('[data-test="agent-chat-input"]');
+  await input.fill("Words worth keeping");
+  await input.press("Enter");
+  await expect(page.locator('[data-test="agent-chat-error"]')).toHaveText("This page has expired. Copy your message, then reload the page to send it.");
+  await expect(input).toHaveValue("Words worth keeping");
 });

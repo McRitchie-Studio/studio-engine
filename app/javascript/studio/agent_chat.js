@@ -18,6 +18,12 @@
 //            until the app answers 201; a refusal shows its reason above them.
 //   FOLLOW   the thread stays at its end while the reader is within FOLLOW_PX of
 //            it, and always after their own send (the hub's chat_follow rule).
+//   REVEAL   the composer sticks over the window's bottom, so on a short window the
+//            thread's end sits under it. On load and after a new turn the page
+//            scrolls that end clear of the composer, with the same manners as
+//            FOLLOW: not for an empty thread, not for a reader who scrolled the page
+//            up (revealFollowing, until their own send), and never during a hold,
+//            when it waits for the button to be let go.
 //   REFRESH  the public hook for code outside the chat (studio/agent_chat_voice, a
 //            host's own composer): dispatch studio:agent-chat:refresh on the
 //            chat's section, optionally with {detail: {turn}}, a turn the app
@@ -43,6 +49,11 @@ export const IDLE_MS = 30000
 export const OFFLINE_MS = 15000
 export const FOLLOW_PX = 20
 export const LIMIT = 50
+export const REVEAL_GAP_PX = 12
+export const INVALID_TOKEN = "invalid_token"
+export const EXPIRED_MESSAGE = "This page has expired. Copy your message, then reload the page to send it."
+export const RECORDER_STATE_EVENT = "studio:voice-recorder:state"
+const HOLDING = "[data-voice-recorder-state='recording'],[data-voice-recorder-state='starting']"
 export const REFRESH_EVENT = "studio:agent-chat:refresh"
 export const SENT_EVENT = "studio:agent-chat:sent"
 const UNSETTLED = new Set(["pending", "typing"])
@@ -102,6 +113,12 @@ export function isFollowing(log, px = FOLLOW_PX) {
   return log.scrollHeight - log.clientHeight - log.scrollTop <= px
 }
 
+// How many pixels of the thread's end the composer (or the window's bottom) hides;
+// zero or less when it is clear of both. Rects are the elements' own.
+export function coveredPx(endRect, composerRect, windowHeight) {
+  return endRect.bottom - Math.min(composerRect.top, windowHeight)
+}
+
 // The page's authenticity token: the form's own field, else the csrf meta.
 export function csrfToken(form, doc = globalThis.document) {
   const field = form && form.querySelector("input[name='authenticity_token']")
@@ -138,12 +155,54 @@ export function mountAgentChat(root, {
   const soul = root.dataset.agentChatSoul
   const name = root.dataset.agentChatName || "The agent"
 
-  const state = { turns: [], pending: false, waitingSince: null, offline: false, inFlight: false, pollAgain: false, sending: false, timer: null, alive: true, following: true }
+  const state = { turns: [], pending: false, waitingSince: null, offline: false, inFlight: false, pollAgain: false, sending: false, timer: null, alive: true, following: true, revealFollowing: true, revealOwed: false }
 
   const onScroll = () => { state.following = isFollowing(log) }
   log.addEventListener("scroll", onScroll, { passive: true })
 
   function toEnd() { log.scrollTop = log.scrollHeight }
+
+  // The last thing in the thread's column above the composer that is showing.
+  function threadEnd() {
+    return [offlineNote, typing].find((el) => el && el.hidden === false) || log
+  }
+
+  function windowHeight() {
+    return doc && doc.documentElement ? doc.documentElement.clientHeight : 0
+  }
+
+  function covered() {
+    const end = threadEnd()
+    if (!form || !end.getBoundingClientRect || !form.getBoundingClientRect) return 0
+    return coveredPx(end.getBoundingClientRect(), form.getBoundingClientRect(), windowHeight())
+  }
+
+  // scrollIntoView, not window.scrollBy: a host may scroll an inner container. The
+  // margin is what the composer takes off the bottom of the window. Instant, so a
+  // host's smooth scrolling cannot leave the page moving when a hold begins.
+  function revealEnd() {
+    if (root.querySelector(HOLDING)) { state.revealOwed = true; return }
+    state.revealOwed = false
+    if (!state.turns.length || covered() <= 0) return
+    const end = threadEnd()
+    const height = windowHeight()
+    end.style.scrollMarginBottom = `${height - Math.min(form.getBoundingClientRect().top, height) + REVEAL_GAP_PX}px`
+    end.scrollIntoView({ block: "end", behavior: "instant" })
+    end.style.scrollMarginBottom = ""
+  }
+
+  // A scroll of the page or a host's container says whether the reader is still at
+  // the thread's end. The log's own scroll, the box's and the picker's say nothing:
+  // only something that holds the chat can move it. A reveal passes this too, and
+  // ends there.
+  const onPageScroll = (event) => {
+    if (!event.target || !event.target.contains || !event.target.contains(root)) return
+    state.revealFollowing = covered() <= FOLLOW_PX
+  }
+
+  const onRecorderState = () => {
+    if (state.revealOwed && !root.querySelector(HOLDING) && state.following && state.revealFollowing) revealEnd()
+  }
 
   function setOffline(offline) {
     state.offline = offline
@@ -185,7 +244,10 @@ export function mountAgentChat(root, {
     const waiting = state.pending || state.turns.some((turn) => !settled(turn))
     if (typing) typing.hidden = !waiting
     if (phase) phase.dataset.phase = typingPhase(state.turns)
-    if (follow) toEnd()
+    if (follow) {
+      toEnd()
+      if (state.revealFollowing) revealEnd()
+    }
   }
 
   function schedule() {
@@ -233,6 +295,7 @@ export function mountAgentChat(root, {
       state.turns = mergeTurns(state.turns, [turn])
       state.pending = turn.status !== "held"
       state.following = true
+      state.revealFollowing = true
       state.waitingSince = now()
       setOffline(false)
       render()
@@ -272,6 +335,7 @@ export function mountAgentChat(root, {
         state.turns = mergeTurns(state.turns, [data.turn])
         state.pending = data.turn.status !== "held"
         state.following = true
+        state.revealFollowing = true
         setOffline(false)
         render()
         toEnd()
@@ -281,7 +345,7 @@ export function mountAgentChat(root, {
         clearTimer(state.timer)
         state.timer = setTimer(poll, POLL_MS)
       } else {
-        showError(data.error || `Couldn't send that to ${name}. Try again.`)
+        showError(data.reason === INVALID_TOKEN ? EXPIRED_MESSAGE : data.error || `Couldn't send that to ${name}. Try again.`)
         if (status) status.textContent = ""
       }
     } catch (_error) {
@@ -313,7 +377,10 @@ export function mountAgentChat(root, {
   input && input.addEventListener("keydown", onKeydown)
   retry && retry.addEventListener("click", onRetry)
   root.addEventListener(REFRESH_EVENT, onRefresh)
+  root.addEventListener(RECORDER_STATE_EVENT, onRecorderState)
   doc && doc.addEventListener && doc.addEventListener("visibilitychange", onVisible)
+  // Scroll events do not bubble; capture hears the page's and any container's.
+  doc && doc.addEventListener && doc.addEventListener("scroll", onPageScroll, { capture: true, passive: true })
   root.dataset.agentChatReady = "true"
   poll()
 
@@ -330,7 +397,9 @@ export function mountAgentChat(root, {
       input && input.removeEventListener("keydown", onKeydown)
       retry && retry.removeEventListener("click", onRetry)
       root.removeEventListener(REFRESH_EVENT, onRefresh)
+      root.removeEventListener(RECORDER_STATE_EVENT, onRecorderState)
       doc && doc.removeEventListener && doc.removeEventListener("visibilitychange", onVisible)
+      doc && doc.removeEventListener && doc.removeEventListener("scroll", onPageScroll, { capture: true })
       delete root.dataset.agentChatReady
     }
   }

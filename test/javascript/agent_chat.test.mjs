@@ -7,8 +7,8 @@ import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/agent_chat.js", import.meta.url), "utf8")
 const {
-  settled, mergeTurns, turnKey, afterCursor, pollDelay, typingPhase, isFollowing, csrfToken, turnsUrl, mountAgentChat,
-  POLL_MS, SLOW_MS, SLOW_AFTER_MS, IDLE_MS, OFFLINE_MS, LIMIT, REFRESH_EVENT, SENT_EVENT
+  settled, mergeTurns, turnKey, afterCursor, pollDelay, typingPhase, isFollowing, csrfToken, turnsUrl, mountAgentChat, coveredPx,
+  REVEAL_GAP_PX, RECORDER_STATE_EVENT, EXPIRED_MESSAGE, POLL_MS, SLOW_MS, SLOW_AFTER_MS, IDLE_MS, OFFLINE_MS, LIMIT, REFRESH_EVENT, SENT_EVENT
 } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 const turn = (id, status = "answered", role = "user") => ({ id, role, status, text: `t${id}` })
@@ -291,4 +291,162 @@ test("a typed send the app took tells the page; a refused one does not", async (
   const second = mountAgentChat(other.root, { fetch: refused.fetcher, doc: null, CustomEventClass: SentEvent, setTimer: () => 0, clearTimer: () => {} })
   await second.submit()
   assert.deepEqual(refused.events, [], "the voice line may still be the one that explains the box")
+})
+
+// ---- the thread's end stays clear of the composer ---------------------------------
+
+test("coveredPx: what the composer, or the window's bottom when it is lower, hides", () => {
+  assert.equal(coveredPx({ bottom: 660 }, { top: 598 }, 844), 62)
+  assert.equal(coveredPx({ bottom: 500 }, { top: 598 }, 844), -98)
+  assert.equal(coveredPx({ bottom: 900 }, { top: 1000 }, 844), 56, "a composer below the fold hides nothing; the window does")
+})
+
+// A stand-in with measurable boxes. `end` is where the log's bottom is now; scrolling
+// the page moves it, as a real page does.
+function measured({ end = 660, composer = 598, holding = false } = {}) {
+  const page = standIn()
+  const box = { end }
+  const scrolls = []
+  const log = page.root.querySelector("[data-agent-chat-log]")
+  log.style = {}
+  log.getBoundingClientRect = () => ({ bottom: box.end })
+  log.scrollIntoView = (options) => {
+    scrolls.push({ ...options, margin: log.style.scrollMarginBottom })
+    box.end = composer - REVEAL_GAP_PX
+  }
+  // The typing line, once it shows, is the thread's end.
+  Object.assign(page.typing, { style: log.style, getBoundingClientRect: log.getBoundingClientRect, scrollIntoView: log.scrollIntoView })
+  const form = { getAttribute: () => "/m", getBoundingClientRect: () => ({ top: composer }), addEventListener() {}, removeEventListener() {} }
+  const realQuery = page.root.querySelector
+  const hold = { holding }
+  page.root.querySelector = (selector) => {
+    if (selector === "[data-agent-chat-form]") return form
+    if (selector.includes("data-voice-recorder-state")) return hold.holding ? {} : null
+    return realQuery(selector)
+  }
+  const listeners = {}
+  const doc = {
+    visibilityState: "visible",
+    documentElement: { clientHeight: 844 },
+    querySelector: () => null,
+    contains: () => true,
+    addEventListener: (type, fn) => { listeners[type] = fn },
+    removeEventListener: (type) => { delete listeners[type] }
+  }
+  return { page, box, scrolls, hold, doc, docListeners: listeners }
+}
+
+function mountMeasured(setup, turns = [turn(1)]) {
+  const fetcher = async () => ({ ok: true, json: async () => ({ turns, pending: false }) })
+  return mountAgentChat(setup.page.root, { fetch: fetcher, doc: setup.doc, setTimer: () => 0, clearTimer: () => {} })
+}
+
+test("load: a thread whose end is under the composer scrolls it clear, by the composer's height and a gap", async () => {
+  const setup = measured()
+  mountMeasured(setup)
+  await flush()
+  assert.deepEqual(setup.scrolls, [{ block: "end", behavior: "instant", margin: `${844 - 598 + REVEAL_GAP_PX}px` }])
+  assert.equal(setup.page.root.querySelector("[data-agent-chat-log]").style.scrollMarginBottom, "", "the margin does not stay")
+})
+
+test("load: an end already clear, or an empty thread, does not scroll the page", async () => {
+  const clear = measured({ end: 500 })
+  mountMeasured(clear)
+  await flush()
+  assert.deepEqual(clear.scrolls, [])
+
+  const empty = measured()
+  mountMeasured(empty, [])
+  await flush()
+  assert.deepEqual(empty.scrolls, [])
+})
+
+test("a reader who scrolled the page up is not moved by a reply; their own turn brings them back", async () => {
+  const setup = measured()
+  const chat = mountMeasured(setup)
+  await flush()
+  setup.scrolls.length = 0
+
+  setup.box.end = 900 // they scrolled up: the end is far under the composer
+  setup.docListeners.scroll({ target: { contains: () => false } })
+  assert.equal(chat.state.revealFollowing, true, "the log's own scroll says nothing: it does not hold the chat")
+  setup.docListeners.scroll({ target: setup.doc })
+  assert.equal(chat.state.revealFollowing, false)
+  await chat.poll()
+  assert.deepEqual(setup.scrolls, [], "a poll's render leaves them where they read")
+
+  chat.refresh({ turn: turn(2) })
+  assert.equal(setup.scrolls.length, 1)
+  assert.equal(chat.state.revealFollowing, true)
+})
+
+test("a reader scrolled up inside the thread is not moved", async () => {
+  const setup = measured({ end: 500 })
+  const chat = mountMeasured(setup)
+  await flush()
+  chat.state.following = false
+  setup.box.end = 700
+  await chat.poll()
+  assert.deepEqual(setup.scrolls, [])
+})
+
+test("during a hold nothing scrolls; the owed reveal is paid when the button is let go", async () => {
+  const setup = measured({ holding: true })
+  const chat = mountMeasured(setup)
+  await flush()
+  assert.deepEqual(setup.scrolls, [])
+  assert.equal(chat.state.revealOwed, true)
+
+  setup.page.listeners[RECORDER_STATE_EVENT]()
+  assert.deepEqual(setup.scrolls, [], "a state change inside the hold pays nothing")
+
+  setup.hold.holding = false
+  setup.page.listeners[RECORDER_STATE_EVENT]()
+  assert.equal(setup.scrolls.length, 1)
+  assert.equal(chat.state.revealOwed, false)
+
+  setup.page.listeners[RECORDER_STATE_EVENT]()
+  assert.equal(setup.scrolls.length, 1, "once")
+})
+
+test("destroy removes the page's and the recorder's listeners", async () => {
+  const setup = measured()
+  const chat = mountMeasured(setup)
+  await flush()
+  assert.equal(typeof setup.docListeners.scroll, "function")
+  chat.destroy()
+  assert.equal(setup.docListeners.scroll, undefined)
+  assert.equal(setup.page.listeners[RECORDER_STATE_EVENT], undefined)
+})
+
+test("the thread's end is the typing line while it shows, and the offline notice over it", async () => {
+  const setup = measured({ end: 500 })
+  const offline = { hidden: true, style: {}, scrollIntoView() { offline.scrolled = true }, getBoundingClientRect: () => ({ bottom: 700 }) }
+  const query = setup.page.root.querySelector
+  setup.page.root.querySelector = (selector) => (selector === "[data-agent-chat-offline]" ? offline : query(selector))
+  const chat = mountMeasured(setup)
+  await flush()
+  assert.equal(offline.scrolled, undefined)
+
+  offline.hidden = false
+  await chat.refresh({ turn: turn(2) })
+  assert.equal(offline.hidden, true, "a turn that landed clears the notice")
+})
+
+test("a typed send refused for its token keeps the words and says to reload", async () => {
+  const page = standIn()
+  const input = { value: "my words", addEventListener() {}, removeEventListener() {} }
+  const error = { hidden: true, textContent: "" }
+  const form = { getAttribute: () => "/agent_chat/messages", querySelector: () => null, addEventListener() {}, removeEventListener() {} }
+  const query = page.root.querySelector
+  const parts = { "[data-agent-chat-input]": input, "[data-agent-chat-error]": error, "[data-agent-chat-form]": form }
+  page.root.querySelector = (selector) => parts[selector] || query(selector)
+  const fetcher = async (url) => (String(url).includes("turns")
+    ? { ok: true, json: async () => ({ turns: [], pending: false }) }
+    : { status: 422, json: async () => ({ error: "This page has expired. Reload it, then try again.", reason: "invalid_token" }) })
+  const chat = mountAgentChat(page.root, { fetch: fetcher, doc: { querySelector: () => null }, setTimer: () => 0, clearTimer: () => {} })
+  await chat.submit()
+  assert.equal(input.value, "my words")
+  assert.equal(error.textContent, EXPIRED_MESSAGE)
+  assert.match(error.textContent, /reload/i)
 })

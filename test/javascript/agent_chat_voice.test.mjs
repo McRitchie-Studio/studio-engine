@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/agent_chat_voice.js", import.meta.url), "utf8")
 const {
-  MESSAGES, EMBED_WAIT_MS, csrfToken, mountAgentChatVoice, parseEmbedder, refusalFor, retryHint, takeForm, voiceMetadata, wordsInBox, within
+  MESSAGES, EMBED_WAIT_MS, csrfToken, mountAgentChatVoice, parseEmbedder, refusalFor, retryHint, takeForm, tokenRefused, voiceMetadata, wordsInBox, within
 } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 class StubFormData {
@@ -42,6 +42,16 @@ test("refusals: each answer from /voice/takes has its own state and line", () =>
     { state: "refused", message: "Voice isn't available on your account yet." })
   assert.equal(refusalFor(413, { error: "That recording is too long to send." }).message, "That recording is too long to send.")
   assert.equal(refusalFor(500, { error: "<b>stack</b>" }).message, MESSAGES.failed, "an unexpected status never shows the server's words")
+})
+
+test("a refused CSRF token reads as a reload hint, from the engine's answer or Rails' own", () => {
+  const expired = { state: "refused", message: MESSAGES.expired }
+  assert.match(MESSAGES.expired, /reload/i)
+  assert.deepEqual(refusalFor(422, { error: "This page has expired. Reload it, then try again.", reason: "invalid_token" }), expired)
+  assert.deepEqual(refusalFor(422, { status: 422, error: "Unprocessable Content" }), expired, "never Rails' words")
+  assert.equal(tokenRefused(422, { error: "That recording was empty." }), false, "the take's own 422s keep their words")
+  assert.equal(tokenRefused(500, { reason: "invalid_token" }), false)
+  assert.equal(tokenRefused(422, null), false)
 })
 
 test("429: rate limited, with the wait from Retry-After or retry_after", () => {
@@ -246,6 +256,16 @@ test("a send that fails puts the words in the box and says so: refused, capped, 
     assert.equal(page.status.textContent, line)
     assert.equal(page.refreshes.length, 0)
   }
+})
+
+test("a send refused for its token keeps the words and says to reload, never to press send", async () => {
+  const page = composer()
+  const { fetcher } = scripted(answer(200, HEARD), answer(422, { error: "This page has expired. Reload it, then try again.", reason: "invalid_token" }))
+  await mount(page, fetcher).takeArrived(take())
+  assert.equal(page.input.value, "Hello Alex")
+  assert.equal(page.state(), "refused")
+  assert.equal(page.status.textContent, MESSAGES.expiredSend)
+  assert.doesNotMatch(page.status.textContent, /press send/)
 })
 
 test("a failed send keeps a typed draft and adds the words after it", async () => {
