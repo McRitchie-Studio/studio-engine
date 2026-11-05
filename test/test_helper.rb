@@ -97,6 +97,7 @@ module Studio
   mattr_accessor :sidebar_geo_signpost, default: true
   # Mirrors lib/studio.rb (whose writer validates; the mirror does not).
   mattr_accessor :sidebar_style,        default: :default
+  mattr_accessor :surface_style,        default: :default
   mattr_accessor :navbar_links,         default: []
   # Mirrors lib/studio.rb (whose writers validate; the mirror does not).
   mattr_accessor :navbar_user_name,     default: nil
