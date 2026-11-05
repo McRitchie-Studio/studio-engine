@@ -310,12 +310,15 @@ class EngineMotionCssTest < Minitest::Test
 
   # A LIT BUTTON ALREADY USES ITS ::after AND ITS BOX-SHADOW. Its rule outranks a
   # trick's, and inset: -1px on the bloom closes the hole, so the bloom washes the
-  # whole face. Asserted in a browser by e2e/button_tricks.spec.js too.
+  # whole face. The lit rules sit in the later utilities layer, so the room is made
+  # there, in engine.css. Asserted in a browser by e2e/button_tricks.spec.js too.
   def test_button_tricks_make_room_on_a_lit_button
-    assert_match(/html\[data-surface-style="glass"\] \.btn:is\(\.edge-rotate-glow, \.studio-team-glow\)[^{]*::after \{\s*inset: calc/m, css,
+    lit = File.read(ENGINE_CSS_PATH)
+    assert_match(/html\[data-surface-style="glass"\] \.btn:is\(\.edge-rotate-glow, \.studio-team-glow\)[^{]*::after \{\s*inset: calc/m, lit,
       "the glow's bloom needs its own box back on a lit button")
-    assert_match(/html\[data-surface-style="glass"\] \.btn\.sheen[^{]*\{\s*overflow: visible/m, css,
+    assert_match(/html\[data-surface-style="glass"\] \.btn\.sheen[^{]*\{\s*overflow: visible/m, lit,
       "the sheen must not clip the lit button's top highlight")
+    assert_includes lit, "--btn-lit-rest: var(--lit-contact)", "the lit rest shadow has a name"
     assert_includes css, "box-shadow: var(--btn-lit-rest, 0 0 #0000), 0 0 0 0",
       "the pulse's keyframes must keep the lit button's rest shadow"
   end

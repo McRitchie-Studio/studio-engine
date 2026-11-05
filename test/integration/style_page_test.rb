@@ -924,11 +924,11 @@ class StylePageTest < ActiveSupport::TestCase
     end
   end
 
-  # Item 7 — the corner glow ships in engine-motion.css and renders as
+  # Item 7 — the edge rotate glow ships in engine-motion.css and renders as
   # its own Tricks specimen, alongside the rainbow border glow (both in the bag).
   test "the edge-rotate-glow primitive ships in engine-motion.css and Tricks" do
     css = File.read("app/assets/tailwind/studio_engine/engine-motion.css")
-    assert_includes css, ".edge-rotate-glow", "the corner glow class ships"
+    assert_includes css, ".edge-rotate-glow", "the glow class ships"
     assert_includes css, "--edge-rotate-glow-color", "the glow color is a CSS var (default CTA)"
     assert_includes css, "@keyframes edge-rotate-glow-spin", "the single-color ring rotation ships"
     refute_match(/rgba\(var\(--color-[^)]+-rgb\)/, css,

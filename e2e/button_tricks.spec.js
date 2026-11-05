@@ -98,7 +98,8 @@ test("the old glow class and old knobs paint exactly as the new names do", async
   });
   const moved = await paint("#old-plain")(page);
   expect(moved.before[1]).toBe("7px");
-  expect(moved.before[3]).toBe("0");
+  // Opacity crosses over 0.4s, as it always has.
+  await expect.poll(async () => (await paint("#old-plain")(page)).before[3]).toBe("0");
 });
 
 test("fizz runs behind a plain button, and hover adds a layer", async ({ page }) => {
