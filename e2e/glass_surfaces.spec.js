@@ -124,6 +124,41 @@ test("full-size buttons are a touch transparent in dark and solid in light", asy
   expect(await css(page, "primary", "backgroundImage")).not.toContain("/ 0.88");
 });
 
+// The painted midpoint, read from a screenshot: it is what white text really sits on, gradient,
+// alpha and backdrop included. A light consumer primary is not graded here: no app but the hub has opted in.
+const lum = ([r, g, b]) => {
+  const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+};
+
+for (const dark of [false, true]) {
+  test(`white text holds 4.5:1 at each filled button's midpoint, ${dark ? "dark" : "light"}`, async ({ page, browser }) => {
+    await open(page);
+    await page.evaluate(() => document.body.insertAdjacentHTML("beforeend", ["secondary", "success", "warning"].map((v) =>
+      `<button id="${v}" class="btn btn-${v}">Go</button>`).join("")));
+    await optIn(page);
+    await theme(page, dark);
+    const reader = await browser.newPage();
+    for (const id of ["primary", "secondary", "success", "danger", "warning"]) {
+      await page.locator(`#${id}`).scrollIntoViewIfNeeded();
+      const shot = await page.locator(`#${id}`).screenshot();
+      const pixel = await reader.evaluate(async (url) => {
+        const image = new Image();
+        image.src = url;
+        await image.decode();
+        const canvas = document.createElement("canvas");
+        canvas.width = image.width;
+        canvas.height = image.height;
+        const context = canvas.getContext("2d");
+        context.drawImage(image, 0, 0);
+        return [...context.getImageData(8, Math.floor(image.height / 2), 1, 1).data].slice(0, 3);
+      }, `data:image/png;base64,${shot.toString("base64")}`);
+      expect(1.05 / (lum(pixel) + 0.05), `${id} ${pixel}`).toBeGreaterThanOrEqual(4.5);
+    }
+    await reader.close();
+  });
+}
+
 test("cards turn translucent, while a modal and a menu stay solid", async ({ page }) => {
   await open(page);
   await optIn(page);

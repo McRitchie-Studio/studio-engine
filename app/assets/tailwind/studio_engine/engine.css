@@ -1355,8 +1355,9 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
     /* A TOUCH OF TRANSPARENCY on a full-size filled button, dark theme only: a photo behind it
        shows subtly, and white text holds 4.5:1 at the midpoint. An outer shadow is not painted
        under its own box, so the glow never brightens the fill. On a light page the backdrop would
-       lift the fill and cost contrast, so it stays solid there. Without a blur it stays solid. */
-    @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+       lift the fill and cost contrast, so it stays solid there. Without a blur, or without relative
+       oklch (the gradient would drop out and leave white text on nothing), it stays solid. */
+    @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) and (color: oklch(from red l c h)) {
       html.dark[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(.btn-sm, :disabled, [aria-disabled="true"]) {
         --lit-fill-alpha: 0.88;
         background-color: transparent;

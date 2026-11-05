@@ -111,6 +111,32 @@ class StylePageTest < ActiveSupport::TestCase
     assert doc.at_css("#theme .border-strong"), "the semantic token specimens render"
   end
 
+  test "the Theme section opens on the logos, and Typography sits beside the editor" do
+    prior = Studio.theme_logos
+    Studio.theme_logos = [{ file: "brand/mark.svg", title: "The Mark" }]
+    html = render_index
+
+    assert_operator html.index("The Mark"), :<, html.index("Role colors"), "the logos lead"
+    doc = Nokogiri::HTML.fragment(html)
+    assert doc.at_css('#theme [data-test="style-type-ladder"]')
+    assert_equal "edited", doc.at_css('#theme [data-test="style-theme-preview"]')["x-show"], "the preview waits for an edit"
+  ensure
+    Studio.theme_logos = prior
+  end
+
+  test "the Glass specimens follow the app's own switches" do
+    prior = Studio.surface_style
+    Studio.surface_style = :default
+    off = Nokogiri::HTML.fragment(render_index)
+    assert off.at_css('[data-test="style-glass"]')
+    assert_includes off.at_css('[data-test="style-glass"]').text, "surface style is off on this app"
+    Studio.surface_style = :glass
+    refute_includes Nokogiri::HTML.fragment(render_index).at_css('[data-test="style-glass"]').text, "surface style is off on this app"
+    assert off.css('[data-test="style-glass-icons"] li').size >= Studio::Icons.names.size
+  ensure
+    Studio.surface_style = prior
+  end
+
   # --- 2. the require_admin gate actually gates ------------------------------
 
   # A bare controller including the SAME concern the real controller inherits

@@ -783,6 +783,9 @@ than assuming drop-in equivalence:
 the engine's: Theme, Modals, Tricks, Tasks. An app grows a **fifth section, its
 own**, by defining one partial:
 
+A host may also define `app/views/style/host/_logos.html.erb`, which replaces the Theme section's
+default logo grid.
+
 ```erb
 <%# app/views/style/host/_modals.html.erb %>
 <div class="card p-4 space-y-3">
