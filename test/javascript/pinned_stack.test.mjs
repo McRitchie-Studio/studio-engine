@@ -453,3 +453,56 @@ test("a publish that moved a layer's top asks for one more frame, and it ends", 
     saved.forEach(([k, v]) => { globalThis[k] = v })
   }
 })
+
+// The publisher started in a page with no section headers, with the frames and the
+// timers held for the test to run.
+const heldPublisher = async ({ hash = "", navigationType = "navigate", getElementById = () => null } = {}) => {
+  const saved = ["window", "document", "ResizeObserver", "performance", "setTimeout"].map((k) => [k, globalThis[k]])
+  const nav = fakeEl({ name: "nav", h: 64, bottom: 64 })
+  const page = fakeEl({ name: "page", h: 56, bottom: 120 })
+  const doc = fakeDocument(nav, [page])
+  doc.getElementById = getElementById
+  doc.readyState = "complete"
+  const frames = []
+  const timers = []
+  const scroll = []
+  let now = 1000
+  globalThis.document = doc
+  globalThis.performance = { now: () => now, getEntriesByType: () => [{ type: navigationType }] }
+  globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
+  globalThis.setTimeout = (fn) => { timers.push(fn); return timers.length }
+  globalThis.window = { ResizeObserver: globalThis.ResizeObserver, location: { hash }, requestAnimationFrame: (fn) => frames.push(fn),
+    addEventListener: (type, fn) => { if (type === "scroll") scroll.push(fn) } }
+  const mod = await freshModule()
+  mod.startPinnedStack()
+  return { nav, frames, timers, scroll, tick: (ms) => { now += ms },
+    drain: () => { let n = 0; while (frames.length && n < 50) { frames.shift()(); n++ } return n },
+    restore: () => saved.forEach(([k, v]) => { globalThis[k] = v }) }
+}
+
+test("a settle reads the layers once more, after it gives their copies back", async () => {
+  const run = await heldPublisher()
+  try {
+    run.drain()
+    run.tick(1000)
+    run.nav.rect.bottom = 40
+    run.scroll.forEach((fn) => fn())
+    run.drain()
+    assert.equal(run.timers.length > 0, true, "a motion publish arms the settle")
+    run.frames.length = 0
+    run.tick(1000)
+    run.timers.at(-1)()
+    assert.equal(run.frames.length > 0, true, "another frame is asked for")
+  } finally {
+    run.restore()
+  }
+})
+
+test("a load with a hash looks for its section; a reload or a Back keeps the reader's place", async () => {
+  for (const [type, landed] of [["navigate", true], ["reload", false], ["back_forward", false]]) {
+    let looked = false
+    const run = await heldPublisher({ hash: "#modals", navigationType: type, getElementById: () => { looked = true; return null } })
+    run.restore()
+    assert.equal(looked, landed, type)
+  }
+})

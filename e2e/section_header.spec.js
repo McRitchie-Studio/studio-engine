@@ -9,14 +9,21 @@ const { watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive } = requ
 // Every claim is a box or a computed style, so the response bytes cannot answer one.
 //
 // CONTROLS, each run against this file with the lab server restarted:
-//   - data-pin-section removed from the partial: no bar and no layer. 8 red.
-//   - the header not a direct child of its section (a wrapper div): it never sticks. 5 red.
-//   - the partial's top off --pin-stack-bottom: the bar chases its own edge. 3 red.
-//   - the stuck rule's background removed: 1 red, the bar.
-//   - section-target back to --nav-h + 0: the jump lands the title under the row. 1 red.
+//   - data-pin-section removed from the partial: no bar and no layer. 11 red.
+//   - the header wrapped in a div: it never sticks. 11 red.
+//   - the partial's top off --pin-stack-bottom: the bar chases its own edge. 6 red.
+//   - the stuck rule's fill removed: 1 red, the bar at rest and stuck.
+//   - section-target off --nav-h: 1 red, the tab's jump, on the section's top.
 //   - the glass rule for the row's square corners removed: 1 red, glass.
 //   - the short-screen floor removed: 1 red, the short screen.
 //   - the sticky gate removed from the CSS: 1 red, the page with no publisher.
+//   - no second landing on hashchange: 1 red, the tab's jump.
+//   - no landing on a load: 1 red, the load with a hash.
+//   - input does not cancel a landing: 2 red, the reader who scrolls, the tab's jump.
+//   - no publish after a settle: red on repeats, the style guide, on 8 of 12 runs before
+//     the fix. Its deterministic control is the unit test in pinned_stack.test.mjs.
+// A reload keeping its place, and the extra frame after a top moved, are controlled in
+// test/javascript/pinned_stack.test.mjs: the first is not stable to drive in the lane.
 
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
@@ -125,22 +132,6 @@ test("a load with a hash lands the title on the bar too", async ({ page }) => {
   await page.goto(`${STYLE}#modals`);
   await expect(page.locator("[data-pin-section][data-stuck]")).toHaveText("Modals");
   await expectUnder(header(page, "modals"), styleRow(page));
-});
-
-test("a reload with a hash keeps the reader's own place", async ({ page }) => {
-  await blockOffsiteRequests(page);
-  await page.setViewportSize(DESKTOP);
-  await page.goto(`${STYLE}#modals`);
-  await expect(page.locator("[data-pin-section][data-stuck]")).toHaveText("Modals");
-  await page.evaluate(() => {
-    const top = document.getElementById("modals").getBoundingClientRect().top;
-    window.scrollBy({ top: top - 500, behavior: "instant" });
-  });
-  await page.waitForTimeout(300);
-  await page.reload();
-  await page.waitForTimeout(800);
-  const line = await page.evaluate(() => window.studioPinnedStack.read().layers.section.top);
-  expect(await page.locator("#modals").evaluate((el) => el.getBoundingClientRect().top), "not hauled down to the section").toBeGreaterThan(line + 100);
 });
 
 test("a jump to a target inside a section lands below the section's bar", async ({ page }) => {
