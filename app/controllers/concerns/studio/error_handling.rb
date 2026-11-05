@@ -274,18 +274,17 @@ module Studio
       end
     end
 
-    # Layer 1: a bad or missing CSRF token is the request's fault, and anyone can
-    # send one to any public POST, so it never writes an ErrorLog row. Left to the
-    # catch-all, production answered 500 to JSON and a redirect home with "Something
-    # went wrong" to HTML, and wrote a row each time; test re-raised, so no test saw it.
+    # Layer 1: a bad or missing CSRF token on a fetch is a 422 the page can read, with
+    # no ErrorLog row: anyone can send one, and the catch-all answered it 500.
     #
-    # JSON (every fetch the engine's pages make) gets a 422 the page can read. Anything
-    # else re-raises to Rails' own 422 (public/422.html, or the host's exceptions_app),
-    # as handle_not_found does, so the app's own page answers.
+    # HTML stays with the catch-all on purpose. Its redirect home hands a stale login or
+    # magic-link form a fresh token and a way on, where public/422.html is a dead end
+    # with no link (Back shows the same stale form). Its row is what the health report
+    # sees when a session config breaks every form at once.
     def handle_invalid_authenticity_token(exception)
       respond_to do |format|
         format.json { render json: { error: INVALID_TOKEN_MESSAGE, reason: "invalid_token" }, status: :unprocessable_entity }
-        format.any { raise exception }
+        format.any { handle_unexpected_error(exception) }
       end
     end
 

@@ -813,12 +813,19 @@ class AgentChatProxyTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # The catch-all is every consumer's, so every controller on it changes, not only
-  # these two: an HTML form with a stale token used to be a 302 to the root with
-  # "Something went wrong" and a row.
-  def test_in_production_a_host_form_post_with_no_token_is_rails_own_422_with_no_error_log_row
+  # Only a fetch changes. A stale HTML form keeps the redirect home, which gives the
+  # person a fresh token, and the row, which is how a broken session config shows.
+  def test_in_production_a_host_form_post_with_no_token_still_redirects_home_and_writes_its_row
     forged_like_production { post "/agent_chat_test_sign_in/#{@sam.id}" }
+    assert_redirected_to "/"
+    assert_equal "Something went wrong.", flash[:alert]
+    assert_equal 1, ErrorLog.count
+  end
+
+  def test_in_production_a_fetch_with_no_accept_preference_is_the_422
+    forged_like_production { post "/agent_chat_test_sign_in/#{@sam.id}", headers: { "Accept" => "*/*" } }
     assert_response :unprocessable_entity
+    assert_equal "invalid_token", JSON.parse(response.body)["reason"]
     assert_equal 0, ErrorLog.count
   end
 

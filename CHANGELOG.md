@@ -6,14 +6,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Changed
 
-- **A bad or missing CSRF token is now a 422 with no ErrorLog row, on every controller using
-  `Studio::ErrorHandling`.** Anyone can send a bad token to a public POST, so each one wrote
-  a row, and the catch-all answered 500 to JSON and a redirect home with "Something went wrong"
-  to HTML. JSON now gets `422 {error, reason: "invalid_token"}` in every environment. HTML and
-  every other format re-raise to Rails' own 422 (`public/422.html`, or the host's
-  `exceptions_app`), so a stale form lands on that page, not home. A test on such a route that
-  asserted `assert_raises(ActionController::InvalidAuthenticityToken)` on a JSON request now
-  asserts the 422.
+- **A bad or missing CSRF token on a JSON or `Accept: */*` request is now a 422 with no ErrorLog
+  row, on every controller using `Studio::ErrorHandling`.** The catch-all answered JSON 500 and
+  wrote a row. It now answers `422 {error, reason: "invalid_token"}` in every environment, and a
+  test on such a route that asserted `assert_raises(ActionController::InvalidAuthenticityToken)`
+  now asserts the 422. An HTML form is unchanged: the redirect home with its alert, and the row.
 
 ### Fixed
 

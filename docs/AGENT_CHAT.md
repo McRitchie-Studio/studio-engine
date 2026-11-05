@@ -288,7 +288,8 @@ machine (a developer's local hub).
 - **the reveal.** The composer sticks over the window's bottom, so on a short window
   the thread's end sits under it. On load and after a new turn the page scrolls that end
   (the log, or the typing line or offline notice while one shows) clear of the composer,
-  by `scrollIntoView`, so a host's inner scroller works too. It does not scroll for an
+  by `scrollIntoView`, so a host's inner scroller works too. It leaves room for the composer's
+  height and sticky bottom, so a host's own content above the chat changes nothing. It does not scroll for an
   empty thread (a card slot stays in view), for a reader scrolled up in the log, or for a
   reader who scrolled the page up; their own send brings them back. During a hold it
   waits, and scrolls when the button is let go;

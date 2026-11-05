@@ -303,7 +303,7 @@ test("coveredPx: what the composer, or the window's bottom when it is lower, hid
 
 // A stand-in with measurable boxes. `end` is where the log's bottom is now; scrolling
 // the page moves it, as a real page does.
-function measured({ end = 660, composer = 598, holding = false } = {}) {
+function measured({ end = 660, composer = 598, composerHeight = 246, holding = false } = {}) {
   const page = standIn()
   const box = { end }
   const scrolls = []
@@ -316,7 +316,7 @@ function measured({ end = 660, composer = 598, holding = false } = {}) {
   }
   // The typing line, once it shows, is the thread's end.
   Object.assign(page.typing, { style: log.style, getBoundingClientRect: log.getBoundingClientRect, scrollIntoView: log.scrollIntoView })
-  const form = { getAttribute: () => "/m", getBoundingClientRect: () => ({ top: composer }), addEventListener() {}, removeEventListener() {} }
+  const form = { getAttribute: () => "/m", getBoundingClientRect: () => ({ top: composer, height: composerHeight }), addEventListener() {}, removeEventListener() {} }
   const realQuery = page.root.querySelector
   const hold = { holding }
   page.root.querySelector = (selector) => {
@@ -347,6 +347,19 @@ test("load: a thread whose end is under the composer scrolls it clear, by the co
   await flush()
   assert.deepEqual(setup.scrolls, [{ block: "end", behavior: "instant", margin: `${844 - 598 + REVEAL_GAP_PX}px` }])
   assert.equal(setup.page.root.querySelector("[data-agent-chat-log]").style.scrollMarginBottom, "", "the margin does not stay")
+})
+
+test("load: a composer not stuck yet still leaves room for its height and its sticky bottom", async () => {
+  const setup = measured({ end: 1400, composer: 1300, composerHeight: 240 })
+  const real = globalThis.getComputedStyle
+  globalThis.getComputedStyle = () => ({ bottom: "8px" })
+  try {
+    mountMeasured(setup)
+    await flush()
+  } finally {
+    globalThis.getComputedStyle = real
+  }
+  assert.equal(setup.scrolls[0].margin, `${240 + 8 + REVEAL_GAP_PX}px`)
 })
 
 test("load: an end already clear, or an empty thread, does not scroll the page", async () => {

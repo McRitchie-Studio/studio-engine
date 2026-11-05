@@ -56,6 +56,8 @@ const { blockOffsiteRequests, watchPageErrors } = require("./helpers");
 //   - drop `state.revealFollowing` from render's test: the scrolled-up-page spec fails at scrollY.
 //   - drop the target check in onPageScroll: the during-a-hold spec fails at the end, the
 //     log's own scroll having said the reader left.
+//   - size revealEnd's margin from the composer's top again: the block-above specs fail
+//     at the newest turn, the composer sticking over it after the scroll.
 //   - drop the HOLDING check in revealEnd: the during-a-hold spec fails at scrollY. Drop
 //     onRecorderState's listener: it fails at the end, the turn still under the composer.
 //   - drop `!state.turns.length` in revealEnd: the empty-thread spec fails at scrollY.
@@ -819,6 +821,36 @@ test("the typed chat at 320x568: no blank tail, and the newest turn shows above 
   const at = await layout(page);
   expect(at.document).toBeLessThanOrEqual(Math.max(at.mainEnd, at.window));
   await expectNewestInView(page);
+});
+
+// A host's own block above the chat, taller than the room there, in place before the
+// first poll: the composer is not stuck yet when the reveal measures it.
+async function expectClearBelowABlock(page, options) {
+  await page.addInitScript(() => {
+    new MutationObserver((_, watcher) => {
+      const main = document.querySelector("main");
+      if (!main) return;
+      watcher.disconnect();
+      const block = document.createElement("div");
+      block.style.height = "600px";
+      main.prepend(block);
+    }).observe(document, { childList: true, subtree: true });
+  });
+  const thread = await openLongThread(page, options);
+  await expectNewestInView(page);
+
+  thread.turns = [...thread.turns, { id: 11, role: "agent", status: "answered", text: "The next reply." }];
+  await page.locator(CHAT).evaluate((chat) => chat.dispatchEvent(new CustomEvent("studio:agent-chat:refresh")));
+  await expect(page.locator(`${LOG} [data-agent-chat-turn]`)).toHaveCount(21);
+  await expectNewestInView(page);
+}
+
+test("under a host's tall block, the voice chat at 390x844: the newest turn clears the composer, and so does the next reply", async ({ page }) => {
+  await expectClearBelowABlock(page, { width: 390, height: 844 });
+});
+
+test("under a host's tall block, the typed chat at 320x568: the newest turn clears the composer, and so does the next reply", async ({ page }) => {
+  await expectClearBelowABlock(page, { width: 320, height: 568, url: "/agent_chat_lab" });
 });
 
 test("a new turn is shown above the composer: an agent's reply, and the person's own send", async ({ page }) => {

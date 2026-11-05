@@ -268,6 +268,19 @@ test("a send refused for its token keeps the words and says to reload, never to 
   assert.doesNotMatch(page.status.textContent, /press send/)
 })
 
+test("a take refused for its token says to copy first when the box holds words a reload would clear", async () => {
+  const refused = answer(422, { error: "This page has expired. Reload it, then try again.", reason: "invalid_token" })
+  const page = composer({ draft: "the last take, kept" })
+  await mount(page, scripted(refused).fetcher).takeArrived(take())
+  assert.equal(page.state(), "refused")
+  assert.equal(page.status.textContent, MESSAGES.expiredSend)
+  assert.equal(page.input.value, "the last take, kept")
+
+  const empty = composer()
+  await mount(empty, scripted(refused).fetcher).takeArrived(take())
+  assert.equal(empty.status.textContent, MESSAGES.expired)
+})
+
 test("a failed send keeps a typed draft and adds the words after it", async () => {
   const page = composer({ draft: "half a thought" })
   const { fetcher } = scripted(answer(200, HEARD), answer(503, {}))

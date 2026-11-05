@@ -269,7 +269,9 @@ export function mountAgentChatVoice(root, {
     if (!response.ok || typeof body.text !== "string" || !body.text.trim()) {
       const retryAfter = response.headers && response.headers.get ? response.headers.get("Retry-After") : null
       const { state, message } = response.ok ? { state: "no_speech", message: MESSAGES.noSpeech } : refusalFor(response.status, body, retryAfter)
-      say(state, message)
+      // A reload clears the box, so words already in it get the copy-first line.
+      const inBox = form && form.querySelector("[data-agent-chat-input]")?.value.trim()
+      say(state, inBox && tokenRefused(response.status, body) ? MESSAGES.expiredSend : message)
       return
     }
     await send(body)

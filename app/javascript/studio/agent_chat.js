@@ -178,15 +178,17 @@ export function mountAgentChat(root, {
   }
 
   // scrollIntoView, not window.scrollBy: a host may scroll an inner container. The
-  // margin is what the composer takes off the bottom of the window. Instant, so a
-  // host's smooth scrolling cannot leave the page moving when a hold begins.
+  // margin is what the composer takes off the bottom of the window once it sticks:
+  // its height and its sticky bottom, not its top now, because a composer lower down
+  // the page is not stuck until this scroll has run. Instant, so a host's smooth
+  // scrolling cannot leave the page moving when a hold begins.
   function revealEnd() {
     if (root.querySelector(HOLDING)) { state.revealOwed = true; return }
     state.revealOwed = false
     if (!state.turns.length || covered() <= 0) return
     const end = threadEnd()
-    const height = windowHeight()
-    end.style.scrollMarginBottom = `${height - Math.min(form.getBoundingClientRect().top, height) + REVEAL_GAP_PX}px`
+    const stuckAt = parseFloat(globalThis.getComputedStyle?.(form).bottom) || 0
+    end.style.scrollMarginBottom = `${form.getBoundingClientRect().height + stuckAt + REVEAL_GAP_PX}px`
     end.scrollIntoView({ block: "end", behavior: "instant" })
     end.style.scrollMarginBottom = ""
   }
