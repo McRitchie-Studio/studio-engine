@@ -17,10 +17,10 @@
 # refuse what someone thought to refuse. The axes are not the disease; reading the
 # SOURCE is.
 #
-# A receipt-reading gate has to be beaten by ARITHMETIC instead, and moving the
-# arithmetic means editing config/e2e_lane.yml, which is a reviewable diff line with
-# a comment attached. The hole can still grow — but only on purpose, in front of a
-# reviewer.
+# A receipt-reading gate has to be beaten by ARITHMETIC instead, and the arithmetic is
+# computed from the committed spec files (bin/lib/e2e_spec_census.rb), not written by
+# the author whose run it judges. The set can still shrink, but only by deleting a spec,
+# in front of a reviewer.
 #
 # The engine also has a standing lesson of its own: bin/suite-guard exists because a
 # curated Ruby test list ran 25 of 26 files with every guard structurally unable to
@@ -39,8 +39,8 @@
 # Porting it anyway would have been the expensive kind of cargo cult — it would ship
 # a documented, reviewed, tested way to EXCLUDE a spec to a lane that has nothing to
 # exclude, and the first inconvenient spec would find it. So the contract has no
-# quarantine concept at all: `executed == total_specs`, and a spec that must not run
-# has to be deleted, which is a diff a reviewer reads as what it is.
+# quarantine concept at all: every committed spec must execute, and a spec that must
+# not run has to be deleted, which is a diff a reviewer reads as what it is.
 #
 # WHAT THIS DELIBERATELY DOES NOT ASSERT: whether the specs PASSED. A failing spec is
 # a red `playwright` job already. This gate answers the question that job cannot
@@ -48,6 +48,7 @@
 
 require "json"
 require "yaml"
+require_relative "e2e_spec_census"
 
 class E2eExecutedSet
   # Playwright statuses. A test is EXECUTED if it reached a verdict — pass, fail, or
@@ -73,14 +74,38 @@ class E2eExecutedSet
     end
   end
 
-  def initialize(contract:, reports:)
-    @contract = contract
-    @reports = reports
+  # `census` is the committed suite's count (E2eSpecCensus.count over e2e/); `contract` is
+  # config/e2e_lane.yml, which holds what the tree cannot compute.
+  # The count diagnosis, shared with bin/e2e-census-check (which predicts this gate from
+  # Playwright's --list), so both say the same thing.
+  def self.count_mismatch(actual, expected_executed, verb: "EXECUTED")
+    delta = actual - expected_executed
+    direction = delta.negative? ? "FEWER" : "MORE"
+
+    "the lane #{verb} #{actual} spec(s); the committed suite under e2e/ counts " \
+      "#{expected_executed} (#{delta.abs} #{direction} than the census).\n" \
+      "The green `playwright` check now covers a DIFFERENT SET than the committed suite, and " \
+      "the source may look completely innocent — this assertion is deliberately blind to HOW " \
+      "the set changed, because every source-reading version of this guard in this ecosystem " \
+      "was defeated by a HOW it had not enumerated.\n" \
+      "If specs LEFT the lane, find out why. Known ways, none of which change the spec count " \
+      "in the source: a `--grep`/`--grep-invert` added to the CI command, `--only-changed`, " \
+      "`--last-failed`, a `--max-failures` early exit, a narrowed `testDir`/`testIgnore`, a " \
+      "dropped shard, or a runtime skip.\n" \
+      "If specs ARRIVED, the census reads bare `test(` declarations, so a spec written in a " \
+      "loop or a helper lands here: declare each one bare. A second browser PROJECT also " \
+      "lands here, since Playwright counts one test per spec PER PROJECT."
   end
 
-  attr_reader :contract, :reports
+  def initialize(contract:, reports:, census:)
+    @contract = contract
+    @reports = reports
+    @census = census
+  end
 
-  def expected_executed = contract.fetch("executed")
+  attr_reader :contract, :reports, :census
+
+  def expected_executed = census.executed
 
   # Walk the report's suite tree. Playwright nests suites per file and per
   # describe-block, so specs live at arbitrary depth; a flat read of `suites[].specs`
@@ -97,11 +122,11 @@ class E2eExecutedSet
   end
 
   # A spec carries one `test` per project. Count TESTS, not specs — that is what
-  # Playwright's own `--list` and `stats` count, so the contract's numbers mean the
-  # same thing here that they mean when a human runs the command by hand.
+  # Playwright's own `--list` and `stats` count, so the census means the same thing
+  # here that it means when a human runs the command by hand.
   #
-  # This is also why adding a second browser project would DOUBLE the executed count
-  # rather than leave it alone. See config/e2e_lane.yml.
+  # This is also why a second browser project would DOUBLE the executed count while the
+  # census stays put: the gate goes red until the census is taught to multiply.
   def tests_in(doc)
     specs_in(doc).flat_map do |spec|
       Array(spec["tests"]).map { |test| { "title" => spec["title"], "status" => test["status"] } }
@@ -136,8 +161,7 @@ class E2eExecutedSet
 
   def summary
     "#{executed_tests.size} executed · #{skipped_tests.size} skipped · " \
-      "#{reports.size} shard report(s) · contract: #{expected_executed} executed " \
-      "(#{contract.fetch("total_specs")} committed)"
+      "#{reports.size} shard report(s) · census: #{expected_executed} committed"
   end
 
   private
@@ -210,8 +234,7 @@ class E2eExecutedSet
      "testInfo`, or a helper in another file that calls it for you — all identical here, all " \
      "invisible to a grep.\n" \
      "THIS LANE HAS NO QUARANTINE, so there is no third option to reach for: fix the spec, or " \
-     "delete it and lower `total_specs`/`executed` in config/e2e_lane.yml. Both are diffs a " \
-     "reviewer reads as what they are."]
+     "delete it. Both are diffs a reviewer reads as what they are."]
   end
 
   # THE ARITHMETIC. Everything above is a named diagnosis; this is the catch-all that
@@ -221,22 +244,6 @@ class E2eExecutedSet
     actual = executed_tests.size
     return [] if actual == expected_executed
 
-    delta = actual - expected_executed
-    direction = delta.negative? ? "FEWER" : "MORE"
-
-    ["the lane EXECUTED #{actual} spec(s); config/e2e_lane.yml pins it at #{expected_executed} " \
-     "(#{delta.abs} #{direction} than the contract).\n" \
-     "The green `playwright` check now covers a DIFFERENT SET than the one this repo signed " \
-     "off on, and the source may look completely innocent — this assertion is deliberately " \
-     "blind to HOW the set changed, because every source-reading version of this guard in this " \
-     "ecosystem was defeated by a HOW it had not enumerated.\n" \
-     "If specs LEFT the lane, find out why before you touch this number. Known ways, none of " \
-     "which change the spec count in the source: a `--grep`/`--grep-invert` added to the CI " \
-     "command, `--only-changed`, `--last-failed`, a `--max-failures` early exit, a narrowed " \
-     "`testDir`/`testIgnore`, a dropped shard, or a runtime skip.\n" \
-     "If specs ARRIVED unexpectedly, a second browser PROJECT is the likeliest cause — " \
-     "Playwright counts one test per spec PER PROJECT, so adding firefox doubles this number.\n" \
-     "If you legitimately added or removed specs: move `total_specs` AND `executed` in " \
-     "config/e2e_lane.yml in the same commit, and confirm with `npx playwright test --list`."]
+    [self.class.count_mismatch(actual, expected_executed)]
   end
 end

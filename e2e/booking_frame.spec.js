@@ -17,7 +17,7 @@ const { blockOffsiteRequests, watchPageErrors } = require("./helpers");
 // off-origin is refused (blockOffsiteRequests), the stub is registered after it,
 // and Playwright runs the last route registered first.
 
-// A predicate, not a glob. test/lib/e2e_lane_contract_test.rb counts the specs
+// A predicate, not a glob. bin/lib/e2e_spec_census.rb counts the specs
 // in this file after stripping comments, and a glob ending in slash-star-star
 // reads to it as the start of a block comment: two tests vanished from its count.
 const isGoogle = (url) => url.hostname === "calendar.google.com";

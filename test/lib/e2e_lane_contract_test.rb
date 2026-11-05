@@ -4,13 +4,14 @@ require "test_helper"
 require "json"
 require "open3"
 require "yaml"
+require_relative "../../bin/lib/e2e_spec_census"
 
 # THE STATIC HALF of the browser lane's guard. bin/e2e-executed-set-check is the
 # runtime half — it reads Playwright's own receipt and asserts what RAN. This file
 # asserts the things a receipt cannot see, because they are properties of the
 # committed source and configuration:
 #
-#   · the contract's arithmetic is internally consistent and matches the tree
+#   · the census reads the tree, and the contract holds no hand-written count
 #   · nothing in playwright.config.js or the CI command NARROWS the set
 #   · no spec carries a selection modifier on any receiver
 #   · the CI lane cannot be made conditional, and its verdict job cannot go quiet
@@ -83,26 +84,34 @@ class E2eLaneContractTest < Minitest::Test
     source.gsub(%r{/\*.*?\*/}m, "").gsub(%r{^\s*//.*$}, "")
   end
 
-  def test_unit_the_contract_arithmetic_is_internally_consistent
-    assert_equal contract.fetch("total_specs"), contract.fetch("executed"),
-                 "this lane has NO quarantine, so every committed spec must execute. If these " \
-                 "two numbers ever differ, an exclusion has appeared without a name."
+  def census = @census ||= E2eSpecCensus.count(File.join(ROOT, "e2e"))
+
+  # THE TWO NUMBERS STAY GONE. They conflicted across parallel PRs and went stale in a
+  # botched merge. A key here would read as live and bind nothing, since the gate reads
+  # only the census.
+  def test_unit_the_contract_holds_no_hand_written_count
+    assert_empty contract.keys & %w[total_specs executed],
+                 "the spec count is computed by bin/lib/e2e_spec_census.rb; do not write it down"
+  end
+
+  def test_unit_the_shard_count_fits_the_census
     assert_operator contract.fetch("shards"), :>=, 1
-    assert_operator contract.fetch("executed"), :>=, contract.fetch("shards"),
+    assert_operator census.executed, :>=, contract.fetch("shards"),
                     "more shards than specs guarantees an EMPTY shard, and an empty shard exits 0 " \
                     "silently — sharding suppresses Playwright's own 'No tests found' guard."
   end
 
-  # THE CONTRACT MUST DESCRIBE THE TREE. Without this, adding a spec and forgetting
-  # the contract leaves the runtime gate red for a reason nobody can act on; worse,
-  # DELETING a spec would sail through with the contract quietly over-counting.
-  def test_unit_the_contract_counts_the_specs_actually_committed
-    declared = spec_paths.sum { |path| strip_comments(File.read(path)).scan(/^\s*test\s*\(/).size }
+  # THE CENSUS MUST READ THE TREE. A scan that stops matching would count zero, and a file
+  # whose specs sit in a loop or a helper would count nothing. Either way this is red here,
+  # with a message that names the file, before the gate is red with a bare difference.
+  def test_unit_the_census_sees_a_spec_in_every_committed_file
+    refute_empty spec_paths, "no spec files found; the glob is broken"
 
-    assert_equal contract.fetch("total_specs"), declared,
-                 "config/e2e_lane.yml says #{contract.fetch("total_specs")} spec(s); the tree " \
-                 "holds #{declared}. Move total_specs AND executed in the same commit, then " \
-                 "confirm with `npx playwright test --list`."
+    silent = spec_paths.select { |path| E2eSpecCensus.declarations(File.read(path)).zero? }
+    assert_empty silent.map { |path| path.delete_prefix("#{ROOT}/") },
+                 "the census counts no bare test( in these files: declare each spec bare"
+    assert_equal spec_paths.size, census.lane_files
+    assert_operator census.total, :>=, spec_paths.size
   end
 
   def test_unit_no_spec_carries_a_selection_modifier

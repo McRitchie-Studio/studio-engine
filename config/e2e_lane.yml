@@ -25,8 +25,11 @@
 #
 #     executed == total_specs
 #
-# TO CHANGE THESE NUMBERS you must edit this file, which is a visible, reviewable diff
-# line with a comment attached. That is the point: the hole cannot grow silently.
+# THE ARITHMETIC IS COMPUTED. `total_specs` and `executed` used to live in this file and
+# every spec add moved them by hand. Two open PRs that each added a spec conflicted on them,
+# and a botched merge once left a stale count. bin/lib/e2e_spec_census.rb now counts the bare
+# `test(` declarations under e2e/, the way mcritchie-studio's lane does, so adding a spec
+# moves nothing here. This file holds only what the tree cannot compute: the shard count.
 #
 # THIS LANE HAS NO QUARANTINE, AND THAT IS A DECISION.
 # The hub's contract carries `quarantined`, a `quarantine_tag`, a `--grep-invert`, and
@@ -39,9 +42,12 @@
 # Shipping the quarantine anyway would hand a lane with nothing to exclude a
 # documented, tested, reviewed way to exclude things — and the first inconvenient
 # spec would find it. There is deliberately no third option here: a spec that cannot
-# be fixed gets DELETED, with both numbers below lowered in the same commit, which is
-# a diff a reviewer reads as exactly what it is.
+# be fixed gets DELETED, which is a diff a reviewer reads as exactly what it is.
 ---
+# THE LEDGER BELOW IS FROZEN HISTORY. It records each move of the two hand-written numbers
+# until they were retired, and spec files cite it for why a spec exists. Add nothing to it:
+# a new spec's reasoning goes at the top of its own file.
+#
 # Every `test(...)` committed under e2e/. Verified against Playwright's own model,
 # not prose:
 #   npx playwright test --list   ->  48 tests in 7 files
@@ -1181,12 +1187,10 @@
 #
 # 538 -> 542: e2e/sidebar_edge.spec.js, sidebar-edge-blur, named below.
 #   npx playwright test --list                                             -> 542
-total_specs: 542
+# Retired here at 542: the census computes it.
 
-# What the lane MUST execute — asserted against the runner's own report, so no
-# source-level spelling on any axis can move it without moving this line. With no
-# quarantine this equals total_specs, and test/lib/e2e_lane_contract_test.rb asserts
-# that equality rather than letting the two drift into a silent exclusion.
+# The ledger of `executed`, also frozen. With no quarantine it always equalled total_specs,
+# and the census now makes the two one number.
 #
 # NOTE FOR ANYONE ADDING A BROWSER. Playwright counts one test per spec PER PROJECT.
 # Adding a `firefox` project to playwright.config.js does not add specs, but it
@@ -1504,7 +1508,7 @@ total_specs: 542
 # sliding panel, lets a click through and stays off a phone is in no response bytes. Each RED
 # by the control named at the top of that file.
 #   npx playwright test --list                                             -> 542 tests, 75 files
-executed: 542
+# Retired here at 542: the census computes it.
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
