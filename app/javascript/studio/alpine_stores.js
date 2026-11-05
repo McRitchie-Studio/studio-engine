@@ -1,5 +1,5 @@
 // studio/alpine_stores: the Alpine stores every host body binds to,
-// $store.theme and $store.devMode, and the theme value and toggle behind them.
+// $store.theme and $store.devMode, and the theme setter behind them.
 //
 // WHY THIS IS ITS OWN ENTRY POINT. Every host's <body> says
 // :class="{ 'dev-mode': $store.devMode }", and the engine's theme toggle reads
@@ -27,36 +27,92 @@
 // inline, nonced script in the head: it must run before the stylesheet paints,
 // which no deferred module can.
 
-// The stored theme, dark unless the reader chose light.
-export function storedTheme(storage) {
-  return storage.getItem('theme') || 'dark'
+// The theme the root's class shows. The store starts here, not from storage: the pre-paint script
+// reads storage by its own rule, and it decides what the reader already sees.
+function classTheme(root) {
+  return root.classList.contains('dark') ? 'dark' : 'light'
 }
 
-// Flips the root's `dark` class under a short transition class, stores the
-// result, and answers it.
-export function toggleTheme(root, storage, later) {
-  root.classList.add('theme-transition')
-  root.classList.toggle('dark')
-  var value = root.classList.contains('dark') ? 'dark' : 'light'
-  storage.setItem('theme', value)
-  later(function () { root.classList.remove('theme-transition') }, 300)
-  return value
+// A visit owns the view transition. A second one would skip Turbo's and cut its motion short, so
+// a toggle during a visit flips at once. data-turbo-visit-direction spans a visit; data-page-transition
+// also spans a full load's arrival (studio/page_transitions).
+function visiting(root) {
+  return root.dataset.turboVisitDirection !== undefined || root.dataset.pageTransition !== undefined
+}
+
+function canCrossfade(env) {
+  if (!env.doc || typeof env.doc.startViewTransition !== 'function') return false
+  if (env.win.matchMedia('(prefers-reduced-motion: reduce)').matches) return false
+  return !visiting(env.root)
+}
+
+// The theme store. set(value) is the one setter: the root class, the store value and localStorage
+// change together, in one step, so they agree at every moment. Under a crossfade that step runs
+// in the transition's callback, after the old picture: for up to a frame after set() all three
+// still read the old theme. The pre-paint script is the one writer that cannot use this: it runs
+// before any module does.
+//
+// data-theme-flip is on the root from before the old picture until the crossfade ends. engine.css
+// reads it: the page is one picture, no element runs its own transition, and the page-transition
+// motions lose. Without a crossfade it stays until the styles of the new theme have been computed.
+export function themeStore(env) {
+  var root = env.root
+  var flips = 0
+  var wanted = null // the theme asked for, while its step has not run
+
+  return {
+    value: classTheme(root),
+    get isDark() { return this.value === 'dark' },
+    set: function (value) {
+      if (value !== 'dark' && value !== 'light') return
+      if (value === wanted) return
+      var self = this
+      var commit = function () {
+        root.classList.toggle('dark', value === 'dark')
+        self.value = value
+        // A full or blocked storage must not throw past the instant path's settle and strand data-theme-flip.
+        try { env.storage.setItem('theme', value) } catch (_) { /* the page still flips; the choice is not kept */ }
+      }
+      // Nothing to show, but the three may have drifted: a host can write the class directly.
+      if (wanted === null && value === classTheme(root)) return commit()
+
+      var mine = ++flips
+      // Only the newest flip acts, so a late callback cannot undo a later choice.
+      var apply = function () {
+        if (mine !== flips) return
+        wanted = null
+        commit()
+      }
+      var settle = function () {
+        if (mine === flips) delete root.dataset.themeFlip
+      }
+      wanted = value
+      root.dataset.themeFlip = ''
+      if (!canCrossfade(env)) {
+        apply()
+        if (env.win) env.win.getComputedStyle(root).color // no transition starts from these styles
+        return env.later(settle, 0)
+      }
+      var transition = env.doc.startViewTransition(apply)
+      // A skipped transition rejects ready; a throw in apply rejects the other two.
+      transition.finished.then(settle, settle)
+      transition.ready.catch(function () {})
+      transition.updateCallbackDone.catch(function () {})
+    },
+    toggle: function () {
+      this.set((wanted || classTheme(root)) === 'dark' ? 'light' : 'dark')
+    }
+  }
 }
 
 // Registers each store Alpine does not already have. env carries what the
-// stores read and write: { storage, root, later }.
+// stores read and write: { storage, root, later, doc, win }.
 export function registerStudioStores(Alpine, env) {
   if (Alpine.store('devMode') === undefined) {
     Alpine.store('devMode', env.storage.getItem('devMode') === 'true')
   }
   if (Alpine.store('theme') === undefined) {
-    Alpine.store('theme', {
-      value: storedTheme(env.storage),
-      get isDark() { return this.value === 'dark' },
-      toggle: function () {
-        this.value = toggleTheme(env.root, env.storage, env.later)
-      }
-    })
+    Alpine.store('theme', themeStore(env))
   }
 }
 
@@ -72,7 +128,9 @@ export function installStudioStores(doc, win) {
     registerStudioStores(win.Alpine, {
       storage: win.localStorage,
       root: doc.documentElement,
-      later: function (fn, ms) { win.setTimeout(fn, ms) }
+      later: function (fn, ms) { win.setTimeout(fn, ms) },
+      doc: doc,
+      win: win
     })
   })
 }

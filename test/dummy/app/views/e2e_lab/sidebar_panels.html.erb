@@ -21,7 +21,7 @@
     <%# A busy page behind the panel, standing in for a board: small text and hard
         edges, which is what a blur has to separate the panel from. %>
     <button type="button" class="rounded border border-subtle px-3 py-2 text-sm" data-test="lab-theme"
-            @click="document.documentElement.classList.toggle('dark')">Light or dark</button>
+            @click="$store.theme.toggle()">Light or dark</button>
     <div class="fixed inset-x-0 bottom-0 top-40 -z-10 grid grid-cols-12 gap-2 overflow-hidden p-2" data-test="lab-busy">
       <% 144.times do |index| %>
         <a href="#busy-<%= index %>" class="rounded border border-strong bg-surface-alt p-2 text-xs text-heading" data-test="lab-busy-card">

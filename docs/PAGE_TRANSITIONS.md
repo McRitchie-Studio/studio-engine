@@ -64,6 +64,7 @@ and Turbo restores the scroll position.
 | A full load to another path: a link with `data-turbo="false"`, `location.assign`, a form that posts natively, a redirect, a Turbo visit answered by `turbo-visit-control: reload` | The direction, once. See [Full page loads](#full-page-loads) |
 | A full load to the same path | Nothing |
 | Reload, or a URL typed in the address bar | Nothing. The browser offers no transition |
+| A theme toggle | No page transition. One 160ms crossfade of the whole page (`data-theme-flip`, `studio/alpine_stores`). During a visit, or with reduced motion or no view transitions, the theme flips at once and the visit's motion plays on |
 
 **The app's page color sits behind the move** (`--color-page`, so it follows the theme). Each
 page stays opaque as it slides, so a blank area reads as the page, in light and in dark. Any

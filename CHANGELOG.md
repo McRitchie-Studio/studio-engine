@@ -33,6 +33,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **A theme toggle is one crossfade.** `$store.theme.toggle()` added `theme-transition` for 300ms, and
+  in a host with that rule about 210 elements ran their own 200ms transition while gradients and
+  the page background snapped. It now flips the whole page in one 160ms view transition with no
+  movement. No element runs its own transition, and no named element keeps its own picture. A
+  browser with no view transitions, a reduced-motion reader, and a toggle during a Turbo visit
+  flip at once, and the visit's motion plays on. Under the crossfade the class, the store value
+  and localStorage change together in the transition's callback, so all three still read the old
+  theme for up to a frame after the call: a caller that reads them in the same tick must wait.
+  `toggleTheme` and `storedTheme` are no longer exported, and the store starts from the root's
+  class. `$store.theme.set("dark" | "light")` is the one setter, and `toggle()` stays. The
+  `theme-transition` rule in a host is now dead. Measured on the hub's `/deployments`, signed in,
+  2100 elements, Metal GPU: the largest step between frames fell from 35-65% of the brightness
+  change to 11%, and element transitions started by one toggle from about 1170 to 0.
+  Chromium sends every pointer hit to the root during a view transition, for about 160ms. A pointer
+  that stops in that time can show no `:hover` until it moves again, and a second click on the toggle
+  is dropped. A host spec that toggles and then hovers must wait for `data-theme-flip` to clear.
+
 - **The agent chat at phone width.** Measured at 390x844 and 320x568, light and dark:
   - No blank tail. A turn's `sr-only` name escaped the log, which had no positioned ancestor,
     and stretched the document to 1933px where `main` ended at 977px. The log is now
