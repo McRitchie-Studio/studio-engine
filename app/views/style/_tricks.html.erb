@@ -33,7 +33,7 @@
 %>
 <section id="tricks" class="space-y-12" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
   <div class="space-y-1">
-    <h2 class="text-base font-extrabold text-heading">Tricks</h2>
+    <h2 class="type-h3 text-heading">Tricks</h2>
     <p class="text-muted text-sm max-w-2xl">
       A board of style tricks you can see and hand to an agent to use out of the box.
       Each specimen surfaces the rendered primitive, its <strong>class name (one-click
@@ -45,7 +45,7 @@
   <!-- Buttons -->
   <section class="space-y-5">
     <div class="space-y-1">
-      <h3 class="label-upper font-bold">Buttons</h3>
+      <h3 class="type-h4 text-heading">Buttons</h3>
       <p class="text-muted text-sm">
         <code class="font-mono text-2xs">.btn</code> base plus one role variant, and the
         <code class="font-mono text-2xs">.btn-sm</code> / <code class="font-mono text-2xs">.btn-lg</code> sizes.
@@ -75,7 +75,7 @@
   <!-- Page header -->
   <section class="space-y-5" data-page-header-specimen>
     <div class="space-y-1">
-      <h3 class="label-upper font-bold">Page header</h3>
+      <h3 class="type-h4 text-heading">Page header</h3>
       <p class="text-muted text-sm">
         <code class="font-mono text-2xs">studio/_page_header</code>: the title, optional meta beside
         it and optional tabs on the right. This page's own title row is one: scroll to see it take the bar.
@@ -110,7 +110,7 @@
   <!-- Surfaces, text and form -->
   <section class="space-y-5">
     <div class="space-y-1">
-      <h3 class="label-upper font-bold">Surfaces, text &amp; form</h3>
+      <h3 class="type-h4 text-heading">Surfaces, text &amp; form</h3>
       <p class="text-muted text-sm">Cards, badges, inputs, the empty state, and the uppercase meta label.</p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -159,7 +159,7 @@
   <!-- Time stamps: the "at" format -->
   <section class="space-y-5">
     <div class="space-y-1">
-      <h3 class="label-upper font-bold">Time stamps — the &ldquo;at&rdquo; format</h3>
+      <h3 class="type-h4 text-heading">Time stamps — the &ldquo;at&rdquo; format</h3>
       <p class="text-muted text-sm">
         <code class="font-mono text-2xs">at_time_tag</code> stamps WHEN something happened, on
         the reader&rsquo;s own clock. The stamps below are live: the server rendered them in this
@@ -233,7 +233,7 @@
   %>
   <section id="loader" class="space-y-5" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
     <div class="space-y-1">
-      <h3 class="label-upper font-bold">Branded loader</h3>
+      <h3 class="type-h4 text-heading">Branded loader</h3>
       <p class="text-muted text-sm max-w-2xl">
         This app's own icon in its theme colours, in the style <code class="font-mono text-2xs">config.loader</code>
         names (<strong><%= loader_config[:style].to_s.tr("_", " ") %></strong>). Page loads, long waits and pending
@@ -284,7 +284,7 @@
   <!-- Motion primitives -->
   <section class="space-y-5">
     <div class="space-y-1">
-      <h3 class="label-upper font-bold">Motion primitives</h3>
+      <h3 class="type-h4 text-heading">Motion primitives</h3>
       <p class="text-muted text-sm">
         The seven <code class="font-mono text-2xs">engine-motion.css</code> primitives. Each knob is a themeable
         CSS variable - tune it inline with <code class="font-mono text-2xs">style="--knob: value"</code>.
@@ -371,7 +371,7 @@
   <!-- Effects -->
   <section class="space-y-5">
     <div class="space-y-1">
-      <h3 class="label-upper font-bold">Effects</h3>
+      <h3 class="type-h4 text-heading">Effects</h3>
       <p class="text-muted text-sm">
         The <code class="font-mono text-2xs">engine-motion.css</code> visual-effect primitives beyond motion -
         gradient text, a soft glow halo, a one- or two-color rotating <strong>selection glow</strong>
@@ -436,7 +436,7 @@
   <!-- Hold to confirm -->
   <section class="space-y-5">
     <div class="space-y-1">
-      <h3 class="label-upper font-bold">Hold to confirm</h3>
+      <h3 class="type-h4 text-heading">Hold to confirm</h3>
       <p class="text-muted text-sm max-w-2xl">
         A press-and-hold CTA for an action you do not want taken by accident, and the
         carbonation behind it. Ported from Turf Monster, where it confirms a contest entry.
@@ -499,7 +499,7 @@
   <!-- Confetti & pulse -->
   <section class="space-y-5">
     <div class="space-y-1">
-      <h3 class="label-upper font-bold">Confetti &amp; pulse</h3>
+      <h3 class="type-h4 text-heading">Confetti &amp; pulse</h3>
       <p class="text-muted text-sm max-w-2xl">
         Celebration effects lifted from Turf Monster into the engine. Confetti is
         <code class="font-mono text-2xs">window.studioConfetti</code> - a zero-dependency,
@@ -546,7 +546,7 @@
   <section class="space-y-5">
     <div class="space-y-1">
       <div class="flex flex-wrap items-center gap-3">
-        <h3 class="label-upper font-bold">Leveling</h3>
+        <h3 class="type-h4 text-heading">Leveling</h3>
         <% if leveling_on %>
           <span class="badge" style="color: var(--color-success-ink); border-color: var(--color-success)">enabled on this app</span>
         <% else %>

@@ -20,9 +20,9 @@
      specimen drives and why it is not the one the Modals section uses:
      app/views/style/_host.html.erb.
 
-     HEADINGS step down the dense scale: the page title is 1.5x (studio/_page_header), a
-     section's h2 is 1x, and a subsection's h3 is the 3/4x label. A larger section heading
-     lands on 1.5x under type-dense, the title's own size.
+     HEADINGS wear the type ladder, on trial on this page only (style/_type_ladder): the one
+     <h1> is studio/_page_header's, at type-h2; a section is an <h2> at type-h3; a subsection
+     is an <h3> at type-h4.
 
      Specimens use ONLY the engine's own classes (engine.css component layer plus
      engine-motion.css motion/effect/leveling layer), so a consumer that imports
@@ -57,7 +57,7 @@
     ["components", "Components"]
   ]
 %>
-<div class="max-w-6xl mx-auto px-4 pt-6 pb-16">
+<div class="max-w-6xl mx-auto px-4 pt-6 pb-16" data-type-ladder>
   <%# The page's title and its section tabs: studio/_page_header, the row of the
       triple stack (docs/PAGE_HEADER.md). It sits at --z-sticky, above --z-raised,
       so the live hold button's portal bubbles scroll under it rather than over it.
