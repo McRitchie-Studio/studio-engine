@@ -35,6 +35,29 @@ class SidebarPanelLeadAndCloseHookTest < ActiveSupport::TestCase
     rule = css[/\[data-sidebar-edge\]::before \{(.*?)\}/m, 1]
     assert_includes rule, "pointer-events: none;"
     assert_includes rule, "backdrop-filter: blur(6px);"
+    assert_includes rule, "width: 6.25rem;"
+  end
+
+  # A hold and a straight fade showed as a line where the blur ended, over a photo. The mask
+  # starts whole and ends clear, only falls, and takes small steps at both ends.
+  test "the blurred edge's mask eases out, with no stop that shows as a line" do
+    css = File.read(File.expand_path("../../app/assets/tailwind/studio_engine/engine.css", __dir__))
+    rule = css[/\[data-sidebar-edge\]::before \{(.*?)\}/m, 1]
+    masks = rule.scan(/mask-image: linear-gradient\(to left, (.*?)\);/).flatten
+    assert_equal 2, masks.size, "the prefixed and the plain property"
+    assert_equal 1, masks.uniq.size, "the two say the same"
+
+    stops = masks.first.split(/, (?=#|rgb|transparent)/)
+    assert_equal "#000", stops.first
+    assert_equal "transparent", stops.last
+    alphas = [1.0] + stops[1..-2].map { |stop| stop[%r{/ ([\d.]+)\)}, 1].to_f } + [0.0]
+    steps = alphas.each_cons(2).map { |a, b| a - b }
+
+    assert_operator stops.size, :>=, 8, "enough stops to read as a curve"
+    assert(steps.all?(&:positive?), "only falls: #{alphas}")
+    assert_operator steps.first, :<=, 0.03, "no shelf at the panel"
+    assert_operator steps.last, :<=, 0.06, "no visible stop at the far end"
+    assert_operator steps.max, :<=, 0.2, "no step steep enough to read as a line"
   end
 
   test "title_html renders in the title's place, before the actions, and names nothing" do

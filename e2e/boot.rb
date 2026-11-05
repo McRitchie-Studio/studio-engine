@@ -182,6 +182,8 @@ FileUtils.mkdir_p(IMG_DIR)
   source = File.join(ROOT, "app", "assets", "images", "emails", source_name)
   FileUtils.cp(source, File.join(IMG_DIR, target_name)) if File.exist?(source)
 end
+# The photo behind /lab/sidebar_panels?busy=photo, a copy of the hub's Denver hero.
+FileUtils.cp(File.join(ROOT, "e2e", "lab_photo.avif"), File.join(IMG_DIR, "lab-photo.avif"))
 
 # ---- The branded loader's icons and art ----------------------------------------
 #

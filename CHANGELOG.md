@@ -23,6 +23,15 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   row keeps its height, its centering and its no-jump description. A section with a blank title
   draws no header. The engine lab shows the case at `/lab/sidebar_panels?sidebar=1&headers=1`.
 
+### Changed
+
+- **Link sidebar: the blurred edge reaches further and fades with no visible end.** The band is
+  100px wide, up from 40px, with the same 6px blur. Its mask is now an eased multi-stop gradient:
+  whole at the panel, half at 60px, clear at 100px, flat at both ends. The old hold and straight
+  fade showed as a line over a photo. It stays flush with the panel, takes no clicks, and draws
+  nothing below `md`. The engine lab shows it over the hub's Denver photo at
+  `/lab/sidebar_panels?sidebar=1&busy=photo`.
+
 ## 0.127.0 — 2026-11-04
 
 ### Added
