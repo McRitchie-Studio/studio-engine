@@ -4,7 +4,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/page_header.js", import.meta.url), "utf8")
-const { isStuck, hiddenEnds, revealBy } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
+const { isStuck, hiddenEnds, revealBy, sentinelMarksThePlace } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 test("a row at its place in the flow is not stuck, a row past it is", () => {
   assert.equal(isStuck(120, 120), false)
@@ -15,6 +15,11 @@ test("a row at its place in the flow is not stuck, a row past it is", () => {
 
 test("a row directly under the navbar at rest is not stuck", () => {
   assert.equal(isStuck(64, 64), false)
+})
+
+test("the sentinel marks the row's place in a block parent, not in a flex or grid one", () => {
+  for (const display of ["block", "flow-root", "inline-block"]) assert.equal(sentinelMarksThePlace(display), true, display)
+  for (const display of ["flex", "inline-flex", "grid", "inline-grid"]) assert.equal(sentinelMarksThePlace(display), false, display)
 })
 
 test("only an end that hides a tab is marked", () => {

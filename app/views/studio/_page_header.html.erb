@@ -33,9 +33,11 @@
 
     THE SENTINEL stays at the row's place in the flow, and the row's distance from
     it is what "stuck" means, on every kind of header. It is absolutely positioned,
-    so a space-y parent adds nothing for it. It carries the controller, so the row
-    keeps its data-studio-controller for the page's own. So the row carries no top
-    margin: the space above it belongs to its container. %>
+    so a space-y parent adds nothing for it. In a flex or grid parent it sits at the
+    parent's start, so the controller measures the row's place from the row. It
+    carries the controller, so the row keeps its data-studio-controller for the
+    page's own. So the row carries no top margin: the space above it belongs to its
+    container. %>
 <div class="page-header-sentinel" data-studio-controller="page-header" aria-hidden="true"></div>
 <%= content_tag(tabs.any? ? :nav : :div,
       class: "page-header sticky #{row_class}".strip,

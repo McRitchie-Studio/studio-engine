@@ -1,0 +1,15 @@
+<%# studio/_page_header under the real chrome (E2eLabController#page_header). The row
+    is the engine's, rendered by name; the parent and the content around it are the
+    host's. %>
+<%= render "studio/banners/stack", devnet: @lab_devnet %>
+<%= render "layouts/navbar", balance_html: nil %>
+<div class="max-w-7xl mx-auto px-4 pt-6 pb-8"<%= %( style="#{@lab_parent_style}").html_safe if @lab_parent_style %>>
+  <p>A sibling above the row.</p>
+  <%= render "studio/page_header",
+        title: params[:title].presence || "Models",
+        meta: (params[:meta].present? ? "v1.2.3" : nil),
+        label: "Lab",
+        tabs: (@lab_right == "tabs" ? E2eLabController::PAGE_HEADER_TABS.map { |name| { label: name, href: "#" } } : []),
+        actions_html: (@lab_right == "actions" ? link_to("Export", "#", class: "btn btn-sm btn-neutral") : nil) %>
+  <div style="height: 2400px">The page.</div>
+</div>

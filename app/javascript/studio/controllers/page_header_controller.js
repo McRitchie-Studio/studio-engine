@@ -10,7 +10,7 @@
 // carries data-studio-controller-failed and engine.css gives the row its bar at
 // all times, so a stuck row never lays a transparent title over the page.
 import { Controller } from "@hotwired/stimulus"
-import { hiddenEnds, isStuck, revealBy } from "studio/page_header"
+import { hiddenEnds, isStuck, revealBy, sentinelMarksThePlace } from "studio/page_header"
 
 export default class extends Controller {
   connect() {
@@ -42,13 +42,27 @@ export default class extends Controller {
   }
 
   sync() {
-    const stuck = isStuck(this.row.getBoundingClientRect().top, this.element.getBoundingClientRect().top)
+    const stuck = isStuck(this.row.getBoundingClientRect().top, this.restTop())
     const ends = this.tabs ? hiddenEnds(this.tabs) : null
 
     this.row.toggleAttribute("data-stuck", stuck)
     if (!ends) return
     this.tabs.toggleAttribute("data-fade-start", ends.start)
     this.tabs.toggleAttribute("data-fade-end", ends.end)
+  }
+
+  // The top of the row's place in the flow. In a flex or grid parent only the row
+  // can say, so it is unstuck for one read. No frame paints in between, and the box
+  // keeps its size, so nothing moves and the stack republishes nothing.
+  restTop() {
+    if (sentinelMarksThePlace(getComputedStyle(this.element.parentElement).display)) {
+      return this.element.getBoundingClientRect().top
+    }
+
+    this.row.style.position = "static"
+    const top = this.row.getBoundingClientRect().top
+    this.row.style.position = ""
+    return top
   }
 
   // Moves the tabs only: scrollIntoView would also move the page.

@@ -8,6 +8,13 @@ export function isStuck(rowTop, restTop) {
   return rowTop - restTop > 0.5
 }
 
+// Whether the sentinel marks the row's place. It is absolutely positioned, so in a
+// block parent it sits where the row starts. In a flex or grid parent it sits at the
+// parent's start instead, whatever is above the row.
+export function sentinelMarksThePlace(parentDisplay) {
+  return !/flex|grid/.test(parentDisplay)
+}
+
 // Which ends of the tabs hide a tab, so a fade marks only an end with more to see.
 export function hiddenEnds({ scrollLeft, clientWidth, scrollWidth }) {
   return {

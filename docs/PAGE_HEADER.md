@@ -45,20 +45,18 @@ a sticky row can travel only as far as its parent.
 Put the space above the row on the container, as `pt-6` is above. The row carries no
 top margin, because a stuck row is measured from its place in the flow.
 
-Two limits, for now:
-
-- **The row's parent is a block.** In a flex or grid parent with a sibling above the
-  row, the sentinel stays at the start of the parent, so the row reads as stuck at rest
-  and shows the bar.
-- **The title is short.** It does not wrap. Past about 18 characters on a phone it
-  squeezes the tabs out, and a much longer title overflows the page.
-
 ## How it behaves
 
 - **At rest** the row has no background and no border. It reads as a normal page
   header, with the tabs floating on the right.
 - **Once stuck** under the navbar it takes the bar. Its height does not change
   between the two states, so the change moves nothing.
+- **In a flex or grid parent** it behaves the same. The sentinel sits at the parent's
+  start there, so the controller measures the row's place from the row.
+- **A long title** wraps. If it leaves the tabs less than 6rem, the tabs move to their
+  own line under it, at full width. The title stops at three lines with an ellipsis;
+  the whole text stays in the `h1`. The page never scrolls sideways, and a short title
+  keeps the row on one line.
 - **On a phone** the tabs scroll sideways inside the row, and the page does not. The
   open tab is scrolled into view on load. A fade marks an end that hides a tab.
 - **If the `page-header` controller fails to load**, the row keeps its bar at all

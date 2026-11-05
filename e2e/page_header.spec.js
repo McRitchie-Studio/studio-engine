@@ -17,12 +17,19 @@ const { watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive } = requ
 //   - "page-header" removed from LAZY: 7 red, every spec that needs the controller.
 //   - revealOpenTab not called: 1 red, the open tab.
 //   - the failed-load selector dropped from the bar's rule: 1 red, the failed load.
+//   - the row does not wrap: 1 red, the long title, on the tabs' room.
+//   - the tabs' floor back to 0: 1 red, the long title, on the tabs' room.
+//   - the line clamp removed: 1 red, the long title, on its three lines.
+//   - overflow-wrap removed: 1 red, the long title, on the page's sideways overflow.
+//   - the flex and grid measure removed from the controller: 1 red, the parents, on
+//     the bar at rest.
 
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
 const MODELS = "/lab/admin_models/sessions";
 const TIMELINE = `${MODELS}?timeline=1`;
 const STYLE = "/lab/style_nav";
+const LAB = "/lab/page_header";
 
 const modelsRow = (page) => page.locator("nav[aria-label='Models']");
 const styleRow = (page) => page.locator("nav[aria-label='Style guide sections']");
@@ -218,4 +225,80 @@ test("a row whose controller failed to load keeps its bar", async ({ page }) => 
 
   await expect(page.locator(".page-header-sentinel")).toHaveAttribute("data-studio-controller-failed", "page-header");
   await expect.poll(async () => (await paint(modelsRow(page))).background).not.toBe(TRANSPARENT);
+});
+
+// What a long title must leave true at one width: nothing past the viewport, the
+// control on the right inside it, and the stack still reading the row's real height.
+async function expectLongTitleHolds(page, viewport, query, label) {
+  await page.setViewportSize(viewport);
+  await page.goto(`${LAB}?${new URLSearchParams(query)}`);
+  const row = page.locator("[data-pin='page']");
+  const title = row.locator("h1");
+
+  const widths = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+  expect(widths.scroll, `${label}: the page has no sideways overflow`).toBeLessThanOrEqual(widths.client);
+
+  const box = await title.boundingBox();
+  expect(box.x + box.width, `${label}: the title ends inside the viewport`).toBeLessThanOrEqual(viewport.width);
+  const lines = await title.evaluate((el) => el.clientHeight / parseFloat(getComputedStyle(el).lineHeight));
+  expect(lines, `${label}: the title stops at three lines`).toBeLessThanOrEqual(3.01);
+
+  if (query.right === "actions") {
+    const action = await row.locator(".page-header-actions a").boundingBox();
+    expect(action.x + action.width, `${label}: the action is on the page`).toBeLessThanOrEqual(viewport.width);
+  } else if (query.right !== "none") {
+    const tabs = row.locator(".page-header-tabs");
+    await tabs.evaluate((el) => { el.scrollLeft = el.scrollWidth; });
+    const strip = await tabs.boundingBox();
+    const last = await row.locator(".page-header-tabs a").last().boundingBox();
+    expect(strip.width, `${label}: the tabs keep room to show a tab`).toBeGreaterThanOrEqual(96);
+    expect(last.x + last.width, `${label}: the last tab scrolls into view`).toBeLessThanOrEqual(viewport.width);
+  }
+
+  // The row may be taller now: what sits under it has to know.
+  await page.evaluate(() => window.scrollTo({ top: 400, behavior: "instant" }));
+  await expect(row).toHaveAttribute("data-stuck", "");
+  await expect.poll(() => row.evaluate((el) => {
+    const published = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--pin-stack-bottom"));
+    return Math.abs(published - el.getBoundingClientRect().bottom);
+  }), `${label}: the stack reads the row's height`).toBeLessThanOrEqual(1);
+}
+
+test("a long title wraps inside the page and leaves the tabs reachable, at 320, 390 and 1280", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  const words = "The quarterly reconciliation of every outstanding contest entry, its settlement and each of its late corrections, by operator and by week, for the whole of the season";
+  const unbroken = "Supercalifragilisticexpialidocious".repeat(4);
+
+  for (const width of [320, 390, 1280]) {
+    const viewport = { width, height: 800 };
+    await expectLongTitleHolds(page, viewport, { title: words, right: "tabs" }, `${width} words, tabs`);
+    await expectLongTitleHolds(page, viewport, { title: "Reconciliation Run", right: "tabs" }, `${width} fits but leaves little, tabs`);
+    await expectLongTitleHolds(page, viewport, { title: unbroken, right: "tabs", meta: "1" }, `${width} unbroken, meta, tabs`);
+    await expectLongTitleHolds(page, viewport, { title: words, right: "actions" }, `${width} words, action`);
+    await expectLongTitleHolds(page, viewport, { title: unbroken, right: "none" }, `${width} unbroken, title only`);
+  }
+
+  // A short title does not wrap the row: the tabs stay on its line at the narrowest width.
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto(STYLE);
+  const title = await styleRow(page).locator("h1").boundingBox();
+  const tabs = await styleRow(page).locator(".page-header-tabs").boundingBox();
+  expect(tabs.y, "the tabs are beside a short title").toBeLessThan(title.y + title.height);
+});
+
+// Scrolled first, so the rest is a transition and cannot pass before the controller
+// has connected. In these parents the sentinel stays at the parent's start.
+test("a row in a flex or grid parent with a sibling above it has no bar at rest", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.setViewportSize(DESKTOP);
+  for (const parent of ["flex", "grid"]) {
+    await page.goto(`${LAB}?parent=${parent}`);
+    const row = page.locator("[data-pin='page']");
+
+    await page.evaluate(() => window.scrollTo({ top: 600, behavior: "instant" }));
+    await expectBar(row);
+
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await expectAtRest(row);
+  }
 });

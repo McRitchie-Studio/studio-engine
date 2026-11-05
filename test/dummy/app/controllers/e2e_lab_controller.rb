@@ -737,6 +737,21 @@ class E2eLabController < ActionController::Base
     render(template: "style/index")
   end
 
+  # studio/_page_header under the real chrome, for what no adopted page shows: a long
+  # title and a flex or grid parent. ?title=, ?meta=1, ?right=tabs|actions|none,
+  # ?parent=flex|grid. A sibling sits above the row in every parent, as on a real page.
+  PAGE_HEADER_PARENTS = {
+    "flex" => "display: flex; flex-direction: column; gap: 1.5rem",
+    "grid" => "display: grid; gap: 1.5rem"
+  }.freeze
+  PAGE_HEADER_TABS = %w[Users Sessions Contests Entries Teams Players Games Markets Invoices].freeze
+
+  def page_header
+    bar_stack_locals
+    @lab_parent_style = PAGE_HEADER_PARENTS[params[:parent]]
+    @lab_right = params[:right].presence || "tabs"
+  end
+
   # The style guide's Tasks section: three live boards on the board primitive
   # (a kanban, one with chrome state and an archive column, and a depth chart
   # with locked cards), all in demo mode, so a drag sends nothing.
