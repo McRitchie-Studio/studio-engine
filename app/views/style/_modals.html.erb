@@ -150,14 +150,12 @@
     target moved. The engine primitive is untouched; its real submit still posts
     to the app-supplied submit_url. Kept on the section (always mounted) so it
     fires even as the age-gate card closes. %>
-<section id="modals" class="space-y-10" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)"
+<section id="modals" class="section-target space-y-10"
          data-studio-controller="style-modals"
          x-data="{}" @ds-modal-close.window="$store.dsModals.close()"
          @age-verified.window="$store.dsModals.open('entry-confirmed', { txSignature: null, lobbyUrl: null, seedsEarned: 0 })">
-  <div class="space-y-1">
-    <h2 class="type-h3 text-heading">Modals</h2>
-    <p class="text-muted text-sm">Click a card to open the real modal.</p>
-  </div>
+  <%= render "studio/section_header", title: "Modals" %>
+  <p class="text-muted text-sm">Click a card to open the real modal.</p>
 
   <%# ---- The section's own modal host (dsModals) --------------------------
       $store.dsModals is the engine's modal stack under the guide's own name:

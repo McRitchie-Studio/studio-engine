@@ -741,6 +741,14 @@ class E2eLabController < ActionController::Base
     render(template: "style/index")
   end
 
+  # The same guide under the real navbar, as a host draws it: the whole stack. ?turbo=1
+  # loads Turbo, as every host does: it moves a tab's hash by pushState and scrolls itself.
+  def style_chrome
+    @theme_setting = ThemeSetting.current if ThemeSetting.table_exists?
+    bar_stack_locals
+    render(:style_chrome, layout: params[:turbo].present? ? "survey_turbo_lab" : "e2e_lab")
+  end
+
   # studio/_page_header under the real chrome, for what no adopted page shows: a long
   # title and a flex or grid parent. ?title=, ?meta=1, ?right=tabs|actions|none,
   # ?parent=flex|grid. A sibling sits above the row in every parent, as on a real page.
@@ -754,6 +762,13 @@ class E2eLabController < ActionController::Base
     bar_stack_locals
     @lab_parent_style = PAGE_HEADER_PARENTS[params[:parent]]
     @lab_right = params[:right].presence || "tabs"
+  end
+
+  # studio/_section_header under the real chrome, with a table inside a section.
+  # ?timeline=1 puts the header on the scroll-driven collapse.
+  def section_header
+    @lab_sticky_table_headers = true
+    bar_stack_locals
   end
 
   # The style guide's Tasks section: three live boards on the board primitive

@@ -22,7 +22,8 @@
 
      HEADINGS wear the type ladder, on trial on this page only (style/_type_ladder): the one
      <h1> is studio/_page_header's, at type-h2; a section is an <h2> at type-h3; a subsection
-     is an <h3> at type-h4.
+     is an <h3> at type-h4. The section's <h2> is studio/_section_header's, in type-h3's numbers,
+     which sticks under the page row until the next section's takes its place.
 
      Specimens use ONLY the engine's own classes (engine.css component layer plus
      engine-motion.css motion/effect/leveling layer), so a consumer that imports
@@ -59,7 +60,7 @@
 %>
 <div class="max-w-6xl mx-auto px-4 pt-6 pb-16" data-type-ladder>
   <%# The page's title and its section tabs: studio/_page_header, the row of the
-      triple stack (docs/PAGE_HEADER.md). It sits at --z-sticky, above --z-raised,
+      pinned stack (docs/PAGE_HEADER.md). It sits at --z-sticky, above --z-raised,
       so the live hold button's portal bubbles scroll under it rather than over it.
 
       The style-section-nav controller moves the highlight as the page scrolls
@@ -77,7 +78,10 @@
             data: { style_section_nav_target: "link" } }
         } %>
 
-  <div class="space-y-16 pt-10">
+  <%# 6rem between sections: a first jump from the top of the page lands by the navbar's
+      collapse below the line, and the section above must be gone from the bar by then
+      (76px on the hub at phone width). %>
+  <div class="space-y-24 pt-10">
     <%= render "style/theme" %>
     <%= render "style/modals" %>
     <% if host_modals %>

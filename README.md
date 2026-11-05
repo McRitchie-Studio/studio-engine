@@ -294,6 +294,11 @@ An admin page's title: a plain header at rest, a bar once stuck under the navbar
 in the pinned stack so a table's sticky header sits under it
 ([`docs/PAGE_HEADER.md`](docs/PAGE_HEADER.md)).
 
+### The section header — `studio/_section_header`
+
+A section's title that sticks under the page row until the next section's takes its place,
+with a bar once stuck ([`docs/PAGE_HEADER.md`](docs/PAGE_HEADER.md#the-section-header)).
+
 ```erb
 <%= render "studio/page_header", title: "Models", meta: "v1.2.3", label: "Models",
       tabs: [{ label: "Users", href: users_path, current: "page" }, { label: "Teams", href: teams_path }] %>

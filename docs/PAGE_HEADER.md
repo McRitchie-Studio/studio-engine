@@ -1,12 +1,13 @@
-# The page header and the triple stack
+# The page header and the pinned stack
 
 ## The rule
 
-A page has three pinned layers, each below the last, and none overlaps another:
+A page has up to four pinned layers, each below the last, and none overlaps another:
 
 1. The navbar (`layouts/_navbar`).
 2. The page row (`studio/_page_header`): the title, then optional meta and tabs.
-3. A table's sticky header (`config.sticky_table_headers`).
+3. The section's header (`studio/_section_header`), on a page long enough to want one.
+4. A table's sticky header (`config.sticky_table_headers`).
 
 An admin page uses `studio/_page_header` for its title. It does not draw its
 own sticky row, and it does not write a pixel height. Each layer takes its place
@@ -87,11 +88,101 @@ The partial is `studio/_page_header`, not `components/_page_header`. A host's vi
 wins over the engine's at the same path, and the hub has its own
 `components/_page_header` with other locals.
 
+## The section header
+
+A long page keeps its reader's place with a section title that stays on screen. The page
+row stays, the section's header sits directly under it, and when the next section arrives
+its header takes the place.
+
+```erb
+<section id="modals" class="section-target space-y-8">
+  <%= render "studio/section_header", title: "Modals" %>
+  ...the section...
+</section>
+```
+
+| Local | What it does |
+|-------|--------------|
+| `title` | The heading's text. Required. |
+| `level` | The heading's tag. The default is `:h2`. |
+| `row_class` | The bleed, as on the page row. The default is `-mx-4 px-4`. |
+
+The rules for the page:
+
+- **Make it the first direct child of its `<section>`.** It is sticky, and a sticky element
+  travels only inside its parent. That parent is what gives the swap, with no scroll script.
+  In a wrapper `div` it leaves with the wrapper. Keep an intro paragraph as its next sibling.
+  Put no top padding on the section: the section's top is how the publisher knows the header
+  has left its place.
+- **Stick one level.** One bar shows at a time. Do not nest a section header in a section header.
+- **No `overflow`, `transform` or `backdrop-filter` on an ancestor.** Each of these can
+  stop a sticky element or its blur.
+
+How it behaves:
+
+- **At rest** it reads as a normal section title, with no background and no border.
+- **Stuck** it takes the page row's bar: solid surface in light and dark, and the glass bar
+  under `data-surface-style="glass"`. Its box does not change, so the change moves nothing.
+  Under glass, while it is stuck, it owns the round bottom corners and the page row goes
+  square, so no page shows in a notch between the two.
+- **It stays one line.** A long title ends in an ellipsis on the bar, and the whole text stays
+  in the heading. The bar is 2.25rem at every width, `--section-header-h`.
+- **On a phone** the same 2.25rem bar is the smaller treatment, and the title keeps its size.
+  Measured at 390x844 under the lab's two-row navbar: 86px navbar, 54px row, 36px bar, so 176px,
+  21% of the screen.
+- **On a short screen**, under 36rem tall, such as a small phone or one on its side, it stays
+  in the flow and never sticks: the navbar and the page row already take a quarter of the height.
+- **If the pinned stack does not run**, it stays in the flow. With no publisher, no bar would
+  come, and a clear title would lie over the page.
+
+### How it joins the stack
+
+A section header is in the stack, so a table's sticky header and any other reader of
+`--pin-stack-bottom` sit under it with no edit. It does not carry `data-pin`. Every layer of
+the registry counts by its bottom edge, so a header waiting below the fold would drag
+`--pin-stack-bottom` down the page, and headers sharing a name would overwrite each other.
+
+So each one carries `data-pin-section`, and together they publish as one layer, `section`:
+
+- `--pin-section-top` is the bottom of the layers above. It stands whether or not one is
+  stuck, and every header positions off it.
+- `--pin-section-h` and `--pin-section-bottom` are 0 until one is stuck. While the end of its
+  section pushes it out, they shrink frame by frame, so a reader under it rises with it.
+- `window.studioPinnedStack.read().layers.section` is the same, for a script.
+
+The publisher puts `data-stuck` on the stuck header, and `data-pin-section-stuck` on the root.
+
+### Where a jump lands
+
+| Class | On | Lands |
+|-------|----|-------|
+| `section-target` | A `<section>` with a section header | Its top just past the pinned line, `--nav-h` plus `--pin-page-h`, so its title shows on its bar. |
+| `section-subtarget` | An anchor inside such a section | One `--section-header-h` lower, clear of the section's bar. |
+
+Do not write `scroll-margin-top` by hand: `--nav-h + 5rem` does not know the page row or the bar.
+
+These are CSS alone. No script moves the page after a jump, so a Back, a reload, a Turbo visit
+and a scroll by the reader or the app all keep their place.
+
+**A first jump from the top of the page lands low.** The navbar is still tall when the browser
+reads the margin, and it collapses after the jump. So the title lands by the collapse below the
+line: 75px on the hub at 390px, 38px on Turf, and 0 on both at desktop width. The title shows and
+the bar comes on the next scroll. Later jumps land on the line.
+
+**Keep the sections further apart than that.** If the gap between two sections is smaller than the
+collapse, the section above still shows a sliver of its bar after the jump. The style guide's gap
+is 6rem for this reason. Its tab highlight has the same margin, `LINE_SLACK`, 80px, so a tab can
+change up to 80px of scroll before the bar swaps.
+
+A short last section cannot reach the line, so the section above it can keep its bar, with the
+title lower on the screen.
+
 ## Who has adopted it
 
-`style/index`, `studio/admin_models/show` and `studio/admin_surveys/index`.
+The page row: `style/index`, `studio/admin_models/show` and `studio/admin_surveys/index`.
+The section header: `style/index`, every section.
 
-These engine pages have not. Each needs more than the row has today:
+These engine pages have not adopted the row. Each needs more than the row has today:
 
 - `studio/admin_surveys/show`: a back link and a mono subtitle.
 - `studio/models/show`: an eyebrow and a mono subtitle.

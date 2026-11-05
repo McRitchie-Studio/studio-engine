@@ -92,6 +92,29 @@ class StylePageTest < ActiveSupport::TestCase
     assert_equal 2, specimen.css(".page-header").size
   end
 
+  test "every section's title is a section header, first in its section, and joins no data-pin" do
+    doc = Nokogiri::HTML.fragment(render_index)
+    { "theme" => "Theme", "modals" => "Modals", "tricks" => "Tricks", "tasks" => "Tasks", "components" => "Components" }.each do |id, title|
+      section = doc.at_css("section##{id}")
+      first = section.element_children.first
+
+      assert_includes section["class"].split, "section-target", id
+      assert_includes first["class"].split, "section-header", "#{id}: sticky travels only inside its parent, so it is a direct child"
+      assert first.has_attribute?("data-pin-section"), id
+      assert_nil first["data-pin"], id
+      assert_equal "h2", first.name, id
+      assert_equal title, first.text.strip
+      assert_includes first["style"], "--pin-section-top", id
+      assert_nil section["style"], "#{id}: the class owns the scroll margin"
+    end
+
+    specimen = doc.at_css("[data-section-header-specimen]")
+    assert specimen, "the Tricks section documents the primitive"
+    assert_equal 1, specimen.css(".section-header[data-stuck]").size
+    assert_empty specimen.css("[data-pin-section]"), "a specimen must not join the stack"
+    assert_empty doc.css("[style*='nav-h, 0px) + 5rem']"), "no hand-summed scroll margin is left on the page"
+  end
+
   test "the Theme section shows the app's logos" do
     before = Studio.theme_logos
     Studio.theme_logos = [{ file: "brand/mark.svg", title: "The Mark" }]
@@ -465,8 +488,12 @@ class StylePageTest < ActiveSupport::TestCase
     own.each do |title|
       heading = doc.css("section#tricks h2, section#tricks h3").find { |h| h.text.strip == title }
       assert heading, "no #{title.inspect} group"
-      header = heading.ancestors("div.space-y-1").first
-      paragraphs = header.css("> p")
+      # A section header is the sticky element itself, so its intro is its next sibling.
+      paragraphs = if heading["class"].to_s.split.include?("section-header")
+        [heading.next_element].compact.select { |el| el.name == "p" }
+      else
+        heading.ancestors("div.space-y-1").first.css("> p")
+      end
       assert_operator paragraphs.size, :<=, 1, "#{title}: one paragraph at most"
       next if paragraphs.empty?
 
