@@ -1347,8 +1347,11 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
     }
     html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(.btn-sm, :disabled, [aria-disabled="true"]) {
       box-shadow: var(--lit-rings), var(--lit-contact),
-        var(--lit-glow) oklch(from var(--lit-low-stop) l c h / var(--lit-glow-alpha));
+        var(--lit-glow) oklch(from var(--lit-glow-stop, var(--lit-low-stop)) l c h / var(--lit-glow-alpha));
     }
+    /* On a dark page a deep green, red or orange glow disappears, so these glow from the top
+       stop. The violet is already bright enough at its low stop. */
+    html.dark[data-surface-style="glass"] :is(.btn-secondary, .btn-danger, .btn-warning, .btn-success) { --lit-glow-stop: var(--lit-top-stop); }
     html[data-surface-style="glass"] .btn-primary:not(:disabled, [aria-disabled="true"]):is(:hover, [data-lit-state="hover"]) {
       filter: brightness(0.94);
     }
