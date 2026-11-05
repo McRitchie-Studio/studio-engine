@@ -57,6 +57,11 @@ If your app doesn't create its own `app/views/layouts/_navbar.html.erb`, the eng
   From `md` up, the link sidebar's inner edge blurs the page behind it in a 100px
   band (`edge: true` on `components/_sidebar_panel`; engine.css, THE SIDEBAR'S EDGE).
   An admin's panel ends with a Geo row; `Studio.sidebar_geo_signpost = false` takes it out.
+- `Studio.sidebar_style = :glass` floats an inset, translucent panel over the page. A link's
+  `icon:` (a `Studio::Icons` name, rendered by `studio_icon`) replaces its emoji and its hover
+  swap, and a link with no `icon:` keeps both. The current page's row is marked
+  `aria-current="page"` and filled with the primary color; `exact: true` keeps a link off the pages
+  beneath it. The default style reads none of this. `engine.css`, THE GLASS SIDEBAR, holds the look.
 
 ## How to Override
 

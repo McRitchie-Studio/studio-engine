@@ -3,6 +3,7 @@
 require "test_helper"
 require "action_view"
 require "nokogiri"
+require_relative "../../app/helpers/studio_icon_helper"
 
 # Renders the link-sidebar family (components/_link_sidebar, _sidebar_panel,
 # _link_sidebar_trigger) through ActionView and pins the emitted contract:
@@ -514,16 +515,146 @@ class LinkSidebarTest < Minitest::Test
     assert_equal ids.size, doc.css("aside").size, "every panel rendered here is in the module's scope"
   end
 
+  # --- Studio.sidebar_style = :glass ------------------------------------------
+
+  GLASS_SECTIONS = [
+    { title: "My Apps", header: true, links: [
+      { label: "Team Voice Notes to Webhook", href: "/apps/voice", emoji: "🐶", hover_emoji: "🚀" }
+    ] },
+    { title: "Admin", header: true, links: [
+      { label: "Dashboard", href: "/admin", emoji: "📊", hover_emoji: "🔬", icon: "chart-column", desc: "Users + logs", exact: true },
+      { label: "Odd", href: "/odd", emoji: "🦄", icon: "no-such-icon" }
+    ] }
+  ].freeze
+
+  def test_the_default_style_ignores_icons_and_marks_no_current_row
+    html = render_sidebar(sections: GLASS_SECTIONS, admin: true, path: "/admin")
+    doc = Nokogiri::HTML5.fragment(html)
+
+    %w[studio-link-sidebar studio-link-sidebar-mobile].each do |id|
+      panel = doc.at_css("##{id}")
+      assert_includes panel["class"], "bg-surface border-l border-subtle shadow-2xl"
+      refute_nil panel["data-sidebar-edge"]
+      assert_nil panel["data-sidebar-glass"]
+    end
+    assert_empty doc.css("svg[stroke]"), "no line icon under the default style"
+    assert_empty doc.css("[aria-current]")
+    assert_empty doc.css("[data-sidebar-glass-shell], [data-sidebar-glass-head], [data-sidebar-glass-foot]")
+    assert_includes html, "👋"
+    assert_includes doc.at_css('[role="group"] + [role="group"]')["class"], "border-t"
+  end
+
+  def test_glass_panels_turn_the_edge_off_and_mark_the_shell
+    doc = glass_doc(path: "/admin")
+
+    %w[studio-link-sidebar studio-link-sidebar-mobile].each do |id|
+      panel = doc.at_css("##{id}")
+      refute_nil panel["data-sidebar-glass"]
+      assert_nil panel["data-sidebar-edge"], "the whole panel blurs, so the separate strip is off"
+      refute_includes panel["class"], "bg-surface"
+      refute_nil panel["data-pin-edge"], "the aside keeps its geometry"
+      assert_equal "translate-x-full", panel["x-transition:enter-start"], "the aside keeps its slide"
+      assert_equal 1, panel.css("> [data-sidebar-glass-shell]").size
+      assert_equal 1, panel.css("[data-sidebar-glass-foot]").size
+    end
+    refute_includes doc.at_css('[role="group"] + [role="group"]')["class"], "border-t", "headers group the rows, not lines"
+  end
+
+  def test_a_glass_row_draws_its_line_icon_with_no_swap
+    row = glass_row("Dashboard", path: "/")
+
+    refute_nil row.at_css("[data-sidebar-row-icon] svg")
+    assert_nil row.at_css(".studio-emoji-swap"), "a line icon row has no hover swap"
+    refute_includes row.text, "📊"
+  end
+
+  def test_a_glass_row_with_no_icon_keeps_its_portrait_and_swap
+    row = glass_row("Team Voice Notes to Webhook", path: "/")
+
+    assert_nil row.at_css("svg")
+    assert_equal "🚀", row.at_css(".studio-emoji-swap-hover").text
+    assert_equal "🐶", row.at_css(".studio-emoji-swap-base").text
+    assert_includes row["class"], "group"
+  end
+
+  def test_a_glass_row_whose_icon_is_unknown_falls_back_to_its_emoji
+    row = glass_row("Odd", path: "/")
+
+    assert_nil row.at_css("svg")
+    assert_includes row.text, "🦄"
+  end
+
+  def test_glass_marks_the_current_row_in_both_panels_and_only_that_row
+    doc = glass_doc(path: "/admin")
+
+    current = doc.css('a[aria-current="page"]')
+    assert_equal 2, current.size, "one row in each panel"
+    assert_equal ["/admin"], current.map { |row| row["href"] }.uniq
+  end
+
+  def test_glass_marks_no_row_on_a_page_without_one
+    assert_empty glass_doc(path: "/nowhere").css("[aria-current]")
+  end
+
+  def test_a_glass_row_keeps_its_hover_description
+    row = glass_row("Dashboard", path: "/")
+
+    refute_nil row["data-sidebar-row-described"]
+    assert_equal "Users + logs", row.at_css("[data-sidebar-row-desc]").text
+  end
+
+  def test_glass_log_out_is_a_line_icon_in_its_own_footer
+    foot = glass_doc(path: "/").at_css("#studio-link-sidebar [data-sidebar-glass-foot]")
+
+    refute_nil foot.at_css('a[href="/logout"] svg')
+    refute_includes foot.text, "👋"
+    assert_empty foot.ancestors("nav"), "Log out sits outside the scrolling list"
+  end
+
+  def test_glass_renders_with_no_request_and_lights_nothing
+    html = with_glass { render_sidebar(sections: GLASS_SECTIONS, admin: true) }
+
+    assert_empty Nokogiri::HTML5.fragment(html).css("[aria-current]")
+  end
+
+  def test_the_panel_without_glass_is_untouched_for_other_callers
+    view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    html = view.render(partial: "components/sidebar_panel", locals: { open: "x", edge: true, id: "p" })
+    panel = Nokogiri::HTML5.fragment(html).at_css("#p")
+
+    assert_includes panel["class"], "bg-surface border-l border-subtle shadow-2xl"
+    refute_nil panel["data-sidebar-edge"]
+    assert_nil panel["data-sidebar-glass"]
+  end
+
   private
+
+  def with_glass
+    prior = Studio.sidebar_style
+    Studio.sidebar_style = :glass
+    yield
+  ensure
+    Studio.sidebar_style = prior
+  end
+
+  def glass_doc(path:)
+    Nokogiri::HTML5.fragment(with_glass { render_sidebar(sections: GLASS_SECTIONS, admin: true, path: path) })
+  end
+
+  def glass_row(label, path:)
+    glass_doc(path: path).at_css("#studio-link-sidebar").css("nav a").find { |row| row.text.include?(label) }
+  end
 
   def named_user(first_name)
     Struct.new(:first_name, :display_name).new(first_name, first_name)
   end
 
-  def render_sidebar(sections:, admin:, logged_in: true, user: nil, geo_flag: nil, geo_routes: false)
+  def render_sidebar(sections:, admin:, logged_in: true, user: nil, geo_flag: nil, geo_routes: false, path: nil)
     previous = Studio.geo_blocking_enabled
     Studio.geo_blocking_enabled = geo_flag
-    view(sections: sections, admin: admin, logged_in: logged_in, user: user, geo_routes: geo_routes)
+    rendered = view(sections: sections, admin: admin, logged_in: logged_in, user: user, geo_routes: geo_routes)
+    rendered.define_singleton_method(:request) { Struct.new(:path, :host).new(path, "hub.example") } if path
+    rendered
       .render(partial: "components/link_sidebar")
   ensure
     Studio.geo_blocking_enabled = previous
@@ -533,6 +664,7 @@ class LinkSidebarTest < Minitest::Test
     resolved = Studio::SidebarSections.resolve(sections, Struct.new(:a) { def admin? = true }.new(1))
     resolved = resolved.reject { |s| s[:admin] } unless admin
     view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    view.extend(StudioIconHelper)
     view.define_singleton_method(:studio_sidebar_sections) { resolved }
     view.define_singleton_method(:admin?) { admin }
     view.define_singleton_method(:logged_in?) { logged_in }

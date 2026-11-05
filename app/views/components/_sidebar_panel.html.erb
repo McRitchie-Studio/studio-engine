@@ -19,7 +19,7 @@
     would cover the expanded header. engine.css (THE PINNED EDGE ON THE SCROLL
     TIMELINE) moves it with the header on the scroll timeline instead.
 
-    Three opt-in locals (unset, the panel renders as it did in 0.113.0):
+    Four opt-in locals (unset, the panel renders as it did in 0.113.0):
       title_html  the header's LEAD SLOT: HTML in the title's place, for a panel
                   whose lead is a live status line rather than a label. It is
                   content, NOT a name: it never feeds aria-labelledby or
@@ -30,6 +30,11 @@
                   panel's inner edge, drawn by engine.css (THE SIDEBAR'S EDGE) from md
                   up. It softens the page beside the panel, so it suits a menu that
                   opens over the page, not a panel kept open beside live content.
+      glass       true floats an inset, translucent panel (engine.css, THE GLASS SIDEBAR).
+                  The aside keeps its geometry, its slide and its pinned edge, and turns
+                  into a clear frame around an inner shell, which holds the blur. A
+                  backdrop-filter makes a containing block, and this keeps it off the
+                  element Alpine and Turbo move. Glass ignores `edge`: the whole panel blurs.
       close_hook  true stamps the close button data-sidebar-panel-close="<id>"
                   too, so a host's own document handler can match the button
                   to its panel by id. Needs `id`; without one it adds nothing.
@@ -53,7 +58,9 @@
 <% aria_label     = local_assigns.fetch(:aria_label, title) %>
 <% labelledby     = id.present? && title.present? ? "#{id}-title" : nil %>
 <% close_hook     = local_assigns.fetch(:close_hook, false) && id.present? %>
-<% edge           = local_assigns.fetch(:edge, false) %>
+<% glass          = local_assigns.fetch(:glass, false) %>
+<% edge           = local_assigns.fetch(:edge, false) && !glass %>
+<% surface_class  = glass ? "" : "bg-surface border-l border-subtle shadow-2xl " %>
 
 <aside
   <% if id.present? %>id="<%= id %>"<% end %>
@@ -78,17 +85,20 @@
   x-transition:leave="transition ease-in duration-200"
   x-transition:leave-start="translate-x-0"
   x-transition:leave-end="translate-x-full"
-  class="<%= display_class %> fixed right-0 <%= width_class %> bg-surface border-l border-subtle shadow-2xl <%= z_class %> flex-col <%= panel_class %>"
+  class="<%= display_class %> fixed right-0 <%= width_class %> <%= surface_class %><%= z_class %> flex-col <%= panel_class %>"
   style="top:var(--nav-bottom, var(--nav-h, 6rem));height:calc(100% - var(--nav-bottom, var(--nav-h, 6rem)))"
   data-pin-edge
   <% if edge %>
   data-sidebar-edge
   <% end %>
+  <% if glass %>
+  data-sidebar-glass
+  <% end %>
   role="<%= role %>"
   <% if labelledby %>aria-labelledby="<%= labelledby %>"<% elsif aria_label.present? %>aria-label="<%= aria_label %>"<% end %>>
-  <div class="flex flex-col h-full">
+  <div class="flex flex-col h-full"<% if glass %> data-sidebar-glass-shell<% end %>>
     <% if title.present? || title_html.present? || actions_html.present? || close_action.present? %>
-      <div class="flex items-center justify-between p-4 border-b border-subtle">
+      <div class="flex items-center justify-between p-4 border-b border-subtle"<% if glass %> data-sidebar-glass-head<% end %>>
         <% if title.present? %>
           <h3 <% if labelledby %>id="<%= labelledby %>"<% end %> class="text-lg font-bold text-heading"><%= title %></h3>
         <% elsif title_html.present? %>

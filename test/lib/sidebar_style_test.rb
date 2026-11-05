@@ -1,0 +1,96 @@
+# frozen_string_literal: true
+
+require "test_helper"
+
+# The rules behind Studio.sidebar_style: which values it takes, and which row a page lights.
+class SidebarStyleTest < Minitest::Test
+  LINKS = [
+    { title: "Admin", links: [
+      { label: "Dashboard", href: "/admin", exact: true },
+      { label: "Design", href: "/admin/style" },
+      { label: "Requests", href: "/build/requests" },
+      { label: "Books", href: "/books" }
+    ] },
+    { title: "Studio", links: [
+      { label: "Home", href: "/" },
+      { label: "Build", href: "/build" },
+      { label: "Turf", href: "https://turf.example/docs" },
+      { label: "Top", href: "#top" },
+      { label: "Mail", href: "mailto:team@example.com" }
+    ] }
+  ].freeze
+
+  def current(path, host: "hub.example") = Studio::SidebarSections.current_href(LINKS, path, host: host)
+
+  def test_style_takes_the_known_values_as_symbol_or_string
+    assert_equal :glass, Studio::SidebarSections.style!(:glass)
+    assert_equal :glass, Studio::SidebarSections.style!("glass")
+    assert_equal :default, Studio::SidebarSections.style!(:default)
+  end
+
+  def test_style_refuses_anything_else_and_names_the_choices
+    [:frosted, "", nil, 1].each do |bad|
+      error = assert_raises(ArgumentError) { Studio::SidebarSections.style!(bad) }
+      assert_includes error.message, "default, glass"
+    end
+  end
+
+  def test_a_page_lights_its_own_row
+    assert_equal "/books", current("/books")
+    assert_equal "/books", current("/books/")
+    assert_equal "/books", current("/books?entity=1")
+  end
+
+  def test_a_row_owns_the_pages_beneath_it
+    assert_equal "/books", current("/books/2026/march")
+  end
+
+  def test_a_shared_prefix_that_is_not_a_segment_does_not_count
+    assert_nil current("/booksellers")
+  end
+
+  def test_the_longest_match_wins_whatever_the_order
+    assert_equal "/build/requests", current("/build/requests")
+    assert_equal "/build/requests", current("/build/requests/9")
+    assert_equal "/build", current("/build/9")
+  end
+
+  def test_exact_keeps_a_row_off_the_pages_beneath_it
+    assert_equal "/admin", current("/admin")
+    assert_equal "/admin/style", current("/admin/style/components")
+    assert_nil current("/admin/schema"), "no Dashboard row on a page that has no row of its own"
+  end
+
+  def test_root_only_matches_itself
+    assert_equal "/", current("/")
+    assert_nil current("/somewhere")
+  end
+
+  def test_an_absolute_href_counts_only_on_its_own_host
+    assert_nil current("/docs")
+    assert_equal "https://turf.example/docs", current("/docs", host: "turf.example")
+  end
+
+  def test_an_anchor_or_a_mailto_never_lights
+    assert_nil Studio::SidebarSections.current_href([{ links: [{ href: "#top" }, { href: "mailto:a@b.c" }, { href: "" }, { href: nil }] }], "/", host: nil)
+  end
+
+  def test_nothing_lights_without_a_path
+    assert_nil current("")
+    assert_nil current(nil)
+  end
+
+  def test_the_profile_row_carries_its_line_icon
+    view = Struct.new(:logged_in) do
+      def profile_path = "/profile"
+      def logged_in? = true
+    end.new(true)
+    prior = Studio.respond_to?(:draw_profile_routes) && Studio.draw_profile_routes
+    Studio.draw_profile_routes = true
+
+    assert_equal "user", Studio::SidebarSections.standard(view).first[:links].first[:icon]
+    assert Studio::Icons.known?("user"), "the engine must vendor the icon it names"
+  ensure
+    Studio.draw_profile_routes = prior
+  end
+end

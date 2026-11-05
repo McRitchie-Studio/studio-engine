@@ -33,6 +33,7 @@ require "studio/js_identifier"
 require "studio/hold_button"
 require "studio/partial_block"
 require "studio/sidebar_sections"
+require "studio/icons"
 require "studio/site_footer"
 require "studio/marketing_kit"
 require "studio/booking"
@@ -263,6 +264,16 @@ module Studio
   # takes the row out of this panel only: components/_geo_signpost stays, so a host
   # that moves Geo elsewhere renders the partial on that page.
   mattr_accessor :sidebar_geo_signpost, default: true
+
+  # How the link sidebar's panel looks. :default is the full-height drawer every app has
+  # today. :glass floats an inset, translucent panel over the page, with line icons
+  # (a link's icon:), a marked current page and no separate blurred edge. It is opt-in,
+  # so an app moves only when it asks. engine.css, THE GLASS SIDEBAR, holds the look.
+  mattr_reader :sidebar_style, default: :default
+
+  def self.sidebar_style=(value)
+    @@sidebar_style = SidebarSections.style!(value)
+  end
 
   # ---- Navbar links ----
   # Links for the engine navbar's desktop bar and phone row. The default []

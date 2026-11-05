@@ -24,8 +24,26 @@ class LinkSidebarHeaderRenderTest < ActionDispatch::IntegrationTest
     { title: "Admin", admin: true, header: true, links: [{ label: "Errors", href: "/up", emoji: "*" }] }
   ].freeze
 
-  setup { @prior = [Studio.sidebar_sections, Studio.sidebar_geo_signpost] }
-  teardown { Studio.sidebar_sections, Studio.sidebar_geo_signpost = @prior }
+  setup { @prior = [Studio.sidebar_sections, Studio.sidebar_geo_signpost, Studio.sidebar_style] }
+  teardown { Studio.sidebar_sections, Studio.sidebar_geo_signpost, Studio.sidebar_style = @prior }
+
+  test "the panel style defaults to the drawer, and the real writer validates" do
+    assert_equal :default, Studio.sidebar_style
+    Studio.sidebar_style = "glass"
+    assert_equal :glass, Studio.sidebar_style
+    assert_raises(ArgumentError) { Studio.sidebar_style = :frosted }
+    assert_equal :glass, Studio.sidebar_style, "a refused value leaves the setting alone"
+  end
+
+  test "a glass panel reaches a real page with the helper the host never wired" do
+    Studio.sidebar_sections = [{ title: "Admin", header: true, links: [{ label: "Errors", href: "/up", emoji: "*", icon: "activity" }] }]
+    Studio.sidebar_style = :glass
+    page = Nokogiri::HTML5(NavbarRenderHost.render_navbar(signed_in: true, admin: true))
+
+    refute_nil page.at_css("#studio-link-sidebar[data-sidebar-glass] > [data-sidebar-glass-shell]")
+    refute_nil page.at_css('#studio-link-sidebar nav a[href="/up"] [data-sidebar-row-icon] svg')
+    refute_nil page.at_css('#studio-link-sidebar a[href="/logout"] svg')
+  end
 
   test "a host's header: true reaches the panel, and only for the sections that opted in" do
     Studio.sidebar_sections = DECLARED
