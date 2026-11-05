@@ -6,6 +6,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **The modified-click booking spec no longer waits on a Playwright event that can stay silent.**
+  `e2e/booking_frame.spec.js` timed out on two `accepted` runs because Playwright 1.62.1 sometimes
+  never fires its `page` event for a tab Chromium did open. The spec now reads the new tab from
+  Chromium's target list. It still needs one new tab at the booking URL, no dialog, and the first
+  page unmoved. No host change: a modified click on a booking link always opened its tab.
+
 - **Firefox runs the shared head's import map.** The head's two URL module tags (`studio/alpine`,
   `studio/sticky_table_header`) sent a `Link: rel=modulepreload` response header, and Firefox then
   refused the import map: every bare `studio/*` import failed and no panel opened, on every host
