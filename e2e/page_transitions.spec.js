@@ -90,36 +90,51 @@ function expectPlayed(names, oldName, newName) {
   expect(names).toContain(`::view-transition-new(root) ${newName}`);
 }
 
-for (const [direction, out, slideIn, unfoldIn] of [
-  ["left", "pt-out-left", "pt-in-from-right", "pt-unfold-right"],
-  ["right", "pt-out-right", "pt-in-from-left", "pt-unfold-left"],
-  ["top", "pt-out-top", "pt-in-from-bottom", "pt-unfold-bottom"],
-  ["bottom", "pt-out-bottom", "pt-in-from-top", "pt-unfold-top"],
-]) {
-  test(`${direction} with no style plays the slide, on every visit`, async ({ page }) => {
-    const errors = watchPageErrors(page);
-    await open(page, `direction=${direction}`);
-    for (let visit = 0; visit < 3; visit += 1) {
-      await page.evaluate(() => { window.__seen.length = 0; });
-      await go(page);
-      const names = await seen(page);
-      expectPlayed(names, out, slideIn);
-      expect(names).not.toContain(`::view-transition-new(root) ${unfoldIn}`);
-    }
-    expect(errors).toEqual([]);
-  });
-
-  test(`${direction} with style=unfold plays the unfold, on every visit`, async ({ page }) => {
-    await open(page, `direction=${direction}&style=unfold`);
-    for (let visit = 0; visit < 3; visit += 1) {
-      await page.evaluate(() => { window.__seen.length = 0; });
-      await go(page);
-      const names = await seen(page);
-      expectPlayed(names, out, unfoldIn);
-      expect(names).not.toContain(`::view-transition-new(root) ${slideIn}`);
-    }
-  });
+// The move on three visits in a row: one setting, one move, and no draw.
+async function expectTheOneMove(page, query, out, plays, never) {
+  await open(page, query);
+  for (let visit = 0; visit < 3; visit += 1) {
+    await page.evaluate(() => { window.__seen.length = 0; });
+    await go(page);
+    const names = await seen(page);
+    expectPlayed(names, out, plays);
+    expect(names).not.toContain(`::view-transition-new(root) ${never}`);
+  }
 }
+
+test("left with no style plays the slide, on every visit", async ({ page }) => {
+  const errors = watchPageErrors(page);
+  await expectTheOneMove(page, "direction=left", "pt-out-left", "pt-in-from-right", "pt-unfold-right");
+  expect(errors).toEqual([]);
+});
+
+test("left with style=unfold plays the unfold, on every visit", async ({ page }) => {
+  await expectTheOneMove(page, "direction=left&style=unfold", "pt-out-left", "pt-unfold-right", "pt-in-from-right");
+});
+
+test("right with no style plays the slide, on every visit", async ({ page }) => {
+  await expectTheOneMove(page, "direction=right", "pt-out-right", "pt-in-from-left", "pt-unfold-left");
+});
+
+test("right with style=unfold plays the unfold, on every visit", async ({ page }) => {
+  await expectTheOneMove(page, "direction=right&style=unfold", "pt-out-right", "pt-unfold-left", "pt-in-from-left");
+});
+
+test("top with no style plays the slide, on every visit", async ({ page }) => {
+  await expectTheOneMove(page, "direction=top", "pt-out-top", "pt-in-from-bottom", "pt-unfold-bottom");
+});
+
+test("top with style=unfold plays the unfold, on every visit", async ({ page }) => {
+  await expectTheOneMove(page, "direction=top&style=unfold", "pt-out-top", "pt-unfold-bottom", "pt-in-from-bottom");
+});
+
+test("bottom with no style plays the slide, on every visit", async ({ page }) => {
+  await expectTheOneMove(page, "direction=bottom", "pt-out-bottom", "pt-in-from-top", "pt-unfold-top");
+});
+
+test("bottom with style=unfold plays the unfold, on every visit", async ({ page }) => {
+  await expectTheOneMove(page, "direction=bottom&style=unfold", "pt-out-bottom", "pt-unfold-top", "pt-in-from-top");
+});
 
 // Stops the motion at its midpoint and reads what the browser computed.
 async function pausedMidway(page) {
@@ -174,30 +189,44 @@ async function setTheme(page, theme) {
   await page.evaluate((dark) => { document.documentElement.classList.toggle("dark", dark); }, theme === "dark");
 }
 
-for (const theme of ["dark", "light"]) {
-  test(`a slide stays opaque over the page color, ${theme} theme`, async ({ page }) => {
-    await open(page, "direction=left");
-    await setTheme(page, theme);
-    await pausedMidway(page);
-    const midway = await readMidway(page);
-    expect(midway.oldOpacity).toBe("1");
-    expect(midway.newOpacity).toBe("1");
-    expect(midway.backdrop).toBe(midway.page);
-    const painted = await shares(page, await page.screenshot(), midway.page);
-    expect(painted.same, "blank page reads as the page color mid-move").toBeGreaterThan(0.5);
-    expect(painted.black).toBeLessThan(0.01);
-  });
-
-  test(`an unfold has the page color behind it, ${theme} theme`, async ({ page }) => {
-    await open(page, "direction=right&style=unfold");
-    await setTheme(page, theme);
-    await pausedMidway(page);
-    const midway = await readMidway(page);
-    expect(midway.backdrop).toBe(midway.page);
-    const painted = await shares(page, await page.screenshot(), midway.page);
-    expect(painted.black, "no black wedge").toBeLessThan(0.01);
-  });
+async function expectOpaqueSlide(page, theme) {
+  await open(page, "direction=left");
+  await setTheme(page, theme);
+  await pausedMidway(page);
+  const midway = await readMidway(page);
+  expect(midway.oldOpacity).toBe("1");
+  expect(midway.newOpacity).toBe("1");
+  expect(midway.backdrop).toBe(midway.page);
+  const painted = await shares(page, await page.screenshot(), midway.page);
+  expect(painted.same, "blank page reads as the page color mid-move").toBeGreaterThan(0.5);
+  expect(painted.black).toBeLessThan(0.01);
 }
+
+async function expectUnfoldOverPageColor(page, theme) {
+  await open(page, "direction=right&style=unfold");
+  await setTheme(page, theme);
+  await pausedMidway(page);
+  const midway = await readMidway(page);
+  expect(midway.backdrop).toBe(midway.page);
+  const painted = await shares(page, await page.screenshot(), midway.page);
+  expect(painted.black, "no black wedge").toBeLessThan(0.01);
+}
+
+test("a slide stays opaque over the page color, dark theme", async ({ page }) => {
+  await expectOpaqueSlide(page, "dark");
+});
+
+test("a slide stays opaque over the page color, light theme", async ({ page }) => {
+  await expectOpaqueSlide(page, "light");
+});
+
+test("an unfold has the page color behind it, dark theme", async ({ page }) => {
+  await expectUnfoldOverPageColor(page, "dark");
+});
+
+test("an unfold has the page color behind it, light theme", async ({ page }) => {
+  await expectUnfoldOverPageColor(page, "light");
+});
 
 // Stops the motion partway and compares pixels: chrome that moved with the page differs.
 async function expectChromeHoldsStill(page) {
