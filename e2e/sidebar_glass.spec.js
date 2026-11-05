@@ -85,9 +85,13 @@ test("the current row shows a focus ring beside its glow, in both themes", async
   await page.setViewportSize({ width: 1280, height: 800 });
   await openGlass(page);
   const current = panel(page).locator('a[aria-current="page"]');
-  const ring = /rgb\(255, 255, 255\) 0px 0px 0px 2px inset/;
+  const read = () => current.evaluate((el) => {
+    const css = getComputedStyle(el);
+    return { ring: `${css.outlineStyle} ${css.outlineWidth} ${css.outlineColor} ${css.outlineOffset}`, glow: css.boxShadow.includes("0px 4px 14px") };
+  });
+  const ringed = { ring: "solid 2px rgb(255, 255, 255) -4px", glow: true };
 
-  await expect(current).not.toHaveCSS("box-shadow", ring);
+  expect((await read()).ring).not.toBe(ringed.ring);
   for (let presses = 0; presses < 20; presses += 1) {
     await page.keyboard.press("Tab");
     if (await current.evaluate((el) => el === document.activeElement)) break;
@@ -96,13 +100,12 @@ test("the current row shows a focus ring beside its glow, in both themes", async
 
   for (const dark of [true, false]) {
     await page.evaluate((on) => document.documentElement.classList.toggle("dark", on), dark);
-    await expect(current).toHaveCSS("box-shadow", ring);
-    expect(await current.evaluate((el) => getComputedStyle(el).boxShadow)).toContain("0px 4px 14px");
+    await expect.poll(read).toEqual(ringed);
   }
 
   await page.keyboard.press("Tab");
-  await expect(current).not.toHaveCSS("box-shadow", ring);
-  expect(await current.evaluate((el) => getComputedStyle(el).boxShadow)).toContain("0px 4px 14px");
+  await expect.poll(async () => (await read()).ring).not.toBe(ringed.ring);
+  expect((await read()).glow).toBe(true);
 });
 
 test("the less-transparency setting keeps the solid fill and no blur, in both themes", async ({ page, context }) => {

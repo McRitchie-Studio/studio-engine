@@ -1286,9 +1286,12 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       box-shadow: 0 4px 14px rgb(var(--color-primary-rgb) / 0.4);
       color: #fff;
     }
-    /* The glow above outranks the row's focus ring, and a box-shadow is all that ring is. */
+    /* The glow above outranks the row's focus ring, which is a box-shadow. This ring is an
+       outline set inside the edge, so the row's own fill shows on both sides of it: at the
+       edge, white would melt into the light theme's panel. */
     [data-sidebar-glass-shell] nav > [role="group"] > a[aria-current="page"]:focus-visible {
-      box-shadow: inset 0 0 0 2px #fff, 0 4px 14px rgb(var(--color-primary-rgb) / 0.4);
+      outline: 2px solid #fff;
+      outline-offset: -4px;
     }
     [data-sidebar-glass-shell] a[aria-current="page"] [data-sidebar-row-desc] { color: rgb(255 255 255 / 0.9); }
     [data-sidebar-glass-shell] nav > [role="group"] > a + a { margin-top: var(--glass-row-gap); }
