@@ -456,10 +456,22 @@ class StylePageTest < ActiveSupport::TestCase
     assert_includes snippet, "<button class=\"btn btn-primary\">", "the code wraps a button"
   end
 
+  # The groups this board writes itself; Glass, Scrims and Site footer are partials
+  # with their own copy.
   test "the section copy stays short" do
     doc = Nokogiri::HTML.fragment(render_index)
-    doc.css("section#tricks > section > div.space-y-1 > p, section#tricks > div.space-y-1 > p").each do |para|
-      assert_operator para.text.split.size, :<=, 20, "too long for this board: #{para.text.strip.inspect}"
+    own = ["Tricks", "Buttons", "Button tricks", "Page header", "Surfaces, text & form",
+           "Time stamps — the “at” format", "Branded loader", "Motion primitives", "Effects", "Leveling"]
+    own.each do |title|
+      heading = doc.css("section#tricks h2, section#tricks h3").find { |h| h.text.strip == title }
+      assert heading, "no #{title.inspect} group"
+      header = heading.ancestors("div.space-y-1").first
+      paragraphs = header.css("> p")
+      assert_operator paragraphs.size, :<=, 1, "#{title}: one paragraph at most"
+      next if paragraphs.empty?
+
+      assert_operator paragraphs.first.text.split.size, :<=, 18,
+        "#{title}: too long for this board: #{paragraphs.first.text.strip.inspect}"
     end
   end
 

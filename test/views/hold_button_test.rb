@@ -251,6 +251,51 @@ class HoldButtonTest < ActiveSupport::TestCase
 
   private
 
+  # ── Fizz around any button ─────────
+
+  test "fizz renders around a plain button with neutral names and no hold" do
+    doc = render_fizz(seed: "save")
+    stack = doc.at_css(".fizz-stack.fizz-lively")
+
+    assert stack, "lively is the default level"
+    assert stack.at_css("> button.btn"), "the button sits in the stack"
+    assert_equal 2, stack.css("> .fizz-layer").size, "both layers, as the button's siblings"
+    assert stack.at_css("> .fizz-layer-extra"), "the hover layer is marked"
+    assert_equal "true", stack.at_css("> .fizz-layer")["aria-hidden"], "decoration only"
+    assert_equal Studio::FizzHelper::ZONES * 10, stack.css(".fizz-bit").size
+    assert_nil stack.at_css("button .fizz-bit"), "no bubble may live inside the button"
+    assert_nil doc.at_css(".hold-stack, .hold-fizz, .hold-fizz-extra, .hold-btn"), "nothing hold-named"
+    refute stack.key?("data-studio-controller"), "and no hold controller"
+  end
+
+  test "fizz takes the same levels and palette as the hold button" do
+    calm = render_fizz(seed: "save", level: :calm)
+    assert_nil calm.at_css(".fizz-lively"), "calm drops the modifier"
+    assert_nil calm.at_css(".fizz-layer-extra"), "and the hover layer with it"
+    assert_equal Studio::FizzHelper::ZONES * 5, calm.css(".fizz-bit").size
+
+    colored = render_fizz(seed: "save", colors: %w[#ff0000 #00ff00])
+    assert_equal "--fizz-c-1:#ff0000;--fizz-c-2:#00ff00", colored.at_css(".fizz-stack")["style"]
+    assert_nil render_fizz(seed: "save").at_css(".fizz-stack")["style"], "no palette, no style attribute"
+  end
+
+  test "the hold button keeps every old fizz class" do
+    html = render_button(hold_id: "desktop").to_html
+    assert_includes html, %(class="hold-fizz")
+    assert_includes html, %(class="hold-fizz hold-fizz-extra")
+    refute_includes html, "fizz-layer", "the neutral names are only for the neutral stack"
+    refute_includes html, "fizz-stack"
+  end
+
+  def render_fizz(**locals)
+    view = ActionView::Base.with_empty_template_cache.with_view_paths(
+      [ File.join(ENGINE_ROOT, "app/views") ]
+    )
+    view.extend(Studio::FizzHelper)
+    html = view.render(layout: "studio/fizz", locals: locals) { %(<button class="btn btn-primary">Save</button>).html_safe }
+    Nokogiri::HTML::DocumentFragment.parse(html.to_s)
+  end
+
   def render_button(**locals)
     view = ActionView::Base.with_empty_template_cache.with_view_paths(
       [ File.join(ENGINE_ROOT, "app/views") ]

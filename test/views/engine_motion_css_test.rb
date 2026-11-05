@@ -269,7 +269,7 @@ class EngineMotionCssTest < Minitest::Test
   # one per wedge. The default aliases the first color, which is what keeps every
   # existing one-color consumer rendering exactly as before.
   def test_selection_glow_second_wedge_takes_its_own_color
-    assert_match(/--studio-corner-glow-color-b:\s*var\(--studio-corner-glow-color\)/, css,
+    assert_match(/--studio-corner-glow-color-b:\s*var\(--studio-team-glow-color-b, var\(--studio-corner-glow-color\)\)/, css,
       "--studio-corner-glow-color-b must default to the first color (no change for one-color callers)")
 
     wedges = rule_body(WEDGES)
