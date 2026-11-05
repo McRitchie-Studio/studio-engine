@@ -185,32 +185,36 @@ test("the whole survey by keyboard reaches the thank-you screen", async ({ page 
 
 // The race behind a flake of the test above. A save still in flight when the form
 // submits could reach the server after the POST completed the survey, and its 409
-// then reached the page. The route holds the PATCH until the POST has answered, and
-// holds the thank-you page until the PATCH has settled, so the page is still there
-// to hear it. No timing is involved. RED with the abort removed from survey.js.
+// then reached the page. The routes run the POST on the server, release the PATCH,
+// and hand the page its redirect only once the PATCH has settled, so the page is
+// still there to hear it. No timing is involved. The redirect is what is held,
+// because a route never sees the GET that follows one.
+// RED with the abort removed from survey.js.
 test("a save in flight at submit is cancelled, and no 409 reaches the page", async ({ page }) => {
   const errors = watchPageErrors(page);
   const statuses = [];
-  let postAnswered;
+  let postCompleted;
   let patchSettled;
-  const untilPostAnswered = new Promise((resolve) => { postAnswered = resolve; });
+  const untilPostCompleted = new Promise((resolve) => { postCompleted = resolve; });
   const untilPatchSettled = new Promise((resolve) => { patchSettled = resolve; });
   const isPatch = (request) => request.url().endsWith("/answers/one_word");
+  const statusTexts = [];
 
   page.on("response", (r) => {
-    if (r.request().method() === "POST" && r.url().endsWith(SURVEY)) postAnswered();
     if (isPatch(r.request())) { statuses.push(r.status()); patchSettled(); }
   });
   page.on("requestfailed", (request) => { if (isPatch(request)) patchSettled(); });
   await page.route("**/answers/one_word", async (route) => {
-    await untilPostAnswered;
+    await untilPostCompleted;
     await route.continue().catch(() => {}); // the page cancelled it, as it should
   });
-  let statusWhileLeaving;
-  await page.route("**/thanks", async (route) => {
+  await page.route(`**${SURVEY}`, async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    const answer = await route.fetch({ maxRedirects: 0 });
+    expect(answer.status()).toBe(303);
+    postCompleted();
     await untilPatchSettled;
-    statusWhileLeaving = await page.locator("[data-survey-status]").textContent();
-    await route.continue();
+    await route.fulfill({ response: answer });
   });
 
   await start(page);
@@ -221,11 +225,16 @@ test("a save in flight at submit is cancelled, and no 409 reaches the page", asy
   await expect(activeStep(page)).toHaveAttribute("data-key", "one_word");
   await page.locator("[data-key=one_word] input").fill("Tense");
   await keyTo(page, "Enter", "anything_else");
+  // Heard as it is written: a locator waits out the pending navigation.
+  await page.exposeFunction("noteSurveyStatus", (text) => statusTexts.push(text));
+  await page.locator("[data-survey-status]").evaluate((el) => {
+    new MutationObserver(() => window.noteSurveyStatus(el.textContent)).observe(el, { childList: true });
+  });
   await page.keyboard.press("Control+Enter");
 
   await expect(page).toHaveURL(/\/surveys\/first-game\/thanks$/);
   expect(statuses).toEqual([]);
-  expect(statusWhileLeaving).not.toContain("Offline");
+  expect(statusTexts.join(" ")).not.toContain("Offline");
   expect(errors).toEqual([]);
 });
 
