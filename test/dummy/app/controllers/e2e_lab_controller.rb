@@ -854,7 +854,7 @@ class E2eLabController < ActionController::Base
   # This page's own knobs, for this request alone. `sidebar` draws groups enough to
   # show what separates them, the admin one for an admin only, and two links with a
   # desc: for the hover, one too long for its line. `signed_in` and `admin` choose the panel's title;
-  # `long_name` is the name that must truncate.
+  # `long_name` is the name that must truncate. `headers` swaps in LAB_SIDEBAR_HEADER_SECTIONS.
   LAB_SIDEBAR_PANEL_SECTIONS = (LAB_SIDEBAR_SECTIONS + [
     { title: "Help", links: [
       { label: "Terms", href: "/site_footer/terms", emoji: "📜", desc: "What you agree to" },
@@ -864,8 +864,22 @@ class E2eLabController < ActionController::Base
     { title: "Ops", admin: true, links: [{ label: "Errors", href: "/up", emoji: "🚨" }] }
   ]).freeze
 
+  # A section's opt-in header (header: true) beside a section that keeps the default, in
+  # one panel. My Apps and Admin show a word; Help does not. My Apps carries a desc: so
+  # the hover can be read under a header.
+  LAB_SIDEBAR_HEADER_SECTIONS = [
+    { title: "My Apps", header: true, links: [
+      { label: "Home", href: "/", emoji: "🏠" },
+      { label: "Terms", href: "/site_footer/terms", emoji: "📜", desc: "What you agree to" }
+    ] },
+    { title: "Help", links: [{ label: "Docs", href: "/up", emoji: "📚", hover_emoji: "🔎" }] },
+    { title: "Admin", admin: true, header: true, links: [{ label: "Errors", href: "/up", emoji: "🚨" }] }
+  ].freeze
+
   private def sidebar_panels_viewer
-    @lab_sidebar_sections = LAB_SIDEBAR_PANEL_SECTIONS if params[:sidebar].present?
+    if params[:sidebar].present?
+      @lab_sidebar_sections = params[:headers].present? ? LAB_SIDEBAR_HEADER_SECTIONS : LAB_SIDEBAR_PANEL_SECTIONS
+    end
     @lab_admin = params[:admin].present?
     return unless params[:signed_in].present? || params[:long_name].present?
 

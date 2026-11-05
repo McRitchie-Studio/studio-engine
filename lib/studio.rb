@@ -259,6 +259,11 @@ module Studio
   #   end
   mattr_accessor :sidebar_sections, default: []
 
+  # Whether the link sidebar draws its own Geo row for an admin. Default true. False
+  # takes the row out of this panel only: components/_geo_signpost stays, so a host
+  # that moves Geo elsewhere renders the partial on that page.
+  mattr_accessor :sidebar_geo_signpost, default: true
+
   # ---- Navbar links ----
   # Links for the engine navbar's desktop bar and phone row. The default []
   # renders nothing, so the navbar stays byte-identical until an app opts in.

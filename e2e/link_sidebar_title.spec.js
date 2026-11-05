@@ -9,7 +9,9 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 // (the groups spec, 46.5 against 44); description in flow (the no-shift spec, row 44 to 60,
 // next row +16); 60ms delay or no transition (the fade spec); hover out of its media query
 // (the touch spec); focus rules dropped (the keyboard and tap specs); no reduced-motion block
-// (that spec); no truncate (the long-name spec).
+// (that spec); no truncate (the long-name spec). A section's opt-in header: pt-3 moved onto a
+// row or no label-upper (the groups spec); the header put in flow inside a row (the groups
+// spec, and the no-shift spec's second pass reads the rows under a header).
 
 const panel = (page) => page.locator("#studio-link-sidebar");
 const phonePanel = (page) => page.locator("#studio-link-sidebar-mobile");
@@ -91,6 +93,7 @@ const openPanel = async (page, query = "sidebar=1&signed_in=1&admin=1") => {
   await page.waitForTimeout(350); // the 300ms slide, or the boxes read off-canvas
 };
 
+const HEADERS = "sidebar=1&headers=1&signed_in=1&admin=1";
 const ROWS = "a, [data-test='geo-signpost-disabled']";
 const TERMS = 'nav a[href="/site_footer/terms"]';
 const opacityOf = (locator) => locator.evaluate((node) => Number(getComputedStyle(node).opacity));
@@ -138,10 +141,42 @@ test("groups show no label word, a divider separates them, and every kind of row
   expect(await measure('nav a[href="/up"]'), "a swap against a plain emoji").toEqual(plain);
   expect(await measure(TERMS), "a desc: against a plain emoji").toEqual(plain);
   expect(await measure("[data-test='geo-signpost-disabled']"), "the Geo row against a plain emoji").toEqual(plain);
+
+  // A section that opts in with header: true: the word shows, small and above its rows,
+  // and the rows under it are the rows of a group with no word.
+  await openPanel(page, HEADERS);
+  const headers = panel(page).locator("[data-sidebar-group-header]");
+  await expect(headers).toHaveCount(2);
+  expect(await headers.allInnerTexts()).toEqual(["MY APPS", "ADMIN"]);
+  expect(await panel(page).locator('nav > [role="group"][aria-label="You"] [data-sidebar-group-header]').count(), "the engine's You stays wordless").toBe(0);
+  const label = await headers.first().evaluate((node) => {
+    const style = getComputedStyle(node);
+    const rowTop = node.nextElementSibling.getBoundingClientRect().top;
+    return {
+      size: style.fontSize,
+      weight: style.fontWeight,
+      transform: style.textTransform,
+      hidden: node.getAttribute("aria-hidden"),
+      bottomToRow: rowTop - node.getBoundingClientRect().bottom
+    };
+  });
+  expect(label).toEqual({ size: "12px", weight: "700", transform: "uppercase", hidden: "true", bottomToRow: 0 });
+  expect(await measure('nav a[href="/"]'), "a row under a header against a plain emoji").toEqual(plain);
+  expect(await measure(TERMS), "a desc: under a header against a plain emoji").toEqual(plain);
+  const divided = await panel(page).locator('nav > [role="group"]').evaluateAll((nodes) =>
+    nodes.map((node) => [node.getAttribute("aria-label"), getComputedStyle(node).borderTopWidth])
+  );
+  expect(divided.slice(0, 4)).toEqual([["You", "0px"], ["My Apps", "1px"], ["Help", "1px"], ["Admin", "1px"]]);
+
+  // It is no click target: a click on the word navigates nowhere and leaves the panel open.
+  const before = page.url();
+  await headers.first().click();
+  expect(page.url()).toBe(before);
+  await expect(panel(page)).toBeVisible();
 });
 
-test("hover moves nothing: every row's top and height, in every frame of the fade", async ({ page }) => {
-  await openPanel(page);
+const hoverMovesNothing = async (page, query) => {
+  await openPanel(page, query);
   const row = panel(page).locator(TERMS);
   const rest = await layoutOf(panel(page));
   expect(await opacityOf(descOf(row)), "hidden at rest").toBe(0);
@@ -173,6 +208,11 @@ test("hover moves nothing: every row's top and height, in every frame of the fad
 
   expect(frames.length, "frames sampled through the fade in and out").toBeGreaterThan(5);
   for (const frame of frames) expect(frame).toEqual(rest);
+};
+
+test("hover moves nothing: every row's top and height, in every frame of the fade", async ({ page }) => {
+  await hoverMovesNothing(page, undefined);
+  await hoverMovesNothing(page, HEADERS);
 });
 
 test("the description sits inside the row, under the lifted label, and truncates to one line", async ({ page }) => {

@@ -7,7 +7,7 @@ const { blockOffsiteRequests } = require("./helpers");
 //
 // CONTROLS, each red for its reason: no backdrop-filter (first two specs, the strip beside
 // the panel reads the same with the band off); the band as wide as the page (first spec, the
-// far strip differs); margin-right: 1px (first spec, the band stops short); pointer-events: auto (click spec, the panel stays open); the media
+// far strip differs); the old 40px width (first spec, the reach strip stays sharp); margin-right: 1px (first spec, the band stops short); pointer-events: auto (click spec, the panel stays open); the media
 // query dropped (phone spec, the band has content).
 
 const BUSY = "/lab/sidebar_panels?sidebar=1&busy=1";
@@ -51,7 +51,8 @@ test("the band blurs the page beside the panel and leaves the page beyond it sha
   await page.waitForTimeout(350); // the 300ms slide
   const { x: left } = await panel(page).boundingBox();
   const beside = { x: left - 24, y: 200, width: 22, height: 300 };
-  const beyond = { x: left - 120, y: 200, width: 60, height: 300 };
+  const reach = { x: left - 90, y: 200, width: 40, height: 300 };
+  const beyond = { x: left - 170, y: 200, width: 60, height: 300 };
 
   // The band's right edge runs over the panel's border, so no lit line stands beside the blur.
   const edge = await panel(page).evaluate((node) => {
@@ -64,6 +65,7 @@ test("the band blurs the page beside the panel and leaves the page beyond it sha
   for (const theme of ["dark", "light"]) {
     if (theme === "light") await page.evaluate(() => document.documentElement.classList.remove("dark"));
     expect(await stripsDiffer(page, beside), `${theme}: blurred beside the panel`).toBe(true);
+    expect(await stripsDiffer(page, reach), `${theme}: the blur reaches far from the panel`).toBe(true);
     expect(await stripsDiffer(page, beyond), `${theme}: sharp beyond the band`).toBe(false);
   }
 });
@@ -79,11 +81,12 @@ test("the band moves with the panel through the slide", async ({ page }) => {
     while (!node.getAnimations().length) await new Promise(requestAnimationFrame);
     const slide = node.getAnimations()[0];
     slide.pause();
-    slide.currentTime = 30000;
+    slide.currentTime = 15000;
     await new Promise(requestAnimationFrame);
     return node.getBoundingClientRect().left;
   });
-  expect(left, "the panel is far enough from home to tell the two places apart").toBeGreaterThan(1000);
+  // The band is 100px wide, so it must clear the strip at home: 958 + 100.
+  expect(left, "the panel is far enough from home to tell the two places apart").toBeGreaterThan(1060);
   expect(left).toBeLessThan(1270);
 
   const beside = { x: left - 24, y: 200, width: 22, height: 300 };

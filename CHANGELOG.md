@@ -25,6 +25,18 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   - A key held on the talk button no longer dismisses the refused-microphone help.
   - The composer's picker scrolls within a short window, so the chip stays on screen.
   - Firefox's `AbortError` reads as a busy microphone, and Esc in the open picker stops there.
+### Added
+
+- **Link sidebar: a section may show its header.** A section in `Studio.sidebar_sections` with
+  `header: true` shows its title above its rows, in the `label-upper` style. The default stays no
+  header, so an app changes only when it opts in. The divider stays, and there is no ADMIN chip.
+  The group keeps its accessible name and the word on screen is `aria-hidden`, so a screen reader
+  announces the title once. The header is plain text outside the rows: it takes no click, and a
+  row keeps its height, its centering and its no-jump description. A section with a blank title
+  draws no header. The engine lab shows the case at `/lab/sidebar_panels?sidebar=1&headers=1`.
+- **`Studio.sidebar_geo_signpost`: a host may take the Geo row out of the link sidebar.** It
+  defaults to true, so no app changes. False draws no Geo row in the panel. The partial
+  `components/_geo_signpost` stays, so a host that moves Geo renders it on its own page.
 
 ### Changed
 
@@ -35,6 +47,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **`CHANGELOG.md` merges with `merge=union`,** so parallel PRs stop conflicting on it. A branch
   forked before a roll can land an entry under the rolled heading: `docs/RELEASE.md`, *Rolling
   `Unreleased` into a version*, says how to read and fix that.
+- **Link sidebar: the blurred edge reaches further and fades with no visible end.** The band is
+  100px wide, up from 40px, with the same 6px blur. Its mask is now an eased multi-stop gradient:
+  whole at the panel, half at 60px, clear at 100px, flat at both ends. The old hold and straight
+  fade showed as a line over a photo. It stays flush with the panel, takes no clicks, and draws
+  nothing below `md`. The engine lab shows it over the hub's Denver photo at
+  `/lab/sidebar_panels?sidebar=1&busy=photo`.
 
 ## 0.127.0 — 2026-11-04
 

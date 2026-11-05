@@ -50,11 +50,13 @@ If your app doesn't create its own `app/views/layouts/_navbar.html.erb`, the eng
   cog glyph, and two gears side by side read as a duplicate. The panel's title
   is the viewer's name (`Studio.navbar_user_name`), or a greeting by the
   browser's local time when signed out. A section's `title` is its group's
-  accessible name, not a visible label: a divider separates the groups. A row
+  accessible name, not a visible label, and a divider separates the groups; a
+  section with `header: true` also shows its title above its rows. A row
   is one line at rest. A link's optional `desc:` fades in on hover or keyboard
   focus and moves nothing; a touch screen does not show it, so keep it extra.
-  From `md` up, the link sidebar's inner edge blurs the page behind it in a 40px
+  From `md` up, the link sidebar's inner edge blurs the page behind it in a 100px
   band (`edge: true` on `components/_sidebar_panel`; engine.css, THE SIDEBAR'S EDGE).
+  An admin's panel ends with a Geo row; `Studio.sidebar_geo_signpost = false` takes it out.
 
 ## How to Override
 

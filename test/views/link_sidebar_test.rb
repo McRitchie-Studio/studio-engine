@@ -9,7 +9,8 @@ require "nokogiri"
 # dual desktop/mobile panels driven by the `sidebars` Alpine store, the anchor
 # for the link-sidebar controller (the store flag and the click handlers are
 # studio/link_sidebar), the panel's title and name, section/link rendering (groups
-# with no label word, one line a row at rest, emoji swap), and the trigger's aria wiring.
+# with no label word unless a section opts in to a header, one line a row at rest, emoji
+# swap), and the trigger's aria wiring.
 class LinkSidebarTest < Minitest::Test
   SECTIONS = [
     { title: "Site", links: [
@@ -53,7 +54,7 @@ class LinkSidebarTest < Minitest::Test
 
   # --- no label word, and the groups stay apart ------------------------------
 
-  def test_no_section_shows_a_label_word_at_any_level
+  def test_no_section_shows_a_label_word_by_default
     [[true, SECTIONS], [false, [SECTIONS.first]]].each do |admin, sections|
       doc = Nokogiri::HTML5.fragment(render_sidebar(sections: sections, admin: admin))
 
@@ -69,6 +70,119 @@ class LinkSidebarTest < Minitest::Test
 
     names = doc.css('#studio-link-sidebar nav > [role="group"]').map { |group| group["aria-label"] }
     assert_equal ["Site", "Ops, admin", "Geo, admin"], names
+  end
+
+  # --- the opt-in header ------------------------------------------------------
+
+  def headed_sections
+    [
+      { title: "My Apps", header: true, links: [{ label: "Home", href: "/", emoji: "*" }] },
+      { title: "Help", links: [{ label: "Docs", href: "/docs", emoji: "*" }] },
+      { title: "Admin", admin: true, header: true, links: [{ label: "Errors", href: "/up", emoji: "*" }] }
+    ]
+  end
+
+  def groups_in(doc, panel = "#studio-link-sidebar")
+    doc.css(%(#{panel} nav > [role="group"]))
+  end
+
+  def test_a_section_with_header_true_shows_its_title_above_its_rows
+    groups = groups_in(Nokogiri::HTML5.fragment(render_sidebar(sections: headed_sections, admin: true)))
+    header = groups[0].element_children.first
+
+    assert_equal "My Apps", header.text
+    assert_includes header["class"].split, "label-upper"
+    assert_includes header["class"].split, "truncate", "a long title stays on one line"
+    assert_equal "a", groups[0].element_children[1].name, "the rows follow the header"
+    assert_equal "Admin", groups[2].element_children.first.text
+  end
+
+  def test_a_section_with_no_header_key_or_header_false_shows_no_word
+    sections = headed_sections + [{ title: "Off", header: false, links: [{ label: "Off", href: "/off", emoji: "*" }] }]
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: sections, admin: true))
+    groups = groups_in(doc)
+
+    assert_empty groups[1].css("[data-sidebar-group-header]")
+    assert_empty groups[3].css("[data-sidebar-group-header]")
+    refute_includes groups[1].text, "Help"
+    assert_equal 2, doc.css("#studio-link-sidebar [data-sidebar-group-header]").size
+  end
+
+  def test_a_declared_string_key_header_opts_in_too
+    sections = [{ "title" => "My Apps", "header" => true, "links" => [{ "label" => "Home", "href" => "/", "emoji" => "*" }] }]
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: sections, admin: false))
+
+    assert_equal ["My Apps"], doc.css("#studio-link-sidebar [data-sidebar-group-header]").map(&:text)
+  end
+
+  def test_a_header_with_a_blank_title_draws_nothing
+    [nil, "", "  "].each do |title|
+      sections = [{ title: title, header: true, links: [{ label: "Home", href: "/", emoji: "*" }] }]
+      doc = Nokogiri::HTML5.fragment(render_sidebar(sections: sections, admin: false))
+
+      assert_empty doc.css("[data-sidebar-group-header]"), "title #{title.inspect}"
+    end
+  end
+
+  # The group's aria-label names it, so the word on screen stays out of the accessibility
+  # tree: a screen reader says it once. It carries no id, as both panels render this body.
+  def test_a_header_keeps_the_group_name_and_is_not_announced_twice
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: headed_sections, admin: true))
+    headers = doc.css("#studio-link-sidebar [data-sidebar-group-header]")
+
+    assert_equal ["My Apps", "Help", "Admin"], groups_in(doc).first(3).map { |group| group["aria-label"] }
+    assert(headers.all? { |header| header["aria-hidden"] == "true" })
+    assert(headers.none? { |header| header["id"] })
+    assert_nil groups_in(doc).first["aria-labelledby"]
+  end
+
+  def test_a_headed_admin_section_says_admin_in_its_name_and_shows_no_chip
+    sections = [{ title: "Ops", admin: true, header: true, links: [{ label: "Errors", href: "/up", emoji: "*" }] }]
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: sections, admin: true))
+
+    assert_equal "Ops, admin", groups_in(doc).first["aria-label"]
+    assert_equal "Ops", doc.at_css("#studio-link-sidebar [data-sidebar-group-header]").text
+    refute_includes doc.at_css("#studio-link-sidebar nav").text, "ADMIN"
+  end
+
+  def test_a_header_is_not_a_click_target_and_sits_outside_every_row
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: headed_sections, admin: true))
+
+    doc.css("#studio-link-sidebar [data-sidebar-group-header]").each do |header|
+      assert_equal "div", header.name
+      assert_empty header.css("a, button"), "no control inside the header"
+      assert_empty header.ancestors("a, button"), "no control around the header"
+      assert_empty header.attribute_nodes.map(&:name).grep(/\A(@|x-on|href|tabindex|role)/), "no handler or focus stop"
+    end
+  end
+
+  def test_a_header_keeps_the_divider_and_shows_in_both_panels
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: headed_sections, admin: true))
+
+    first, second, third = groups_in(doc).first(3).map { |group| group["class"].split }
+    refute_includes first, "border-t"
+    assert_includes second, "border-t"
+    assert_includes third, "border-t"
+    assert_equal ["My Apps", "Admin"], doc.css("#studio-link-sidebar-mobile [data-sidebar-group-header]").map(&:text)
+  end
+
+  def test_a_title_is_escaped_in_the_header
+    sections = [{ title: "<b>Apps</b>", header: true, links: [{ label: "Home", href: "/", emoji: "*" }] }]
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: sections, admin: false))
+    header = doc.at_css("#studio-link-sidebar [data-sidebar-group-header]")
+
+    assert_equal "<b>Apps</b>", header.text
+    assert_empty header.element_children
+  end
+
+  def test_the_rows_of_a_headed_group_are_the_rows_of_an_unheaded_one
+    links = [{ label: "Home", href: "/", emoji: "*", desc: "Front door" }, { label: "Docs", href: "/docs", emoji: "*" }]
+    rows = [true, false].map do |header|
+      doc = Nokogiri::HTML5.fragment(render_sidebar(sections: [{ title: "Site", header: header, links: links }], admin: false))
+      doc.css("#studio-link-sidebar nav a").map(&:to_html)
+    end
+
+    assert_equal rows[1], rows[0]
   end
 
   # Cyvasse, Industries and Commercial Welding name their admin section "Admin".
@@ -299,6 +413,28 @@ class LinkSidebarTest < Minitest::Test
 
     refute_nil doc.at_css(%(a[href="/admin/geo"])), "a sidebar-chrome app must reach the geo manager"
     assert_includes html, ">Geo<", "and the row must say what it is"
+  end
+
+  def test_the_geo_row_is_on_by_default_and_a_host_may_take_it_out
+    assert_equal true, Studio.sidebar_geo_signpost
+
+    previous = Studio.sidebar_geo_signpost
+    on = render_sidebar(sections: SECTIONS, admin: true, geo_flag: true, geo_routes: true)
+    Studio.sidebar_geo_signpost = false
+    off = render_sidebar(sections: SECTIONS, admin: true, geo_flag: true, geo_routes: true)
+    off_disabled = render_sidebar(sections: SECTIONS, admin: true, geo_flag: false, geo_routes: false)
+
+    assert_equal ["Site", "Ops, admin", "Geo, admin"], group_names(on)
+    assert_equal ["Site", "Ops, admin"], group_names(off), "no Geo group, so no stray divider"
+    assert_includes on, "/admin/geo"
+    refute_includes off, "/admin/geo"
+    refute_includes off_disabled, "geo-signpost-disabled"
+  ensure
+    Studio.sidebar_geo_signpost = previous
+  end
+
+  def group_names(html)
+    Nokogiri::HTML5.fragment(html).css('#studio-link-sidebar nav > [role="group"]').map { |group| group["aria-label"] }
   end
 
   # Signage, not silence, for an app that has not turned geo on — the same

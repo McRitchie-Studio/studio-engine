@@ -122,18 +122,21 @@ test("a link sidebar anchor that arrives after load registers the flag through i
 // moves 0.5px with a font's rounding, and read 0.75px on items-start in Georgia.
 test("a one-line row centers its icon on its label", async ({ page }) => {
   await blockOffsiteRequests(page);
-  await page.goto("/lab/sidebar_panels?sidebar=1");
-  await page.waitForFunction(() => window.Alpine);
-  await trigger(page).click();
-  await expect(panel(page)).toBeVisible();
-  const gap = await panel(page).locator('nav a[href="/up"]').evaluate((row) => {
-    const middle = (el) => {
-      const box = el.getBoundingClientRect();
-      return box.top + box.height / 2;
-    };
-    return Math.abs(middle(row.children[0]) - middle(row.children[1].firstElementChild));
-  });
-  expect(gap).toBeLessThanOrEqual(0.5);
+  // The second query draws the row under a section's opt-in header, which it must not shift.
+  for (const [query, href] of [["sidebar=1", "/up"], ["sidebar=1&headers=1", "/"]]) {
+    await page.goto(`/lab/sidebar_panels?${query}`);
+    await page.waitForFunction(() => window.Alpine);
+    await trigger(page).click();
+    await expect(panel(page)).toBeVisible();
+    const gap = await panel(page).locator(`nav a[href="${href}"]`).evaluate((row) => {
+      const middle = (el) => {
+        const box = el.getBoundingClientRect();
+        return box.top + box.height / 2;
+      };
+      return Math.abs(middle(row.children[0]) - middle(row.children[1].firstElementChild));
+    });
+    expect(gap, query).toBeLessThanOrEqual(0.5);
+  }
 });
 
 test("the sidebar opens and closes when the boot fails to load", async ({ page }) => {
