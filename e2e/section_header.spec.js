@@ -21,12 +21,11 @@ const { watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive } = requ
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
 const LAB = "/lab/section_header";
-const STYLE = "/lab/style_nav";
+const STYLE = "/lab/style_chrome";
 
 const TRANSPARENT = "rgba(0, 0, 0, 0)";
 const header = (page, id) => page.locator(`#${id} > .section-header`);
 const styleRow = (page) => page.locator("nav[aria-label='Style guide sections']");
-const labRow = (page) => page.locator("nav[aria-label='Lab'], div.page-header").first();
 
 async function open(page, url, viewport) {
   await blockOffsiteRequests(page);
@@ -72,7 +71,7 @@ test("the style guide: Style stays, Modals sits directly under it, and Tricks ta
     await expect(tricks).toHaveAttribute("data-stuck", "");
     await expect(modals).not.toHaveAttribute("data-stuck", "");
     expect(Math.abs((await topOf(tricks)) - (await bottomOf(row)))).toBeLessThanOrEqual(1);
-    expect(await page.locator(".section-header[data-stuck]").count()).toBe(1);
+    expect(await page.locator("[data-pin-section][data-stuck]").count()).toBe(1);
     await expect(row.locator("a[aria-current='true']")).toHaveText("Tricks");
 
     const noSideScroll = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
@@ -153,7 +152,7 @@ test("under glass the bar blurs, and the row above it goes square until it leave
     const rowBottom = document.querySelector(".page-header").getBoundingClientRect().bottom;
     window.scrollBy({ top: top - rowBottom - 30, behavior: "instant" });
   });
-  await expect(page.locator(".section-header[data-stuck]")).toHaveCount(0);
+  await expect(page.locator("[data-pin-section][data-stuck]")).toHaveCount(0);
   await expect.poll(() => row.evaluate((el) => getComputedStyle(el).borderBottomLeftRadius)).not.toBe("0px");
 });
 
@@ -172,7 +171,7 @@ test("a table's sticky header sits under the stuck bar, and the stack's bottom i
 
     // Pushed out at the section's end, the bar gives its room back.
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
-    await expect(page.locator(".section-header[data-stuck]")).toHaveCount(0);
+    await expect(page.locator("[data-pin-section][data-stuck]")).toHaveCount(0);
   }
 });
 
@@ -184,7 +183,7 @@ test("headers below the fold do not move the stack, and only one is stuck at a t
 
   await page.evaluate(() => window.scrollTo({ top: 5000, behavior: "instant" }));
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 200))));
-  expect(await page.locator(".section-header[data-stuck]").count()).toBe(1);
+  expect(await page.locator("[data-pin-section][data-stuck]").count()).toBe(1);
   await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--pin-section-h"))).not.toBe("0px");
 });
 

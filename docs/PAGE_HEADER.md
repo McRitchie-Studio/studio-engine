@@ -112,6 +112,8 @@ The rules for the page:
 - **Make it the first direct child of its `<section>`.** It is sticky, and a sticky element
   travels only inside its parent. That parent is what gives the swap, with no scroll script.
   In a wrapper `div` it leaves with the wrapper. Keep an intro paragraph as its next sibling.
+  Put no top padding on the section: the section's top is how the publisher knows the header
+  has left its place.
 - **Stick one level.** One bar shows at a time. Do not nest a section header in a section header.
 - **No `overflow`, `transform` or `backdrop-filter` on an ancestor.** Each of these can
   stop a sticky element or its blur.
@@ -125,10 +127,11 @@ How it behaves:
   square, so no page shows in a notch between the two.
 - **It stays one line.** A long title ends in an ellipsis on the bar, and the whole text stays
   in the heading. The bar is 2.25rem at every width, `--section-header-h`.
-- **On a phone** the same 2.25rem bar is the smaller treatment. Measured at 390x844, with the
-  navbar and the page row, the stack takes 165px. At 320x568 it takes the same 165px.
-- **On a short screen**, under 31rem tall, such as a phone on its side, it stays in the flow
-  and never sticks: the navbar and the page row already take a third of the height.
+- **On a phone** the same 2.25rem bar is the smaller treatment, and the title keeps its size.
+  Measured at 390x844 under the lab's two-row navbar: 86px navbar, 54px row, 36px bar, so 176px,
+  21% of the screen.
+- **On a short screen**, under 36rem tall, such as a small phone or one on its side, it stays
+  in the flow and never sticks: the navbar and the page row already take a quarter of the height.
 - **If the pinned stack does not run**, it stays in the flow. With no publisher, no bar would
   come, and a clear title would lie over the page.
 

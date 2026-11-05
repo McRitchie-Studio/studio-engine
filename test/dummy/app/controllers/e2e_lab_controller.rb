@@ -737,6 +737,12 @@ class E2eLabController < ActionController::Base
     render(template: "style/index")
   end
 
+  # The same guide under the real navbar, as a host draws it: the whole stack.
+  def style_chrome
+    @theme_setting = ThemeSetting.current if ThemeSetting.table_exists?
+    bar_stack_locals
+  end
+
   # studio/_page_header under the real chrome, for what no adopted page shows: a long
   # title and a flex or grid parent. ?title=, ?meta=1, ?right=tabs|actions|none,
   # ?parent=flex|grid. A sibling sits above the row in every parent, as on a real page.

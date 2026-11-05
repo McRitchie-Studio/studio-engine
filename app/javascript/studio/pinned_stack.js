@@ -175,14 +175,16 @@ export function documentIndex(list, el) {
 // frame by frame.
 //
 // rects are { top, bottom, parentTop }, in page order; line is --pin-section-top. A
-// header counts once it has reached the line and is not yet past it. The parent's top
-// is its place in the flow, since it is the section's first child: a header resting
-// exactly on the line, with nothing scrolled, has not left its place and is not stuck.
+// header is stuck once it has left its place in the flow and part of it still shows
+// below the line. Its section's top is that place, since it is the section's first child
+// and the section has no top padding. Not its distance from the line: while the navbar
+// collapses the line moves first and the header's own `top` follows a frame later, so
+// the bar would drop for the whole collapse.
 export function stuckSection(rects, line) {
   var found = -1;
   for (var i = 0; i < rects.length; i++) {
     var r = rects[i];
-    if (r.top <= line + 0.5 && r.bottom > line + 0.5 && r.top - r.parentTop > 0.5) found = i;
+    if (r.top - r.parentTop > 0.5 && r.bottom > line + 0.5) found = i;
   }
   return found;
 }

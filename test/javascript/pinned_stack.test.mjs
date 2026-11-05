@@ -306,17 +306,17 @@ test("a publish is announced only when the stack moved: its bottom, its mode or 
 // Many headers, one layer. A header waiting below the fold must not move the stack,
 // and only the stuck one adds its edge.
 
-test("a header counts once it reaches the line, until it is past it", () => {
-  const at = (top) => stuckSection([{ top, bottom: top + 36, parentTop: top - 500 }], 100)
-  assert.equal(at(400), -1, "below the fold")
-  assert.equal(at(101), -1, "still a pixel short")
-  assert.equal(at(100), 0, "on the line")
-  assert.equal(at(80), 0, "being pushed out: part of it still shows")
-  assert.equal(at(64), -1, "pushed out whole")
+test("a header counts once it leaves its place, until it is past the line", () => {
+  const at = (top, parentTop) => stuckSection([{ top, bottom: top + 36, parentTop }], 100)
+  assert.equal(at(400, 400), -1, "below the fold, in its place")
+  assert.equal(at(100, 100), -1, "resting exactly on the line, in its place")
+  assert.equal(at(100, 60), 0, "held on the line")
+  assert.equal(at(80, 20), 0, "being pushed out: part of it still shows")
+  assert.equal(at(64, 0), -1, "pushed out whole")
 })
 
-test("a header resting on the line has not left its place, so it is not stuck", () => {
-  assert.equal(stuckSection([{ top: 100, bottom: 136, parentTop: 100 }], 100), -1)
+test("a header stays stuck while the line rises ahead of it in a navbar's collapse", () => {
+  assert.equal(stuckSection([{ top: 121, bottom: 157, parentTop: -400 }], 116), 0)
 })
 
 test("of the headers on the page, the one at the line is the stuck one", () => {
@@ -355,32 +355,32 @@ const reading = (sections, options) => {
 }
 
 test("headers waiting below the fold do not move the stack, and publish at height 0", () => {
-  const r = reading([sectionEl(900), sectionEl(2000)])
+  const r = reading([sectionEl(900, 900), sectionEl(2000, 2000)])
   assert.equal(r.bottom, 120)
   assert.deepEqual(r.layers.section, { h: 0, top: 120, bottom: 0 })
 })
 
 test("the stack bottom includes the stuck header", () => {
-  const r = reading([sectionEl(-400), sectionEl(120), sectionEl(900)])
+  const r = reading([sectionEl(-400, -900), sectionEl(120), sectionEl(900, 900)])
   assert.equal(r.bottom, 156)
   assert.deepEqual(r.layers.section, { h: 36, top: 120, bottom: 156 })
 })
 
 test("a header being pushed out gives its room back", () => {
-  const r = reading([sectionEl(100), sectionEl(900)])
+  const r = reading([sectionEl(100), sectionEl(900, 900)])
   assert.equal(r.bottom, 136)
   assert.deepEqual(r.layers.section, { h: 16, top: 120, bottom: 136 })
 })
 
 test("a header the CSS left in the flow never counts", () => {
-  const r = reading([sectionEl(120), sectionEl(900)], { position: "relative" })
+  const r = reading([sectionEl(120), sectionEl(900, 900)], { position: "relative" })
   assert.equal(r.bottom, 120)
   assert.equal(r.layers.section.h, 0)
 })
 
 test("on the scroll timeline the stuck header stacks by height too", () => {
   const options = { attrs: { "data-nav-timeline-on": "" }, style: { "--nav-band": "40px" }, navH: 104 }
-  const r = reading([sectionEl(120), sectionEl(900)], options)
+  const r = reading([sectionEl(120), sectionEl(900, 900)], options)
   // The compact bar 64, the row 56, the bar 36.
   assert.equal(r.bottom, 156)
   assert.deepEqual(r.layers.section, { h: 36, top: 120, bottom: 156 })
@@ -391,7 +391,8 @@ test("the publisher puts the bar on the stuck header alone, and a swap keeps the
   let top = 900
   const first = toggled(sectionEl(0))
   first.getBoundingClientRect = () => ({ top, bottom: top + 36 })
-  const second = toggled(sectionEl(2000))
+  first.parentElement = { getBoundingClientRect: () => ({ top: top === 900 ? 900 : -400 }) }
+  const second = toggled(sectionEl(2000, 2000))
   second.setAttribute("data-stuck", "") // a Turbo snapshot's leftover
   const { doc, win } = withSections([first, second])
   toggled(doc.documentElement)

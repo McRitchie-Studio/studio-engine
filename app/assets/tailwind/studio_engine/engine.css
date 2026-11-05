@@ -379,8 +379,8 @@ body.modal-open .studio-app-banner {
    IT STICKS ONLY ONCE THE PUBLISHER RUNS (html[data-pin-live]). With no publisher no bar
    ever comes, and a clear title would lie over the page; in the flow it is a plain title.
 
-   A SHORT SCREEN KEEPS ITS ROOM. Under 31rem tall, a phone on its side, the header stays in
-   the flow: the navbar and the page row already take a third of the height there.
+   A SHORT SCREEN KEEPS ITS ROOM. Under 36rem tall, a small phone or one on its side, the
+   header stays in the flow: the navbar and the page row already take a quarter of the height.
 
    z-index is one tier under the page row, set by the partial, so a header being pushed out
    passes under the row and over the content. --section-header-h is what a target inside a
@@ -402,7 +402,7 @@ body.modal-open .studio-app-banner {
   transition: background-color 150ms ease, border-color 150ms ease;
 
   html[data-pin-live] & {
-    @media (height >= 31rem) {
+    @media (height >= 36rem) {
       position: sticky;
     }
   }
