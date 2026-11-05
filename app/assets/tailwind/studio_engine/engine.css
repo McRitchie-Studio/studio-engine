@@ -1177,6 +1177,194 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       }
     }
 
+    /* THE GLASS SIDEBAR (Studio.sidebar_style = :glass, components/_sidebar_panel glass: true).
+       A rounded panel floats off the page's edge with the page blurred through it.
+
+       TWO BOXES. The aside keeps the drawer's geometry: its top and height from --nav-bottom,
+       data-pin-edge's scroll animation, and Alpine's translate-x-full slide, which now carries
+       the inset off screen with it. It is a clear frame that takes no clicks, so a click in
+       the inset reaches the page and closes the panel like any outside click. The shell inside
+       holds the fill and the blur. That keeps the containing block a backdrop-filter makes off
+       the element Alpine, Turbo's snapshot and a view transition move.
+
+       THE FILL IS THE FALLBACK. Here it is nearly solid, so a browser with no backdrop-filter,
+       or a reader who asks for less transparency, still gets readable text. The @supports rule
+       thins it where the browser says it has the blur.
+
+       CONTRAST. The worst page behind the panel is the opposite of its theme: a white image
+       under dark glass, a black one under light. A browser can claim the blur and not paint it, so
+       the thin fill alone holds resting soft ink at 4.5:1 over both, and brightness() only adds
+       to that. A thinner fill looks more like glass and fails over a white page.
+
+       IT HANGS FROM THE NAVBAR. The frame has no top padding, so no page shows between the
+       navbar and the panel, and the shell's top is square with no top border: the navbar is
+       its top edge. The sides and the bottom keep the inset and the round corners. The frame
+       still takes its top from --nav-bottom and data-pin-edge, so it follows every navbar state.
+
+       SPACING IS FIVE TOKENS, on the shell: --glass-row-height, --glass-row-gap between rows,
+       --glass-icon-size, --glass-icon-gap between icon and label, and --glass-section-gap,
+       which sets the space under a section and above its header and from which the title and
+       Log out padding derive. A row's no-jump description needs no rule of its own: the 18px
+       label and 14px description take 32px, and with the lift at 7px a 44px row leaves 6px above
+       and below them.
+
+       THE PHONE gets a narrower inset, the full width and a lighter blur, which costs less
+       through the slide. */
+    [data-sidebar-glass] {
+      --sidebar-glass-inset: 0.75rem;
+      width: 19.5rem;
+      padding: 0 var(--sidebar-glass-inset) var(--sidebar-glass-inset);
+      pointer-events: none;
+    }
+    [data-sidebar-glass-shell] {
+      --glass-row-height: 2.75rem;
+      --glass-row-gap: 0.125rem;
+      --glass-icon-size: 1.375rem;
+      --glass-icon-gap: 0.625rem;
+      --glass-section-gap: 1rem;
+      --sidebar-row-lift: 0.4375rem;
+      --glass-fill: rgb(250 249 253 / 0.97);
+      --glass-thin-fill: rgb(255 255 255 / 0.72);
+      --glass-filter: blur(24px) saturate(150%) brightness(1.15);
+      --glass-ink: #1d1832;
+      --glass-soft-ink: #474260;
+      --glass-hover: rgb(29 24 50 / 0.08);
+      --glass-line: rgb(29 24 50 / 0.14);
+      --glass-shadow: 0 24px 60px rgb(29 24 50 / 0.24);
+      pointer-events: auto;
+      overflow: hidden;
+      min-height: 0;
+      border: 1px solid var(--glass-line);
+      border-top: 0;
+      border-radius: 0 0 1.125rem 1.125rem;
+      background-color: var(--glass-fill);
+      box-shadow: var(--glass-shadow);
+      color: var(--glass-ink);
+      font-size: 0.84375rem;
+    }
+    .dark [data-sidebar-glass-shell] {
+      --glass-fill: rgb(36 30 62 / 0.97);
+      --glass-thin-fill: rgb(36 30 62 / 0.72);
+      --glass-filter: blur(24px) saturate(150%) brightness(0.8);
+      --glass-ink: #f1effa;
+      --glass-soft-ink: #dedaed; /* 4.5:1 on the thin fill alone over white, if a blur never paints */
+      --glass-hover: rgb(255 255 255 / 0.1);
+      --glass-line: rgb(255 255 255 / 0.14);
+      --glass-shadow: 0 24px 60px rgb(0 0 0 / 0.5);
+    }
+    /* The less-transparency rule turns the blur off, rather than this rule asking for that
+       setting's absence: a browser that does not know the media feature answers false to a
+       not query as well, which left Safari and Firefox on the solid fill. */
+    @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      [data-sidebar-glass-shell] {
+        background-color: var(--glass-thin-fill);
+        -webkit-backdrop-filter: var(--glass-filter);
+        backdrop-filter: var(--glass-filter);
+      }
+      @media (prefers-reduced-transparency: reduce) {
+        [data-sidebar-glass-shell] {
+          background-color: var(--glass-fill);
+          -webkit-backdrop-filter: none;
+          backdrop-filter: none;
+        }
+      }
+    }
+    @media (max-width: 47.99rem) {
+      [data-sidebar-glass] {
+        --sidebar-glass-inset: 0.5rem;
+        width: 100%;
+      }
+      [data-sidebar-glass-shell] { --glass-filter: blur(16px) saturate(150%); }
+      .dark [data-sidebar-glass-shell] { --glass-filter: blur(16px) saturate(150%) brightness(0.8); }
+    }
+    [data-sidebar-glass-head] {
+      padding: calc(var(--glass-section-gap) + 0.25rem) 0.875rem calc(var(--glass-section-gap) * 0.75) 1.125rem;
+      border-bottom: 0;
+    }
+    [data-sidebar-glass-head] [data-link-sidebar-title],
+    [data-sidebar-glass-head] [data-sidebar-panel-lead] > * {
+      color: var(--glass-ink);
+      font-size: 0.9375rem;
+      font-weight: 600;
+    }
+    [data-sidebar-glass-head] [data-link-sidebar-close] { color: var(--glass-soft-ink); }
+    [data-sidebar-glass-head] [data-link-sidebar-close]:hover {
+      color: var(--glass-ink);
+      background-color: var(--glass-hover);
+    }
+    [data-sidebar-glass-shell] nav { padding-block: 0; scrollbar-width: thin; scrollbar-color: var(--glass-line) transparent; }
+    [data-sidebar-glass-shell] nav > [role="group"] { padding: 0 0.625rem var(--glass-section-gap); }
+    [data-sidebar-glass-shell] [data-sidebar-group-header] {
+      padding: calc(var(--glass-section-gap) * 0.5) 0.5rem 0.375rem;
+      color: var(--glass-soft-ink);
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: normal;
+      text-transform: none;
+    }
+    [data-sidebar-glass-shell] nav > [role="group"] > :is(a, [aria-disabled]),
+    [data-sidebar-glass-foot] > a {
+      height: var(--glass-row-height);
+      gap: var(--glass-icon-gap);
+      padding: 0 0.5rem 0 0.375rem;
+      border-radius: 0.625rem;
+      color: var(--glass-ink);
+      font-size: inherit;
+      font-weight: 500;
+      line-height: 1.125rem;
+    }
+    [data-sidebar-glass-shell] nav > [role="group"] > :is(a, [aria-disabled]):hover,
+    [data-sidebar-glass-foot] > a:hover {
+      color: var(--glass-ink);
+      background-color: var(--glass-hover);
+    }
+    [data-sidebar-glass-shell] [data-sidebar-row-desc] {
+      color: var(--glass-soft-ink);
+      font-size: 0.6875rem;
+      line-height: 0.875rem;
+    }
+    [data-sidebar-glass-shell] nav > [role="group"] > a[aria-current="page"],
+    [data-sidebar-glass-shell] nav > [role="group"] > a[aria-current="page"]:hover {
+      /* A step down the primary's own scale: white on the hub's primary is 3.1:1, and this
+         mix holds 4.5:1 and still reads as the brand's violet. */
+      background-color: color-mix(in srgb, var(--color-primary-600) 65%, var(--color-primary-700));
+      box-shadow: 0 4px 14px rgb(var(--color-primary-rgb) / 0.4);
+      color: #fff;
+    }
+    /* The glow above outranks the row's focus ring, which is a box-shadow. This ring is an
+       outline set inside the edge, so the row's own fill shows on both sides of it: at the
+       edge, white would melt into the light theme's panel. */
+    [data-sidebar-glass-shell] nav > [role="group"] > a[aria-current="page"]:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: -4px;
+    }
+    [data-sidebar-glass-shell] a[aria-current="page"] [data-sidebar-row-desc] { color: rgb(255 255 255 / 0.9); }
+    [data-sidebar-glass-shell] nav > [role="group"] > a + a { margin-top: var(--glass-row-gap); }
+    /* The fixed column: a line icon sits in the 24px box the engine's emoji and portrait rows
+       already take (EMOJI_SWAP_CSS), so every label starts at one x. A line icon, a portrait
+       and an emoji all draw at --glass-icon-size. The swap's box is 1.25em tall and clips, so
+       the font size is what keeps an emoji or a portrait whole. A host's portrait class asks
+       for 20px, and the helper's svg for 18. */
+    [data-sidebar-glass-shell] [data-sidebar-row-icon] {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.5rem;
+      height: var(--glass-icon-size);
+    }
+    [data-sidebar-glass-shell] [data-sidebar-row-icon] svg,
+    [data-sidebar-glass-shell] nav > [role="group"] > a > :is(.studio-emoji-box, .studio-emoji-swap) img {
+      width: var(--glass-icon-size);
+      height: var(--glass-icon-size);
+    }
+    [data-sidebar-glass-shell] nav > [role="group"] > a > :is(.studio-emoji-box, .studio-emoji-swap) {
+      font-size: calc(var(--glass-icon-size) / 1.25);
+    }
+    [data-sidebar-glass-foot] {
+      padding: calc(var(--glass-section-gap) * 0.625) 0.625rem;
+      border-top: 1px solid var(--glass-line);
+    }
+
     /* THE GLASS SURFACES (Studio.surface_style = :glass, on the host's root as
        html[data-surface-style="glass"]). A card turns translucent over a soft ambient page.
 
@@ -1415,194 +1603,6 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
     }
     html[data-surface-style="glass"] .badge { box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--lit-badge); }
     html[data-surface-style="glass"] .input-field { box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--lit-input); }
-
-    /* THE GLASS SIDEBAR (Studio.sidebar_style = :glass, components/_sidebar_panel glass: true).
-       A rounded panel floats off the page's edge with the page blurred through it.
-
-       TWO BOXES. The aside keeps the drawer's geometry: its top and height from --nav-bottom,
-       data-pin-edge's scroll animation, and Alpine's translate-x-full slide, which now carries
-       the inset off screen with it. It is a clear frame that takes no clicks, so a click in
-       the inset reaches the page and closes the panel like any outside click. The shell inside
-       holds the fill and the blur. That keeps the containing block a backdrop-filter makes off
-       the element Alpine, Turbo's snapshot and a view transition move.
-
-       THE FILL IS THE FALLBACK. Here it is nearly solid, so a browser with no backdrop-filter,
-       or a reader who asks for less transparency, still gets readable text. The @supports rule
-       thins it where the browser says it has the blur.
-
-       CONTRAST. The worst page behind the panel is the opposite of its theme: a white image
-       under dark glass, a black one under light. A browser can claim the blur and not paint it, so
-       the thin fill alone holds resting soft ink at 4.5:1 over both, and brightness() only adds
-       to that. A thinner fill looks more like glass and fails over a white page.
-
-       IT HANGS FROM THE NAVBAR. The frame has no top padding, so no page shows between the
-       navbar and the panel, and the shell's top is square with no top border: the navbar is
-       its top edge. The sides and the bottom keep the inset and the round corners. The frame
-       still takes its top from --nav-bottom and data-pin-edge, so it follows every navbar state.
-
-       SPACING IS FIVE TOKENS, on the shell: --glass-row-height, --glass-row-gap between rows,
-       --glass-icon-size, --glass-icon-gap between icon and label, and --glass-section-gap,
-       which sets the space under a section and above its header and from which the title and
-       Log out padding derive. A row's no-jump description needs no rule of its own: the 18px
-       label and 14px description take 32px, and with the lift at 7px a 44px row leaves 6px above
-       and below them.
-
-       THE PHONE gets a narrower inset, the full width and a lighter blur, which costs less
-       through the slide. */
-    [data-sidebar-glass] {
-      --sidebar-glass-inset: 0.75rem;
-      width: 19.5rem;
-      padding: 0 var(--sidebar-glass-inset) var(--sidebar-glass-inset);
-      pointer-events: none;
-    }
-    [data-sidebar-glass-shell] {
-      --glass-row-height: 2.75rem;
-      --glass-row-gap: 0.125rem;
-      --glass-icon-size: 1.375rem;
-      --glass-icon-gap: 0.625rem;
-      --glass-section-gap: 1rem;
-      --sidebar-row-lift: 0.4375rem;
-      --glass-fill: rgb(250 249 253 / 0.97);
-      --glass-thin-fill: rgb(255 255 255 / 0.72);
-      --glass-filter: blur(24px) saturate(150%) brightness(1.15);
-      --glass-ink: #1d1832;
-      --glass-soft-ink: #474260;
-      --glass-hover: rgb(29 24 50 / 0.08);
-      --glass-line: rgb(29 24 50 / 0.14);
-      --glass-shadow: 0 24px 60px rgb(29 24 50 / 0.24);
-      pointer-events: auto;
-      overflow: hidden;
-      min-height: 0;
-      border: 1px solid var(--glass-line);
-      border-top: 0;
-      border-radius: 0 0 1.125rem 1.125rem;
-      background-color: var(--glass-fill);
-      box-shadow: var(--glass-shadow);
-      color: var(--glass-ink);
-      font-size: 0.84375rem;
-    }
-    .dark [data-sidebar-glass-shell] {
-      --glass-fill: rgb(36 30 62 / 0.97);
-      --glass-thin-fill: rgb(36 30 62 / 0.72);
-      --glass-filter: blur(24px) saturate(150%) brightness(0.8);
-      --glass-ink: #f1effa;
-      --glass-soft-ink: #dedaed; /* 4.5:1 on the thin fill alone over white, if a blur never paints */
-      --glass-hover: rgb(255 255 255 / 0.1);
-      --glass-line: rgb(255 255 255 / 0.14);
-      --glass-shadow: 0 24px 60px rgb(0 0 0 / 0.5);
-    }
-    /* The less-transparency rule turns the blur off, rather than this rule asking for that
-       setting's absence: a browser that does not know the media feature answers false to a
-       not query as well, which left Safari and Firefox on the solid fill. */
-    @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-      [data-sidebar-glass-shell] {
-        background-color: var(--glass-thin-fill);
-        -webkit-backdrop-filter: var(--glass-filter);
-        backdrop-filter: var(--glass-filter);
-      }
-      @media (prefers-reduced-transparency: reduce) {
-        [data-sidebar-glass-shell] {
-          background-color: var(--glass-fill);
-          -webkit-backdrop-filter: none;
-          backdrop-filter: none;
-        }
-      }
-    }
-    @media (max-width: 47.99rem) {
-      [data-sidebar-glass] {
-        --sidebar-glass-inset: 0.5rem;
-        width: 100%;
-      }
-      [data-sidebar-glass-shell] { --glass-filter: blur(16px) saturate(150%); }
-      .dark [data-sidebar-glass-shell] { --glass-filter: blur(16px) saturate(150%) brightness(0.8); }
-    }
-    [data-sidebar-glass-head] {
-      padding: calc(var(--glass-section-gap) + 0.25rem) 0.875rem calc(var(--glass-section-gap) * 0.75) 1.125rem;
-      border-bottom: 0;
-    }
-    [data-sidebar-glass-head] [data-link-sidebar-title],
-    [data-sidebar-glass-head] [data-sidebar-panel-lead] > * {
-      color: var(--glass-ink);
-      font-size: 0.9375rem;
-      font-weight: 600;
-    }
-    [data-sidebar-glass-head] [data-link-sidebar-close] { color: var(--glass-soft-ink); }
-    [data-sidebar-glass-head] [data-link-sidebar-close]:hover {
-      color: var(--glass-ink);
-      background-color: var(--glass-hover);
-    }
-    [data-sidebar-glass-shell] nav { padding-block: 0; scrollbar-width: thin; scrollbar-color: var(--glass-line) transparent; }
-    [data-sidebar-glass-shell] nav > [role="group"] { padding: 0 0.625rem var(--glass-section-gap); }
-    [data-sidebar-glass-shell] [data-sidebar-group-header] {
-      padding: calc(var(--glass-section-gap) * 0.5) 0.5rem 0.375rem;
-      color: var(--glass-soft-ink);
-      font-size: 0.6875rem;
-      font-weight: 600;
-      letter-spacing: normal;
-      text-transform: none;
-    }
-    [data-sidebar-glass-shell] nav > [role="group"] > :is(a, [aria-disabled]),
-    [data-sidebar-glass-foot] > a {
-      height: var(--glass-row-height);
-      gap: var(--glass-icon-gap);
-      padding: 0 0.5rem 0 0.375rem;
-      border-radius: 0.625rem;
-      color: var(--glass-ink);
-      font-size: inherit;
-      font-weight: 500;
-      line-height: 1.125rem;
-    }
-    [data-sidebar-glass-shell] nav > [role="group"] > :is(a, [aria-disabled]):hover,
-    [data-sidebar-glass-foot] > a:hover {
-      color: var(--glass-ink);
-      background-color: var(--glass-hover);
-    }
-    [data-sidebar-glass-shell] [data-sidebar-row-desc] {
-      color: var(--glass-soft-ink);
-      font-size: 0.6875rem;
-      line-height: 0.875rem;
-    }
-    [data-sidebar-glass-shell] nav > [role="group"] > a[aria-current="page"],
-    [data-sidebar-glass-shell] nav > [role="group"] > a[aria-current="page"]:hover {
-      /* A step down the primary's own scale: white on the hub's primary is 3.1:1, and this
-         mix holds 4.5:1 and still reads as the brand's violet. */
-      background-color: color-mix(in srgb, var(--color-primary-600) 65%, var(--color-primary-700));
-      box-shadow: 0 4px 14px rgb(var(--color-primary-rgb) / 0.4);
-      color: #fff;
-    }
-    /* The glow above outranks the row's focus ring, which is a box-shadow. This ring is an
-       outline set inside the edge, so the row's own fill shows on both sides of it: at the
-       edge, white would melt into the light theme's panel. */
-    [data-sidebar-glass-shell] nav > [role="group"] > a[aria-current="page"]:focus-visible {
-      outline: 2px solid #fff;
-      outline-offset: -4px;
-    }
-    [data-sidebar-glass-shell] a[aria-current="page"] [data-sidebar-row-desc] { color: rgb(255 255 255 / 0.9); }
-    [data-sidebar-glass-shell] nav > [role="group"] > a + a { margin-top: var(--glass-row-gap); }
-    /* The fixed column: a line icon sits in the 24px box the engine's emoji and portrait rows
-       already take (EMOJI_SWAP_CSS), so every label starts at one x. A line icon, a portrait
-       and an emoji all draw at --glass-icon-size. The swap's box is 1.25em tall and clips, so
-       the font size is what keeps an emoji or a portrait whole. A host's portrait class asks
-       for 20px, and the helper's svg for 18. */
-    [data-sidebar-glass-shell] [data-sidebar-row-icon] {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 1.5rem;
-      height: var(--glass-icon-size);
-    }
-    [data-sidebar-glass-shell] [data-sidebar-row-icon] svg,
-    [data-sidebar-glass-shell] nav > [role="group"] > a > :is(.studio-emoji-box, .studio-emoji-swap) img {
-      width: var(--glass-icon-size);
-      height: var(--glass-icon-size);
-    }
-    [data-sidebar-glass-shell] nav > [role="group"] > a > :is(.studio-emoji-box, .studio-emoji-swap) {
-      font-size: calc(var(--glass-icon-size) / 1.25);
-    }
-    [data-sidebar-glass-foot] {
-      padding: calc(var(--glass-section-gap) * 0.625) 0.625rem;
-      border-top: 1px solid var(--glass-line);
-    }
 
     /* THE SIDEBAR ROW'S DESCRIPTION (components/_link_sidebar, _geo_signpost). At rest
        a row with a description is one line, the height of any other row. On hover or
