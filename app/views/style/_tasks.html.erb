@@ -63,11 +63,9 @@
     "stage-shipped"    => [{ title: "SES email backend",    repo: "mcritchie",     who: "ST" }]
   }
 %>
-<section id="tasks" class="space-y-8" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
-  <div class="space-y-1">
-    <h2 class="type-h3 text-heading">Tasks</h2>
-    <p class="text-muted text-sm max-w-2xl">The real board primitive in demo mode, so a drag saves nothing.</p>
-  </div>
+<section id="tasks" class="section-target space-y-8">
+  <%= render "studio/section_header", title: "Tasks" %>
+  <p class="text-muted text-sm max-w-2xl">The real board primitive in demo mode, so a drag saves nothing.</p>
 
   <%# ---- The LIVE primitive (demo mode) --------------------------------- %>
   <%# demo: true → drag animates + toasts locally, nothing POSTs. %>

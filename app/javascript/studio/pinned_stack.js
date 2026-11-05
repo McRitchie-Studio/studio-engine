@@ -37,6 +37,11 @@
 // SIZE something as tall as the header; use --nav-bottom to START something
 // underneath it. Same distinction for --pin-<name>-h vs --pin-<name>-bottom.
 //
+// THE SECTION LAYER (studio/_section_header, docs/PAGE_HEADER.md) IS THE ONE LAYER
+// THAT IS NOT A data-pin. A page has many section headers and only one is stuck, so
+// each carries `data-pin-section`, and together they publish as one layer, `section`.
+// See stuckSection below.
+//
 // Started once per document by studio/application. The listeners it adds live
 // for the document, and a Turbo visit republishes through them rather than
 // starting it again.
@@ -152,6 +157,62 @@ export function documentIndex(list, el) {
   return list.length;
 }
 
+// THE SECTION LAYER: MANY HEADERS, ONE LAYER, ONLY THE STUCK ONE COUNTS.
+//
+// A section header is sticky inside its own <section>, so the browser does the
+// swap: the next section's header arrives as the last one is pushed out. It joins
+// the stack so that a table's sticky header and any other reader of
+// --pin-stack-bottom sit under it. It cannot be a plain [data-pin]: composed() takes
+// the lowest edge of every layer, so a header waiting below the fold would drag
+// --pin-stack-bottom down the page, and headers sharing a name would overwrite each
+// other's values.
+//
+// So all of them are one layer named `section`, always in the registry while any is
+// on the page. The roster never changes per swap, so a swap is not a structural write,
+// and --pin-section-top, which every header positions off, stays published when none
+// is stuck. That layer's height is 0 until one is stuck, and then it is the part of the
+// bar still below the layers above, so a header being pushed out gives its room back
+// frame by frame.
+//
+// rects are { top, bottom, parentTop, parentBottom }, in page order; line is
+// --pin-section-top. A header is stuck once it has left its place in the flow and part
+// of it still shows below the line. Its section's top is that place, since it is the
+// section's first child and the section has no top padding.
+//
+// NEITHER FACT READS THE HEADER'S OWN EDGE AGAINST THE LINE. While the navbar collapses
+// the line moves first and the header's `top` follows a publish later, so a comparison
+// would drop the bar for the whole collapse, and a bottom read off the rect would be
+// published one step stale, with nothing left to correct it once the page is still. So
+// the bar's bottom is what sticky will make it: one height under the line, or the end of
+// its section while that pushes it out.
+export function sectionBottom(r, line) {
+  return Math.min(line + (r.bottom - r.top), r.parentBottom);
+}
+
+export function stuckSection(rects, line) {
+  var found = -1;
+  for (var i = 0; i < rects.length; i++) {
+    var r = rects[i];
+    if (r.top - r.parentTop > 0.5 && sectionBottom(r, line) > line + 0.5) found = i;
+  }
+  return found;
+}
+
+function measureSections(nodes, line) {
+  // Below the short-screen floor, or before the publisher runs, the CSS leaves these in
+  // the flow (engine.css, @utility section-header). A header scrolling past the line
+  // there is not stuck, so it must not count.
+  if (window.getComputedStyle(nodes[0]).position !== 'sticky') return null;
+  var rects = [];
+  for (var i = 0; i < nodes.length; i++) {
+    var r = nodes[i].getBoundingClientRect();
+    var parent = nodes[i].parentElement.getBoundingClientRect();
+    rects.push({ top: r.top, bottom: r.bottom, parentTop: parent.top, parentBottom: parent.bottom });
+  }
+  var at = stuckSection(rects, line);
+  return at < 0 ? null : { el: nodes[at], bottom: sectionBottom(rects[at], line) };
+}
+
 // THE REGISTRY IS DERIVED, NEVER CACHED — and that is a correctness rule.
 //
 // This used to build a `pins` array once and hold each element by reference
@@ -168,8 +229,9 @@ export function documentIndex(list, el) {
 // reference IMPOSSIBLE rather than merely unlikely: there is no window between
 // a DOM patch and a re-scan in which this can be pointed at the wrong node.
 //
-// Returns { pins, stack, timeline }: every layer measured and composed, the
-// stack's bottom, and whether the header is on the scroll timeline.
+// Returns { pins, stack, timeline, travel, sections, stuck }: every layer measured and
+// composed, the stack's bottom, whether the header is on the scroll timeline and how
+// far it travels, the section headers, and which of them is stuck.
 export function readStack() {
   var header = document.querySelector('header');
   var timeline = onTimeline(header);
@@ -191,11 +253,28 @@ export function readStack() {
   // never publish at all. Both live consumers own their header, so it is
   // adopted as a pin even when it does not ask to be.
   if (header && !headerPinned) list.splice(documentIndex(list, header), 0, measurePin(header, 'nav', true, timeline));
+  // In the registry at height 0 first, so the composition says where its line is.
+  var sections = document.querySelectorAll('[data-pin-section]');
+  var section = null;
+  if (sections.length) {
+    section = { el: sections[0], name: 'section', legacy: false, h: 0, bottom: 0 };
+    list.splice(documentIndex(list, sections[0]), 0, section);
+  }
+  var stack = timeline ? pinnedAt(list) : composed(list);
+  var stuck = section ? measureSections(sections, section.top) : null;
+  if (stuck) {
+    section.el = stuck.el;
+    section.h = stuck.bottom - section.top;
+    section.bottom = stuck.bottom;
+    stack = timeline ? pinnedAt(list) : composed(list);
+  }
   return {
     pins: list,
-    stack: timeline ? pinnedAt(list) : composed(list),
+    stack: stack,
     timeline: timeline,
-    travel: timeline ? timelineTravel(header) : 0
+    travel: timeline ? timelineTravel(header) : 0,
+    sections: sections,
+    stuck: stuck ? stuck.el : null
   };
 }
 
@@ -414,6 +493,9 @@ export function startPinnedStack() {
     settleTimer = null;
     publishAll();
     releaseFollowers();
+    // That publish measured the layers while they still held their last copies. Given back,
+    // they move to the root's values, so their edges are read once more.
+    schedule();
   }
 
   // The registry and the measurement are module-level (readStack, measurePin
@@ -505,12 +587,38 @@ export function startPinnedStack() {
     }
   }
 
+  // WHO WEARS THE BAR, written after every read of the publish. The box does not change
+  // with the attribute, so this resizes nothing and moves nothing. The root's attribute
+  // squares the page row's corners against the bar under it (engine.css, glass).
+  function syncSections(reading) {
+    for (var i = 0; i < reading.sections.length; i++) {
+      var node = reading.sections[i];
+      var on = node === reading.stuck;
+      if (node.hasAttribute('data-stuck') !== on) node.toggleAttribute('data-stuck', on);
+    }
+    var root = document.documentElement;
+    if (root.hasAttribute('data-pin-section-stuck') !== !!reading.stuck) root.toggleAttribute('data-pin-section-stuck', !!reading.stuck);
+  }
+
   var lastPublished = null;
+  var lastTops = null;
   function publishAll() {
+    // What lets a section header stick at all (engine.css): with no publisher its bar
+    // would never come, and it would lay a clear title over the page. Before the read,
+    // so the first publish on a restored scroll already sees it sticky.
+    var html = document.documentElement;
+    if (!html.hasAttribute('data-pin-live')) html.setAttribute('data-pin-live', '');
     var reading = readStack();
     var pins = reading.pins;
     write(pins, reading.stack, reading.timeline, reading.travel);
+    syncSections(reading);
     syncObserver(pins);
+    // A LAYER UNDER A LAYER SETTLES ONE PUBLISH LATER. A new --pin-page-top moves the page
+    // row without resizing it, so nothing wakes the publisher to read the row's new edge,
+    // and the layer under the row would keep a stale line once the page is still. So a
+    // publish that moved any layer's top asks for one more frame. It ends when none moved.
+    var tops = pins.map(function (p) { return p.top; }).join('|');
+    if (tops !== lastTops) { lastTops = tops; schedule(); }
     var key = publishedKey(reading);
     if (key !== lastPublished) {
       lastPublished = key;

@@ -5,7 +5,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/pinned_stack.js", import.meta.url), "utf8")
-const { composed, order, readsLive, followerSelectors, pinnedAt, measurePin, stackBottom, stackReading, publishedKey, PUBLISHED_EVENT } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
+const { composed, stuckSection, sectionBottom, order, readsLive, followerSelectors, pinnedAt, measurePin, stackBottom, stackReading, publishedKey, PUBLISHED_EVENT } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 // A reading as measure() returns it, with an element that answers only the
 // one attribute composed() reads.
@@ -299,4 +299,215 @@ test("a publish is announced only when the stack moved: its bottom, its mode or 
   assert.notEqual(publishedKey(base), publishedKey({ ...base, timeline: false }))
   assert.notEqual(publishedKey(base), publishedKey({ ...base, travel: 0 }))
   assert.equal(PUBLISHED_EVENT, "studio:pinned-stack-published")
+})
+
+// --- the section layer (task stacked-section-headers) ------------------------
+//
+// Many headers, one layer. A header waiting below the fold must not move the stack,
+// and only the stuck one adds its edge.
+
+const rect = (top, parentTop, parentBottom = parentTop + 5000) => ({ top, bottom: top + 36, parentTop, parentBottom })
+
+test("a header counts once it leaves its place, until its section's end has pushed it out", () => {
+  const at = (...args) => stuckSection([rect(...args)], 100)
+  assert.equal(at(400, 400), -1, "below the fold, in its place")
+  assert.equal(at(100, 100), -1, "resting exactly on the line, in its place")
+  assert.equal(at(100, 60), 0, "held on the line")
+  assert.equal(at(80, -500, 116), 0, "being pushed out: part of it still shows")
+  assert.equal(at(64, -500, 100), -1, "pushed out whole")
+})
+
+test("a header stays stuck while the line rises ahead of it in a navbar's collapse", () => {
+  assert.equal(stuckSection([rect(121, -400)], 116), 0)
+})
+
+test("a stuck header's bottom is one height under the line, whatever its own top still says", () => {
+  assert.equal(sectionBottom(rect(121, -400), 116), 152)
+  assert.equal(sectionBottom(rect(80, -500, 116), 100), 116, "or its section's end")
+})
+
+test("of the headers on the page, the one at the line is the stuck one", () => {
+  assert.equal(stuckSection([rect(-900, -900), rect(100, -300), rect(900, 900)], 100), 1)
+})
+
+const sectionEl = (top, parentTop = top - 500, parentBottom = parentTop + 5000) => {
+  const el = fakeEl({ h: 36, bottom: top + 36 })
+  el.getBoundingClientRect = () => ({ top, bottom: top + 36 })
+  el.parentElement = { getBoundingClientRect: () => ({ top: parentTop, bottom: parentBottom }) }
+  el.compareDocumentPosition = () => 0
+  return el
+}
+
+// A nav, a page row under it, and the given headers, in document order.
+const withSections = (sections, { attrs = {}, style = {}, position = "sticky", navH = 64, navBottom = 64, pageBottom = 120 } = {}) => {
+  const nav = fakeEl({ name: "nav", h: navH, bottom: navBottom, attrs, style })
+  const page = fakeEl({ name: "page", h: 56, bottom: pageBottom })
+  const doc = fakeDocument(nav, [page])
+  const all = doc.querySelectorAll
+  doc.querySelectorAll = (sel) => (sel === "[data-pin-section]" ? sections : all(sel))
+  return { doc, win: { getComputedStyle: () => ({ position }) } }
+}
+
+const reading = (sections, options) => {
+  const { doc, win } = withSections(sections, options)
+  const saved = [globalThis.document, globalThis.window]
+  globalThis.document = doc
+  globalThis.window = win
+  try { return stackReading() } finally { [globalThis.document, globalThis.window] = saved }
+}
+
+test("headers waiting below the fold do not move the stack, and publish at height 0", () => {
+  const r = reading([sectionEl(900, 900), sectionEl(2000, 2000)])
+  assert.equal(r.bottom, 120)
+  assert.deepEqual(r.layers.section, { h: 0, top: 120, bottom: 0 })
+})
+
+test("the stack bottom includes the stuck header", () => {
+  const r = reading([sectionEl(-400, -900), sectionEl(120), sectionEl(900, 900)])
+  assert.equal(r.bottom, 156)
+  assert.deepEqual(r.layers.section, { h: 36, top: 120, bottom: 156 })
+})
+
+test("a header being pushed out gives its room back", () => {
+  const r = reading([sectionEl(100, -500, 136), sectionEl(900, 900)])
+  assert.equal(r.bottom, 136)
+  assert.deepEqual(r.layers.section, { h: 16, top: 120, bottom: 136 })
+})
+
+test("a header the CSS left in the flow never counts", () => {
+  const r = reading([sectionEl(120), sectionEl(900, 900)], { position: "relative" })
+  assert.equal(r.bottom, 120)
+  assert.equal(r.layers.section.h, 0)
+})
+
+test("on the scroll timeline the stuck header stacks by height too", () => {
+  const options = { attrs: { "data-nav-timeline-on": "" }, style: { "--nav-band": "40px" }, navH: 104 }
+  const r = reading([sectionEl(120), sectionEl(900, 900)], options)
+  // The compact bar 64, the row 56, the bar 36.
+  assert.equal(r.bottom, 156)
+  assert.deepEqual(r.layers.section, { h: 36, top: 120, bottom: 156 })
+})
+
+test("the publisher puts the bar on the stuck header alone, and a swap keeps the roster", async () => {
+  const toggled = (el) => { el.toggleAttribute = (n, on) => (on ? el.setAttribute(n, "") : el.removeAttribute(n)); return el }
+  let top = 900
+  const first = toggled(sectionEl(0))
+  first.getBoundingClientRect = () => ({ top, bottom: top + 36 })
+  first.parentElement = { getBoundingClientRect: () => ({ top: top === 900 ? 900 : -400, bottom: 4000 }) }
+  const second = toggled(sectionEl(2000, 2000))
+  second.setAttribute("data-stuck", "") // a Turbo snapshot's leftover
+  const { doc, win } = withSections([first, second])
+  toggled(doc.documentElement)
+  const saved = ["window", "document", "ResizeObserver", "performance", "setTimeout"].map((k) => [k, globalThis[k]])
+  globalThis.setTimeout = () => 0 // the settle timer, which would outlive the test
+  const scroll = []
+  globalThis.document = doc
+  globalThis.performance = { now: () => 1000 }
+  globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
+  globalThis.window = { ...win, ResizeObserver: globalThis.ResizeObserver, requestAnimationFrame: (fn) => fn(),
+    addEventListener: (type, fn) => { if (type === "scroll") scroll.push(fn) } }
+  try {
+    const mod = await freshModule()
+    mod.startPinnedStack()
+    assert.equal(doc.documentElement.hasAttribute("data-pin-live"), true, "the publisher says it runs")
+    assert.equal(first.hasAttribute("data-stuck"), false)
+    assert.equal(second.hasAttribute("data-stuck"), false, "the leftover is cleared")
+    assert.equal(doc.documentElement.hasAttribute("data-pin-section-stuck"), false)
+    assert.equal(doc.documentElement.style.getPropertyValue("--pin-section-top"), "120px", "the line is published while none is stuck")
+
+    top = 120
+    scroll.forEach((fn) => fn())
+    assert.equal(first.hasAttribute("data-stuck"), true)
+    assert.equal(second.hasAttribute("data-stuck"), false)
+    assert.equal(doc.documentElement.hasAttribute("data-pin-section-stuck"), true)
+  } finally {
+    saved.forEach(([k, v]) => { globalThis[k] = v })
+  }
+})
+
+test("a publish that moved a layer's top asks for one more frame, and it ends", async () => {
+  const saved = ["window", "document", "ResizeObserver", "performance", "setTimeout"].map((k) => [k, globalThis[k]])
+  globalThis.setTimeout = () => 0 // the settle timer, which would outlive the test
+  const nav = fakeEl({ name: "nav", h: 64, bottom: 64 })
+  const page = fakeEl({ name: "page", h: 56, bottom: 120 })
+  const doc = fakeDocument(nav, [page])
+  const frames = []
+  const scroll = []
+  globalThis.document = doc
+  globalThis.performance = { now: () => 1000 }
+  globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
+  globalThis.window = { ResizeObserver: globalThis.ResizeObserver, requestAnimationFrame: (fn) => frames.push(fn),
+    addEventListener: (type, fn) => { if (type === "scroll") scroll.push(fn) } }
+  const drain = () => { let n = 0; while (frames.length) { frames.shift()(); n++ } return n }
+  try {
+    const mod = await freshModule()
+    mod.startPinnedStack()
+    drain()
+    assert.equal(frames.length, 0)
+    // The navbar's edge moves; the page row's top moves with it, one publish on.
+    nav.rect.bottom = 40
+    scroll.forEach((fn) => fn())
+    const passes = drain()
+    assert.equal(passes, 2, "the publish that moved the top, and the one after it")
+  } finally {
+    saved.forEach(([k, v]) => { globalThis[k] = v })
+  }
+})
+
+// The publisher started in a page with no section headers, with the frames and the
+// timers held for the test to run.
+const heldPublisher = async () => {
+  const saved = ["window", "document", "ResizeObserver", "performance", "setTimeout"].map((k) => [k, globalThis[k]])
+  const nav = fakeEl({ name: "nav", h: 64, bottom: 64 })
+  const page = fakeEl({ name: "page", h: 56, bottom: 120 })
+  const doc = fakeDocument(nav, [page])
+  const frames = []
+  const timers = []
+  const scroll = []
+  let now = 1000
+  globalThis.document = doc
+  globalThis.performance = { now: () => now }
+  globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
+  globalThis.setTimeout = (fn) => { timers.push(fn); return timers.length }
+  globalThis.window = { ResizeObserver: globalThis.ResizeObserver, requestAnimationFrame: (fn) => frames.push(fn),
+    addEventListener: (type, fn) => { if (type === "scroll") scroll.push(fn) } }
+  const mod = await freshModule()
+  mod.startPinnedStack()
+  return { nav, frames, timers, scroll, tick: (ms) => { now += ms },
+    drain: () => { let n = 0; while (frames.length && n < 50) { frames.shift()(); n++ } return n },
+    restore: () => saved.forEach(([k, v]) => { globalThis[k] = v }) }
+}
+
+test("a settle reads the layers once more, after it gives their copies back", async () => {
+  const run = await heldPublisher()
+  try {
+    run.drain()
+    run.tick(1000)
+    run.nav.rect.bottom = 40
+    run.scroll.forEach((fn) => fn())
+    run.drain()
+    assert.equal(run.timers.length > 0, true, "a motion publish arms the settle")
+    run.frames.length = 0
+    run.tick(1000)
+    run.timers.at(-1)()
+    assert.equal(run.frames.length > 0, true, "another frame is asked for")
+  } finally {
+    run.restore()
+  }
+})
+
+test("a hash the browser cannot decode does not stop the boot", async () => {
+  const run = await heldPublisher()
+  run.restore()
+  const saved = ["window", "document", "ResizeObserver", "performance"].map((k) => [k, globalThis[k]])
+  globalThis.document = fakeDocument(fakeEl({ name: "nav", h: 64, bottom: 64 }))
+  globalThis.performance = { now: () => 1000 }
+  globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
+  globalThis.window = { ResizeObserver: globalThis.ResizeObserver, location: { hash: "#100%" }, requestAnimationFrame: () => 0, addEventListener: () => {} }
+  try {
+    const mod = await freshModule()
+    assert.doesNotThrow(() => mod.startPinnedStack())
+  } finally {
+    saved.forEach(([k, v]) => { globalThis[k] = v })
+  }
 })
