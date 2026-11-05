@@ -1553,7 +1553,7 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
        lift the fill and cost contrast, so it stays solid there. Without a blur, or without relative
        oklch (the gradient would drop out and leave white text on nothing), it stays solid. */
     @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) and (color: oklch(from red l c h)) {
-      html.dark[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(.btn-sm, :disabled, [aria-disabled="true"]) {
+      html.dark[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(.btn-sm, :disabled, [aria-disabled="true"], [class*=" bg-"], [class^="bg-"]) {
         --lit-fill-alpha: 0.94;
         background-color: transparent;
         -webkit-backdrop-filter: blur(6px);

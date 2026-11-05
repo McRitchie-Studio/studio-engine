@@ -257,3 +257,13 @@ test("disabling a filled button keeps its box", async ({ page }) => {
   await page.evaluate(() => { document.getElementById("primary").disabled = true; });
   expect(await box()).toEqual(before);
 });
+
+test("a filled button that spells its own bg-* keeps a fill in dark", async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => document.body.insertAdjacentHTML("beforeend", `<button id="owned" class="btn btn-primary bg-warning/5">Go</button>`));
+  await theme(page, true);
+  const before = await css(page, "owned", "backgroundColor");
+  await optIn(page);
+
+  expect(await css(page, "owned", "backgroundColor")).toBe(before);
+});
