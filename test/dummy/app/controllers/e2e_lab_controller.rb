@@ -876,8 +876,34 @@ class E2eLabController < ActionController::Base
     { title: "Admin", admin: true, header: true, links: [{ label: "Errors", href: "/up", emoji: "🚨" }] }
   ].freeze
 
+  # The glass panel's rows (Studio.sidebar_style = :glass, for this request): a portrait with
+  # its rocket, line icons, the row for this page, and a desc: for the hover.
+  LAB_SIDEBAR_GLASS_SECTIONS = [
+    { title: "My Apps", header: true, links: [
+      { label: "Team Voice Notes to Webhook and Then Some More Words", href: "/up", hover_emoji: "🚀",
+        emoji: %(<img src="/e2e/img/lab-photo.avif" alt="" class="w-5 h-5 rounded-full object-cover">).html_safe }
+    ] },
+    { title: "Admin", header: true, links: [
+      { label: "This page", href: "/lab/sidebar_panels", emoji: "🧪", hover_emoji: "🔬", icon: "activity" },
+      { label: "Terms", href: "/site_footer/terms", emoji: "📜", icon: "book-open", desc: "What you agree to" },
+      { label: "Unknown icon", href: "/site_footer/privacy", emoji: "🔒", icon: "no-such-icon" }
+    ] }
+  ].freeze
+
+  around_action :with_lab_sidebar_style, only: %i[sidebar_panels sidebar_panels_turbo]
+
+  private def with_lab_sidebar_style
+    prior = Studio.sidebar_style
+    Studio.sidebar_style = :glass if params[:glass].present?
+    yield
+  ensure
+    Studio.sidebar_style = prior
+  end
+
   private def sidebar_panels_viewer
-    if params[:sidebar].present?
+    if params[:glass].present?
+      @lab_sidebar_sections = LAB_SIDEBAR_GLASS_SECTIONS
+    elsif params[:sidebar].present?
       @lab_sidebar_sections = params[:headers].present? ? LAB_SIDEBAR_HEADER_SECTIONS : LAB_SIDEBAR_PANEL_SECTIONS
     end
     @lab_admin = params[:admin].present?
