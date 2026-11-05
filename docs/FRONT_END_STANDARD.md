@@ -248,7 +248,7 @@ components:
 | Navbar collapse | `studio/nav_collapse` | `nav-collapse` | `x-data="navCollapse()"` |
 | Page header (`studio/_page_header`, docs/PAGE_HEADER.md) | `studio/page_header` | `page-header`, lazy | none |
 | Pinned stack (`--pin-*`, `--nav-h`, `--nav-bottom`) | `studio/pinned_stack` | the boot | none needed in CSS; a script reads `window.studioPinnedStack.bottom()`, never the root, and re-places on `studio:pinned-stack-refresh` and `studio:pinned-stack-published` (the sticky table header does) |
-| Theme and dev mode | `studio/alpine_stores` | its own module tag, and the boot | `$store.theme`, `$store.devMode` |
+| Theme and dev mode | `studio/alpine_stores` | its own module tag, and the boot | `$store.theme` (`set('dark'\|'light')`, `toggle()`), `$store.devMode` |
 | Nav spinner, success confetti | `studio/head_chrome` | the boot | `showNavSpinner`, `hideNavSpinner`, `fireSuccessConfetti` |
 | Branded loader: page-load overlay, pending buttons (docs/LOADER.md) | `studio/loader` | the boot | `window.StudioLoader.show`, `.hide`, `.setPercent` |
 | Modal host, scoped host | `studio/modal_host` | `modal-host`, its own module tag | `$store.modals`, each scoped `$store.<name>`, `window.ModalAnimations`, `window.StudioModals` |
@@ -271,7 +271,10 @@ components:
 The stores load by their own nonced module tag as well as the boot, because
 every host's `<body>` binds `$store.devMode`: a boot that fails to load must
 not make that binding throw. `studio/alpine_stores` imports nothing, and
-registers a store only where Alpine has none of that name. `studio/modal_host`,
+registers a store only where Alpine has none of that name. `$store.theme.set`
+is the one theme setter: the root class, the store value and localStorage change
+together, up to a frame after the call under a crossfade. Only the head's pre-paint
+script writes the class another way. `studio/modal_host`,
 `studio/toast`, `studio/link_sidebar` and `studio/transition_snapshot` have their
 own tag for the same reason, and so does `studio/stimulus`, whose only imports are Stimulus,
 `studio/lazy_controllers` and the hold button's controller: a failure elsewhere

@@ -799,6 +799,59 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
 @keyframes pt-unfold-bottom { from { opacity: 0; transform: perspective(1200px) translateY(100%) rotateX(-90deg); } }
 @keyframes pt-unfold-top { from { opacity: 0; transform: perspective(1200px) translateY(-100%) rotateX(90deg); } }
 
+/* -- The theme flip --------------------------------------------------------
+   $store.theme.set (studio/alpine_stores) puts data-theme-flip on the root for one
+   flip. The whole page changes in one crossfade, whatever its size: no element
+   runs its own transition, no named element keeps its own picture, and nothing
+   here moves. !important because a wildcard pseudo-element is weaker than the
+   rules above and than a host's rule for a name. A pointer's click during the
+   crossfade hits the root, not the page (Chromium ignores pointer-events on these
+   pseudo-elements); a key press still reaches the focused toggle. */
+html[data-theme-flip],
+html[data-theme-flip] *,
+html[data-theme-flip] *::before,
+html[data-theme-flip] *::after {
+  transition: none !important;
+}
+
+/* The root keeps its name: it is the one picture. */
+html[data-theme-flip] * {
+  view-transition-name: none !important;
+}
+
+html[data-theme-flip]::view-transition {
+  background: none !important;
+}
+
+html[data-theme-flip]::view-transition-group(*) {
+  animation: none !important;
+}
+
+html[data-theme-flip]::view-transition-old(*),
+html[data-theme-flip]::view-transition-new(*) {
+  mix-blend-mode: plus-lighter !important;
+}
+
+html[data-theme-flip]::view-transition-old(*) {
+  animation: vt-theme-out 160ms linear both !important;
+}
+
+html[data-theme-flip]::view-transition-new(*) {
+  animation: vt-theme-in 160ms linear both !important;
+}
+
+@keyframes vt-theme-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes vt-theme-in {
+  from {
+    opacity: 0;
+  }
+}
+
 /* Turbo's progress bar is the slow-load feedback under no-preview (the old
    page holds until the fresh response). Theme it so every app's bar matches
    its brand instead of Turbo's default. The fallback (#0076ff, Turbo's own
