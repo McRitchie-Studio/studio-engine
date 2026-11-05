@@ -1144,12 +1144,12 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
 
        THE FILL IS THE FALLBACK. Here it is nearly solid, so a browser with no backdrop-filter,
        or a reader who asks for less transparency, still gets readable text. The @supports rule
-       thins it only where the blur is real.
+       thins it where the browser says it has the blur.
 
        CONTRAST. The worst page behind the panel is the opposite of its theme: a white image
-       under dark glass, a black one under light. The fill and the brightness() are set so the
-       soft ink holds 4.5:1 over both, with the blur at its least help. A thinner fill looks
-       more like glass and risks failing over a white page.
+       under dark glass, a black one under light. A browser can claim the blur and not paint it, so
+       the thin fill alone holds resting soft ink at 4.5:1 over both, and brightness() only adds
+       to that. A thinner fill looks more like glass and fails over a white page.
 
        IT HANGS FROM THE NAVBAR. The frame has no top padding, so no page shows between the
        navbar and the panel, and the shell's top is square with no top border: the navbar is

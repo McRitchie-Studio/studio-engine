@@ -619,9 +619,21 @@ class LinkSidebarTest < Minitest::Test
 
   def test_glass_marks_the_geo_row_on_its_own_page
     html = with_glass { render_sidebar(sections: GLASS_SECTIONS + [{ title: "Ops", admin: true, links: [{ label: "Admin", href: "/admin", emoji: "🛠" }] }], admin: true, geo_flag: true, geo_routes: true, path: "/admin/geo") }
-    rows = Nokogiri::HTML5.fragment(html).css('#studio-link-sidebar a[aria-current="page"]')
+    doc = Nokogiri::HTML5.fragment(html)
+    rows = doc.css('#studio-link-sidebar a[aria-current="page"]')
 
     assert_equal ["/admin/geo"], rows.map { |row| row["href"] }
+    # The fill and the focus ring reach it through this selector, and the lab cannot light it.
+    assert_equal rows.to_a, doc.css('#studio-link-sidebar [data-sidebar-glass-shell] nav > [role="group"] > a[aria-current="page"]').to_a
+  end
+
+  # The partial's walk runs on every page of a glass app, so this raise would be a 500 everywhere.
+  def test_glass_renders_past_an_href_uri_refuses
+    sections = [{ title: "Help", links: [{ label: "Odd mail", href: "mailto:foo?bar", emoji: "✉️" }, { label: "Books", href: "/books", emoji: "📚" }] }]
+    doc = Nokogiri::HTML5.fragment(with_glass { render_sidebar(sections: sections, admin: false, path: "/books") })
+
+    assert_equal ["/books"], doc.css("#studio-link-sidebar a[aria-current]").map { |row| row["href"] }
+    refute_empty doc.css('#studio-link-sidebar a[href="mailto:foo?bar"]')
   end
 
   # Safari and Firefox do not know prefers-reduced-transparency, so a not query is false there
