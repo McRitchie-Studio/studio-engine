@@ -374,8 +374,6 @@ class AgentChatProxyTest < ActionDispatch::IntegrationTest
     post "/voice/takes", params: { voice: { audio: audio, mime_type: "audio/webm", duration_ms: 900 } },
                          headers: { "Accept" => "application/json", "X-CSRF-Token" => token }
     response.status
-  rescue ActionController::InvalidAuthenticityToken
-    :invalid_token
   end
 
   def test_with_forgery_on_a_take_passes_on_the_meta_token_and_is_refused_on_the_chat_forms
@@ -385,7 +383,7 @@ class AgentChatProxyTest < ActionDispatch::IntegrationTest
     refute_equal meta, form, "the form's token is per-form under load_defaults 8.1"
 
     assert_equal 200, post_take_with(meta)
-    assert_includes [:invalid_token, 422], post_take_with(form), "the reason the script reads the meta tag first"
+    assert_equal 422, post_take_with(form), "the reason the script reads the meta tag first"
   end
 
   def test_with_forgery_on_the_chat_post_passes_on_the_meta_token
@@ -751,10 +749,98 @@ class AgentChatProxyTest < ActionDispatch::IntegrationTest
 
   def test_a_post_without_the_authenticity_token_is_refused
     ActionController::Base.allow_forgery_protection = true
-    assert_raises(ActionController::InvalidAuthenticityToken) do
+    post "/agent_chat/messages", params: { soul: "alex", text: "Hi" }.to_json, headers: json_headers
+    assert_response :unprocessable_entity
+    assert_empty @hub.requests
+  end
+
+  # ---- a forged post under production's handling -------------------------------
+  #
+  # The test environment hides this one: the catch-all re-raises in test, so the
+  # middleware or the test sees the exception, not the answer production gives. These
+  # run the request as production does: forgery on, Rails.env production (which is
+  # all the catch-all reads) and the exceptions app answering.
+
+  def forged_like_production
+    saved_env = Rails.env
+    config = Rails.application.env_config
+    saved = config.slice("action_dispatch.show_exceptions", "action_dispatch.show_detailed_exceptions")
+    ActionController::Base.allow_forgery_protection = true
+    ErrorLog.delete_all
+    Rails.env = "production"
+    config["action_dispatch.show_exceptions"] = :all
+    config["action_dispatch.show_detailed_exceptions"] = false
+    yield
+  ensure
+    Rails.env = saved_env
+    config.merge!(saved)
+  end
+
+  def test_in_production_a_typed_post_with_no_token_is_a_422_with_no_error_log_row_and_a_reload_hint
+    forged_like_production do
       post "/agent_chat/messages", params: { soul: "alex", text: "Hi" }.to_json, headers: json_headers
     end
+    assert_response :unprocessable_entity
+    assert_equal "invalid_token", JSON.parse(response.body)["reason"]
+    assert_match(/reload/i, JSON.parse(response.body)["error"])
+    assert_equal 0, ErrorLog.count, "a visitor's bad token is the visitor's, and anyone can send one"
     assert_empty @hub.requests
+  end
+
+  def test_in_production_a_typed_post_with_a_wrong_token_is_a_422_with_no_error_log_row
+    forged_like_production do
+      post "/agent_chat/messages", params: { soul: "alex", text: "Hi" }.to_json,
+                                   headers: json_headers.merge("X-CSRF-Token" => "not-the-token")
+    end
+    assert_response :unprocessable_entity
+    assert_equal 0, ErrorLog.count
+  end
+
+  def test_in_production_a_take_with_a_bad_or_missing_token_is_a_422_with_no_error_log_row
+    Studio.voice_transcription = true
+    sign_in(@sam)
+    ["not-the-token", nil].each do |token|
+      forged_like_production do
+        audio = Rack::Test::UploadedFile.new(StringIO.new("\x1A\x45\xDF\xA3audio".b), "audio/webm", true, original_filename: "take")
+        post "/voice/takes", params: { voice: { audio: audio, mime_type: "audio/webm", duration_ms: 900 } },
+                             headers: { "Accept" => "application/json", "X-CSRF-Token" => token }.compact
+      end
+      assert_response :unprocessable_entity
+      assert_equal "invalid_token", JSON.parse(response.body)["reason"]
+      assert_equal 0, ErrorLog.count
+    end
+  end
+
+  # The catch-all is every consumer's, so every controller on it changes, not only
+  # these two: an HTML form with a stale token used to be a 302 to the root with
+  # "Something went wrong" and a row.
+  def test_in_production_a_host_form_post_with_no_token_is_rails_own_422_with_no_error_log_row
+    forged_like_production { post "/agent_chat_test_sign_in/#{@sam.id}" }
+    assert_response :unprocessable_entity
+    assert_equal 0, ErrorLog.count
+  end
+
+  def test_in_production_a_good_token_still_passes_and_a_genuine_fault_still_writes_its_row
+    @hub.respond { [201, { "turn" => { "id" => 9 } }] }
+    forged_like_production do
+      get "/agent_chat_lab"
+      token = css_select('form[data-test="agent-chat-form"] input[name="authenticity_token"]').first["value"]
+      post "/agent_chat/messages", params: { soul: "alex", text: "Hi" }.to_json,
+                                   headers: json_headers.merge("X-CSRF-Token" => token)
+      assert_response :created
+      assert_equal 0, ErrorLog.count
+
+      real = Studio::AgentChat.method(:post_message)
+      Studio::AgentChat.define_singleton_method(:post_message) { |**| raise ArgumentError, "boom" }
+      begin
+        post "/agent_chat/messages", params: { soul: "alex", text: "Hi" }.to_json,
+                                     headers: json_headers.merge("X-CSRF-Token" => token)
+      ensure
+        Studio::AgentChat.define_singleton_method(:post_message, real)
+      end
+      assert_response :internal_server_error
+      assert_equal 1, ErrorLog.count, "narrowing the catch-all would lose the trail of a genuine fault"
+    end
   end
 
   def test_a_post_with_the_pages_token_is_accepted

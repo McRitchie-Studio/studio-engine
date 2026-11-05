@@ -7,6 +7,8 @@ module Studio
     # methods only.
     include Studio::SessionDrift
 
+    INVALID_TOKEN_MESSAGE = "This page has expired. Reload it, then try again."
+
     included do
       # ORDER IS LOAD-BEARING — ActiveSupport::Rescuable resolves handlers with
       # `reverse_each`, so the LAST matching rescue_from registered wins. The
@@ -19,6 +21,7 @@ module Studio
       rescue_from ActiveRecord::RecordNotFound, with: :handle_not_found
       # A string, so including this concern does not load the model concern.
       rescue_from "Sluggable::SlugRefused", with: :handle_slug_refused
+      rescue_from ActionController::InvalidAuthenticityToken, with: :handle_invalid_authenticity_token
 
       before_action :require_authentication
       after_action :track_user_session
@@ -268,6 +271,21 @@ module Studio
         format.html { redirect_back_or_to root_path, alert: reason }
         format.json { render json: { error: reason }, status: :unprocessable_entity }
         format.any  { render plain: reason, status: :unprocessable_entity }
+      end
+    end
+
+    # Layer 1: a bad or missing CSRF token is the request's fault, and anyone can
+    # send one to any public POST, so it never writes an ErrorLog row. Left to the
+    # catch-all, production answered 500 to JSON and a redirect home with "Something
+    # went wrong" to HTML, and wrote a row each time; test re-raised, so no test saw it.
+    #
+    # JSON (every fetch the engine's pages make) gets a 422 the page can read. Anything
+    # else re-raises to Rails' own 422 (public/422.html, or the host's exceptions_app),
+    # as handle_not_found does, so the app's own page answers.
+    def handle_invalid_authenticity_token(exception)
+      respond_to do |format|
+        format.json { render json: { error: INVALID_TOKEN_MESSAGE, reason: "invalid_token" }, status: :unprocessable_entity }
+        format.any { raise exception }
       end
     end
 
