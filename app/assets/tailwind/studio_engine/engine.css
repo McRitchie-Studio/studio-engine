@@ -1271,8 +1271,10 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
        direction of the cards' top highlight. Four shadows: top light, bottom shade, contact, and
        a glow in the button's own color.
 
-       THE GRADIENT NEVER GOES LIGHTER THAN THE FILL. It starts at the token and falls to 84% of
-       it, so white on the top stop is exactly the contrast the fill already had.
+       THE GRADIENT KEEPS ITS CHROMA. Both stops are built in oklch from the token, a brighter
+       and an equally saturated top over a deep saturated bottom; mixing toward black or grey is
+       what mutes a button. White text is held to 4.5:1 against the midpoint behind it, so the
+       top stop reads lower, as it does in the rule this follows.
 
        WHO GETS WHAT. Filled buttons: gradient, top, bottom, contact. The glow only on a full-size
        .btn-primary, since a tab or a small primary in a toolbar is not the main action. Neutral,
@@ -1286,31 +1288,48 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
        FOCUS IS AN OUTLINE on .btn, which no box-shadow here touches. The ring variables stay in
        each list, for an element a host gave a ring utility, such as a selected summary card.
 
-       HEIGHT. A filled button gets a clear 1px border, so a selected tab is as tall as the
-       neutral tabs beside it. The gradient paints under that border.
+       EDGE TO EDGE. An inset box-shadow paints inside the padding box, so a 1px border leaves a
+       strip where the light and the shade stop short. The inset shadows live on ::after, over
+       the whole border box and on the same radius. The clear 1px border stays as a spacer, so
+       every size, including a hand-sized .btn px-3 py-1, keeps its box and a selected tab is as
+       tall as the neutral tabs beside it. Neutral paints its hairline there too. An outline
+       button keeps its real border.
 
        data-lit-state forces a state, for the specimens on the style guide. */
     html[data-surface-style="glass"] {
       --lit-top: inset 0 1px 0 rgb(255 255 255 / 0.35);
       --lit-bottom: inset 0 -2px 0 rgb(0 0 0 / 0.2);
-      --lit-contact: 0 1px 2px rgb(29 24 50 / 0.32);
+      --lit-contact: 0 1px 2px rgb(0 0 0 / 0.4);
+      --lit-glow: 0 8px 24px -6px;
+      --lit-glow-alpha: 0.6;
       --lit-soft-top: inset 0 1px 0 rgb(255 255 255 / 0.8);
       --lit-soft-bottom: inset 0 -1px 0 rgb(29 24 50 / 0.08);
-      --lit-pressed: inset 0 2px 4px rgb(0 0 0 / 0.3);
+      --lit-pressed: inset 0 2px 4px rgb(0 0 0 / 0.27);
       --lit-soft-pressed: inset 0 2px 3px rgb(29 24 50 / 0.16);
       --lit-badge: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 1px 1px rgb(29 24 50 / 0.12);
       --lit-input: inset 0 1px 2px rgb(29 24 50 / 0.14), inset 0 -1px 0 rgb(255 255 255 / 0.6);
       --lit-rings: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000);
     }
     html.dark[data-surface-style="glass"] {
-      --lit-contact: 0 1px 2px rgb(0 0 0 / 0.6);
+      --lit-contact: 0 1px 2px rgb(0 0 0 / 0.65);
+      --lit-glow: 0 8px 28px -6px;
+      --lit-glow-alpha: 0.8;
       --lit-soft-top: inset 0 1px 0 rgb(255 255 255 / 0.12);
       --lit-soft-bottom: inset 0 -1px 0 rgb(0 0 0 / 0.25);
       --lit-soft-pressed: inset 0 2px 3px rgb(0 0 0 / 0.4);
       --lit-badge: inset 0 1px 0 rgb(255 255 255 / 0.14), 0 1px 1px rgb(0 0 0 / 0.35);
       --lit-input: inset 0 1px 2px rgb(0 0 0 / 0.4), inset 0 -1px 0 rgb(255 255 255 / 0.06);
     }
-    html[data-surface-style="glass"] .btn-primary { --lit-fill: var(--color-cta-fill, var(--color-cta)); --lit-hover-fill: var(--color-cta-hover); }
+    /* Stops: the app's primary is often too light for white, so it steps down its own lightness;
+       the semantic fills already hold 4.5:1, so the midpoint stays on the fill. */
+    html[data-surface-style="glass"] .btn-primary {
+      --lit-top-stop: oklch(from var(--color-cta) calc(l - 0.03) calc(c + 0.03) h);
+      --lit-low-stop: oklch(from var(--color-cta) calc(l - 0.18) calc(c + 0.05) h);
+    }
+    html[data-surface-style="glass"] :is(.btn-secondary, .btn-danger, .btn-warning, .btn-success) {
+      --lit-top-stop: oklch(from var(--lit-fill) calc(l + 0.05) calc(c + 0.02) h);
+      --lit-low-stop: oklch(from var(--lit-fill) calc(l - 0.08) calc(c + 0.02) h);
+    }
     html[data-surface-style="glass"] .btn-secondary { --lit-fill: var(--btn-secondary-bg, var(--color-success)); }
     html[data-surface-style="glass"] .btn-danger { --lit-fill: var(--color-danger-fill, var(--color-danger)); }
     html[data-surface-style="glass"] .btn-warning { --lit-fill: var(--color-warning-fill, var(--color-warning)); }
@@ -1318,24 +1337,44 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
     html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(:disabled, [aria-disabled="true"]) {
       border: 1px solid transparent;
       background-origin: border-box;
-      background-image: linear-gradient(var(--lit-fill), color-mix(in srgb, var(--lit-fill) 84%, #000));
-      box-shadow: var(--lit-rings), var(--lit-top), var(--lit-bottom), var(--lit-contact);
+      background-image: linear-gradient(var(--lit-top-stop), var(--lit-low-stop));
+      --lit-inset: var(--lit-top), var(--lit-bottom);
+      --lit-inset-pressed: var(--lit-pressed);
+      box-shadow: var(--lit-rings), var(--lit-contact);
     }
     html[data-surface-style="glass"] .btn-primary:not(.btn-sm, :disabled, [aria-disabled="true"]) {
-      box-shadow: var(--lit-rings), var(--lit-top), var(--lit-bottom), var(--lit-contact),
-        0 8px 24px -6px color-mix(in srgb, var(--lit-fill) 60%, transparent);
+      box-shadow: var(--lit-rings), var(--lit-contact),
+        var(--lit-glow) oklch(from var(--lit-low-stop) l c h / var(--lit-glow-alpha));
     }
     html[data-surface-style="glass"] .btn-primary:not(:disabled, [aria-disabled="true"]):is(:hover, [data-lit-state="hover"]) {
-      background-image: linear-gradient(var(--lit-hover-fill), color-mix(in srgb, var(--lit-hover-fill) 84%, #000));
+      filter: brightness(0.94);
     }
-    html[data-surface-style="glass"] :is(.btn-neutral, .btn-outline, .btn-google):not(:disabled, [aria-disabled="true"]) {
+    html[data-surface-style="glass"] :is(.btn-neutral, .btn-google):not(:disabled, [aria-disabled="true"]) {
+      border-color: transparent;
+      --lit-inset: inset 0 0 0 1px var(--surface-glass-line), var(--lit-soft-top), var(--lit-soft-bottom);
+      --lit-inset-pressed: inset 0 0 0 1px var(--surface-glass-line), var(--lit-soft-pressed);
+      box-shadow: var(--lit-rings), var(--lit-contact);
+    }
+    html[data-surface-style="glass"] .btn-outline:not(:disabled, [aria-disabled="true"]) {
       box-shadow: var(--lit-rings), var(--lit-soft-top), var(--lit-soft-bottom), var(--lit-contact);
     }
-    html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(:disabled, [aria-disabled="true"]):is(:active, [data-lit-state="pressed"]) {
-      box-shadow: var(--lit-rings), var(--lit-pressed);
-    }
-    html[data-surface-style="glass"] :is(.btn-neutral, .btn-outline, .btn-google):not(:disabled, [aria-disabled="true"]):is(:active, [data-lit-state="pressed"]) {
+    html[data-surface-style="glass"] .btn-outline:not(:disabled, [aria-disabled="true"]):is(:active, [data-lit-state="pressed"]) {
       box-shadow: var(--lit-rings), var(--lit-soft-pressed);
+    }
+    html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success, .btn-neutral, .btn-google):not(:disabled, [aria-disabled="true"], .absolute, .fixed, .sticky) { position: relative; }
+    html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success, .btn-neutral, .btn-google):not(:disabled, [aria-disabled="true"])::after {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      border-radius: inherit;
+      pointer-events: none;
+      box-shadow: var(--lit-inset);
+    }
+    html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success, .btn-neutral, .btn-google):not(:disabled, [aria-disabled="true"]):is(:active, [data-lit-state="pressed"]) {
+      box-shadow: var(--lit-rings);
+    }
+    html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success, .btn-neutral, .btn-google):not(:disabled, [aria-disabled="true"]):is(:active, [data-lit-state="pressed"])::after {
+      box-shadow: var(--lit-inset-pressed);
     }
     @media (prefers-reduced-motion: no-preference) {
       html[data-surface-style="glass"] .btn:not(.btn-sm, :disabled, [aria-disabled="true"]):is(:active, [data-lit-state="pressed"]) { translate: 0 1px; }
