@@ -1359,6 +1359,7 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
     @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
       html.dark[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(.btn-sm, :disabled, [aria-disabled="true"]) {
         --lit-fill-alpha: 0.88;
+        background-color: transparent;
         -webkit-backdrop-filter: blur(6px);
         backdrop-filter: blur(6px);
       }

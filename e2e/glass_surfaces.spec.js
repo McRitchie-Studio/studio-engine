@@ -115,6 +115,8 @@ test("full-size buttons are a touch transparent in dark and solid in light", asy
   await theme(page, true);
   expect(await css(page, "primary", "backdropFilter")).toContain("blur");
   expect(await css(page, "primary", "backgroundImage")).toContain("/ 0.88");
+  // An opaque fill under the gradient would hide the backdrop however thin the gradient is.
+  expect(await css(page, "primary", "backgroundColor")).toBe("rgba(0, 0, 0, 0)");
   expect(await css(page, "small", "backdropFilter")).toBe("none");
 
   await theme(page, false);
