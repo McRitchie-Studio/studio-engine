@@ -1632,7 +1632,7 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       box-shadow: none;
     }
     html[data-surface-style="glass"] .btn.studio-border-glow:not(.btn-outline, :disabled, [aria-disabled="true"])::after {
-      inset: -36px;
+      inset: -46px;
       box-shadow: none;
     }
 

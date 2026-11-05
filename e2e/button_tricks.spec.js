@@ -156,7 +156,7 @@ test("the tricks keep a lit button lit", async ({ page }) => {
   expect(await after(glow, "top")).toBe("-28px");
   expect(await after(glow, "boxShadow")).toBe("none");
   expect(await host(glow, "boxShadow")).toContain("inset");
-  expect(await after("section#button-tricks button.studio-border-glow", "top")).toBe("-36px");
+  expect(await after("section#button-tricks button.studio-border-glow", "top")).toBe("-46px");
 
   // The inset light still rides ::after on a sheen, and overflow does not cut it.
   const sheen = "section#button-tricks button.sheen";

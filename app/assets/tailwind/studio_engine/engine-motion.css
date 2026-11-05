@@ -169,11 +169,14 @@
   transform: translateZ(0);
 }
 
-/* On a button the halo needs room: 10px of reach ends an 18px blur on a hard line,
-   which reads as a box around so small a host. Twice the blur lets it fade out. */
+/* On a button the halo needs room, as .edge-rotate-glow's bloom does. Mask applies
+   after filter, so the gradient stops at the padding box and the transparent border
+   is empty room for the blur to fade into. Without it the halo ends on a hard box. */
 .btn.studio-border-glow::after {
-  inset: -36px;
-  padding: 36px;
+  inset: -46px;
+  padding: 10px;
+  border: 36px solid transparent;
+  background-clip: padding-box;
 }
 
 @keyframes studioBorderGlowSteam {
