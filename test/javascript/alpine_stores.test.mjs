@@ -216,6 +216,16 @@ for (const [name, options] of [
   })
 }
 
+test("instant: a storage that throws still flips and still clears the attribute", () => {
+  const p = page("dark", { doc: {} })
+  p.store.setItem = () => { throw new Error("QuotaExceededError") }
+  assert.doesNotThrow(() => p.theme.toggle())
+  assert.equal(p.theme.value, "light")
+  assert.equal(p.html.set.has("dark"), false)
+  p.later[0][0]()
+  assert.equal(p.html.dataset.themeFlip, undefined, "a stranded attribute keeps transition: none on the whole page")
+})
+
 for (const attribute of ["turboVisitDirection", "pageTransition"]) {
   test(`instant: during a visit (${attribute}) a toggle leaves Turbo's transition alone`, () => {
     const p = page("dark")

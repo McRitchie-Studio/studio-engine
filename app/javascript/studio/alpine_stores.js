@@ -70,7 +70,8 @@ export function themeStore(env) {
       var commit = function () {
         root.classList.toggle('dark', value === 'dark')
         self.value = value
-        env.storage.setItem('theme', value)
+        // A full or blocked storage must not throw past the instant path's settle and strand data-theme-flip.
+        try { env.storage.setItem('theme', value) } catch (_) { /* the page still flips; the choice is not kept */ }
       }
       // Nothing to show, but the three may have drifted: a host can write the class directly.
       if (wanted === null && value === classTheme(root)) return commit()
