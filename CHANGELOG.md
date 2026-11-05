@@ -4,8 +4,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
-## 0.129.0 — 2026-11-05
-
 ### Changed
 
 - **Tricks starts with the buttons, then what you can add to them.** A new Button tricks group
@@ -18,6 +16,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   button in a `.fizz-stack`. The hold button's markup and selectors are unchanged. The only tie was
   the `.hold-stack` selector.
 - **Trial: a dark, full-size lit button's fill drops from 0.94 to 0.85 alpha** (`--lit-fill-alpha`).
+
+### Fixed
+
+- **The button tricks keep a lit button lit.** A lit button's `::after` closed the hole in the glow's
+  bloom, which washed its whole face. The sheen clipped the top highlight, and the pulse dropped the
+  lit shadow. `.studio-border-glow` on a button no longer ends its halo on a hard box edge.
+
+## 0.129.0 — 2026-11-05
+
+### Changed
+
 - **The `/admin/style` copy is trimmed.** Each section keeps at most one short sentence of intro,
   and the notes under specimens are cut the same way. Controls, specimens and error messages are
   unchanged. The hidden copy-to-agent references on the modal cards are unchanged too. The Tricks
@@ -31,9 +40,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
-- **The button tricks keep a lit button lit.** A lit button's `::after` closed the hole in the glow's
-  bloom, which washed its whole face. The sheen clipped the top highlight, and the pulse dropped the
-  lit shadow. `.studio-border-glow` on a button no longer ends its halo on a hard box edge.
 - **A theme toggle is one crossfade.** `$store.theme.toggle()` added `theme-transition` for 300ms, and
   in a host with that rule about 210 elements ran their own 200ms transition while gradients and
   the page background snapped. It now flips the whole page in one 160ms view transition with no
