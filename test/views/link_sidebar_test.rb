@@ -54,7 +54,7 @@ class LinkSidebarTest < Minitest::Test
 
   # --- no label word, and the groups stay apart ------------------------------
 
-  def test_no_section_shows_a_label_word_at_any_level
+  def test_no_section_shows_a_label_word_by_default
     [[true, SECTIONS], [false, [SECTIONS.first]]].each do |admin, sections|
       doc = Nokogiri::HTML5.fragment(render_sidebar(sections: sections, admin: admin))
 
