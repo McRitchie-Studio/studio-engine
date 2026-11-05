@@ -1608,10 +1608,10 @@ html[data-theme-flip]::view-transition-new(*) {
        direction of the cards' top highlight. Four shadows: top light, bottom shade, contact, and
        a glow in the button's own color.
 
-       THE GRADIENT KEEPS ITS CHROMA. Both stops are built in oklch from the token, a brighter
-       and an equally saturated top over a deep saturated bottom; mixing toward black or grey is
-       what mutes a button. White text is held to 4.5:1 against the midpoint behind it, so the
-       top stop reads lower, as it does in the rule this follows.
+       THE GRADIENT KEEPS ITS CHROMA. Both stops are built in oklch from the token, the same step
+       lighter and darker at the token's own chroma; mixing toward black or grey is what mutes a
+       button. The midpoint is the token, so white text holds 4.5:1 there on the semantic fills
+       and about 3:1 on the default primary, which Alex McRitchie accepted to match the brand word.
 
        WHO GETS WHAT. Every full-size filled button: gradient, top, bottom, contact and a glow in
        its own color, on the same 0.15 lightness range. A .btn-sm has no glow, since a toolbar or
@@ -1689,7 +1689,7 @@ html[data-theme-flip]::view-transition-new(*) {
         var(--lit-glow) oklch(from var(--lit-glow-stop, var(--lit-low-stop)) l c h / var(--lit-glow-alpha));
     }
     /* On a dark page a deep green, red or orange glow disappears, so these glow from the top
-       stop. The violet is already bright enough at its low stop. */
+       stop. The violet, centered on the brand colour, is bright enough at its low stop. */
     html.dark[data-surface-style="glass"] :is(.btn-secondary, .btn-danger, .btn-warning, .btn-success) { --lit-glow-stop: var(--lit-top-stop); }
     /* A TOUCH OF TRANSPARENCY on a full-size filled button, dark theme only: a photo behind it
        shows subtly, and white text holds its contrast at the midpoint. An outer shadow is not painted
