@@ -233,6 +233,81 @@ class SurveyFlowTest < ActionDispatch::IntegrationTest
     assert_redirected_to "/surveys/first-game"
   end
 
+  # --- a save or a submit that overlaps a completion -----------------------------
+
+  # What the row looked like to a request that found it open: locate hands back
+  # this copy, loaded before the completion. Hand-rolled, as Minitest 6 has no stub.
+  def with_located(copy)
+    original = Studio::SurveyResponse.method(:locate)
+    Studio::SurveyResponse.define_singleton_method(:locate) { |*_args, **_opts| copy }
+    yield
+  ensure
+    Studio::SurveyResponse.define_singleton_method(:locate, original)
+  end
+
+  def open_then_complete
+    patch "/surveys/first-game/answers/overall", params: { value: "5" }, as: :json
+    stale = Studio::SurveyResponse.sole
+    post "/surveys/first-game", params: { answers: complete_answers }
+    assert Studio::SurveyResponse.sole.completed?
+    @completed.clear
+    stale
+  end
+
+  test "a save after completion answers 409 and changes nothing" do
+    open_then_complete
+    finished = Studio::SurveyResponse.sole.answers
+
+    patch "/surveys/first-game/answers/rules", params: { value: "1" }, as: :json
+
+    assert_response :conflict
+    assert_equal "already complete", response.parsed_body["error"]
+    assert_equal finished, Studio::SurveyResponse.sole.answers
+  end
+
+  test "a save that found the row open before a submit completed it answers 409, not a validation error" do
+    stale = open_then_complete
+    finished = Studio::SurveyResponse.sole.answers
+
+    with_located(stale) { patch "/surveys/first-game/answers/rules", params: { value: "1" }, as: :json }
+
+    assert_response :conflict
+    assert_equal "already complete", response.parsed_body["error"]
+    assert_equal finished, Studio::SurveyResponse.sole.answers
+  end
+
+  test "a submit that found the row open before another completed it keeps the answers and fires no second hook" do
+    stale = open_then_complete
+    finished = Studio::SurveyResponse.sole.answers
+
+    with_located(stale) { post "/surveys/first-game", params: { answers: complete_answers.merge(word: "Stale") } }
+
+    assert_redirected_to "/surveys/first-game/thanks"
+    assert_empty @completed
+    assert_equal finished, Studio::SurveyResponse.sole.answers
+  end
+
+  test "a submit completes inside its transaction and fires the hook after the commit, once" do
+    connection = Studio::SurveyResponse.connection
+    depth_at_completion = nil
+    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+      depth_at_completion = connection.open_transactions if payload[:sql].match?(/UPDATE.*completed_at/m)
+    end
+    depth_at_hook = nil
+    Studio.on_survey_completed = lambda { |record|
+      depth_at_hook = connection.open_transactions
+      @completed << record
+    }
+
+    post "/surveys/first-game", params: { answers: complete_answers }
+
+    assert_equal 1, depth_at_completion, "the completion must share the answers' lock"
+    assert_equal 0, depth_at_hook, "a hook that mails must not run in an open transaction"
+    assert_equal 1, @completed.size
+  ensure
+    ActiveSupport::Notifications.unsubscribe(subscriber)
+  end
+
   # --- attribution ------------------------------------------------------------------
 
   test "a signed-in respondent is attributed to current_user" do

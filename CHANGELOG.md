@@ -33,6 +33,16 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   nothing below `md`. The engine lab shows it over the hub's Denver photo at
   `/lab/sidebar_panels?sidebar=1&busy=photo`.
 
+### Fixed
+
+- **A late survey autosave can no longer change a completed response.** `record_answer` rewrote
+  the whole answers hash from the copy it had loaded, so a save that overlapped the submit could
+  replace the finished answers with a stale set, and two saves at once could lose each other's
+  keys. It now reads and writes under a row lock, and it refuses a completed row. The submit holds
+  one lock from its first answer through the completion. `on_survey_completed` still fires once,
+  after the commit. The stepper cancels any save still in flight when the form submits. A save that
+  loses the race answers 409, and the stepper shows the visitor no error. A host needs no change.
+
 ## 0.127.0 — 2026-11-04
 
 ### Added

@@ -87,25 +87,32 @@ module Studio
 
     # Stores one answer (or clears it, for a blank). Returns [ok, error]. Never
     # touches a completed response: a finished survey is a record, not a draft.
+    #
+    # THE ROW LOCK IS THE GUARD, not the loaded copy. This writes the whole answers
+    # hash, so a copy loaded before a submit completed the row would put its stale
+    # hash over the finished answers, and two saves at once would lose each other's
+    # keys. with_lock reloads under the lock, so both checks read the row as it is.
     def record_answer(question, raw)
-      return [false, "This survey is already complete."] if completed?
+      with_lock do
+        next [false, "This survey is already complete."] if completed?
 
-      value, error = question.normalize(raw)
-      return [false, error] if error
+        value, error = question.normalize(raw)
+        next [false, error] if error
 
-      next_answers = (answers || {}).dup
-      if value.nil?
-        next_answers.delete(question.key)
-      else
-        next_answers[question.key] = {
-          "value" => value, "label" => question.label, "type" => question.type.to_s,
-          "display" => question.display(value), "answered_at" => Time.current.utc.iso8601
-        }
+        next_answers = (answers || {}).dup
+        if value.nil?
+          next_answers.delete(question.key)
+        else
+          next_answers[question.key] = {
+            "value" => value, "label" => question.label, "type" => question.type.to_s,
+            "display" => question.display(value), "answered_at" => Time.current.utc.iso8601
+          }
+        end
+        self.answers = next_answers
+        self.current_key = question.key
+        save!
+        [true, nil]
       end
-      self.answers = next_answers
-      self.current_key = question.key
-      save!
-      [true, nil]
     end
 
     def missing_required(survey)

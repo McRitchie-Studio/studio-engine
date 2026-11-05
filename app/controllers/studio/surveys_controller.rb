@@ -32,11 +32,15 @@ module Studio
       return render(json: { error: "unknown question" }, status: :not_found) unless question
 
       response = open_response!
-      return render(json: { error: "already complete" }, status: :conflict) unless response
+      return render_already_complete unless response
 
       ok, error = rescue_survey_write(response) { response.record_answer(question, params[:value]) }
       if ok
         render json: { saved: true, key: question.key, answered: response.answers.keys & @survey.keys }
+      elsif response.completed?
+        # A submit completed it after this request found it open: the same answer
+        # as the branch above, never a validation error for the visitor to read.
+        render_already_complete
       else
         render json: { saved: false, error: error }, status: :unprocessable_entity
       end
@@ -48,6 +52,10 @@ module Studio
 
       submitted = submitted_answers
       @errors = {}
+      completed = false
+      # One transaction, so record_answer's row lock holds from the first answer to
+      # the completion and a late autosave cannot change an answer between the two.
+      # The hook runs after the commit.
       Studio::SurveyResponse.transaction do
         @survey.questions.each do |question|
           next unless submitted.key?(question.key)
@@ -55,10 +63,11 @@ module Studio
           ok, error = response.record_answer(question, submitted[question.key])
           @errors[question.key] = error unless ok
         end
+        response.missing_required(@survey).each { |key| @errors[key] ||= "This one is required." }
+        completed = @errors.empty? && response.complete!(@survey)
       end
-      response.missing_required(@survey).each { |key| @errors[key] ||= "This one is required." }
 
-      if @errors.empty? && response.complete!(@survey)
+      if completed
         run_completed_hook(response)
         redirect_to studio_survey_thanks_path(@survey.slug), status: :see_other
       elsif response.completed?
@@ -76,6 +85,10 @@ module Studio
     end
 
     private
+
+    def render_already_complete
+      render json: { error: "already complete" }, status: :conflict
+    end
 
     def load_survey
       @survey = Studio.survey(params[:slug])

@@ -9,7 +9,8 @@
 //
 // AUTOSAVE IS BEST EFFORT: the final Submit posts the whole form, so a failed
 // autosave loses nothing. Without this module the page is the plain form, every
-// question on one page, and it submits the same answers.
+// question on one page, and it submits the same answers. So a submit cancels every
+// save still in flight: one left running could reach the server after the POST.
 //
 // It imports nothing; test/javascript/survey.test.mjs loads it as a data:
 // module. Bound to the page by the survey controller.
@@ -84,6 +85,7 @@ export function enhanceSurvey(root, win = window, doc = document) {
   var reduce = win.matchMedia && win.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var saved = {};
   var timers = {};
+  var requests = [];
   var current = -1;
   var pointerPick = false;
   var submitting = false;
@@ -121,12 +123,20 @@ export function enhanceSurvey(root, win = window, doc = document) {
     }
     var url = root.dataset.answerBase + encodeURIComponent(key);
     status.textContent = "Saving…";
+    var request = new win.AbortController();
+    requests.push(request);
     return win.fetch(url, {
       method: "PATCH",
       body: body,
       credentials: "same-origin",
+      signal: request.signal,
       headers: { "Accept": "application/json", "X-CSRF-Token": csrf }
     }).then(function (res) {
+      // Completed elsewhere, such as in a second tab. There is nothing to fix here.
+      if (res.status === 409) {
+        status.textContent = "";
+        return false;
+      }
       // fetch resolves on a 4xx/5xx — the status is the only signal.
       if (!res.ok) {
         return res.json().catch(function () { return {}; }).then(function (data) {
@@ -139,6 +149,8 @@ export function enhanceSurvey(root, win = window, doc = document) {
       status.textContent = "Saved";
       return true;
     }).catch(function () {
+      // The submit cancelled it, which is not the visitor being offline.
+      if (submitting) return false;
       status.textContent = "Offline? Your answers still go in when you submit.";
       return false;
     });
@@ -196,8 +208,8 @@ export function enhanceSurvey(root, win = window, doc = document) {
       setError(step, "");
     }
     if (current === steps.length - 1) {
-      // No autosave here: the POST carries every answer, and a PATCH racing
-      // it would land after completion and be refused.
+      // No autosave here: the POST carries every answer. The submit handler
+      // cancels any earlier save still in flight.
       submitForm();
     } else {
       if (step.dataset.key) save(step);
@@ -222,6 +234,7 @@ export function enhanceSurvey(root, win = window, doc = document) {
     }
     Object.keys(timers).forEach(function (key) { win.clearTimeout(timers[key]); });
     submitting = true;
+    requests.forEach(function (request) { request.abort(); });
     submit.disabled = true;
     submit.textContent = "Sending…";
   });

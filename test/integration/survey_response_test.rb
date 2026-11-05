@@ -168,6 +168,36 @@ class SurveyResponseTest < ActiveSupport::TestCase
     assert again.persisted?, "completed rows fall out of the one-open-response index"
   end
 
+  # Loaded before the submit, saved after it: what an autosave overlapping the
+  # submit does. The stale copy still reads as open.
+  test "a stale save leaves a completed response's answers intact" do
+    response = open!
+    stale = Studio::SurveyResponse.find(response.id)
+    response.record_answer(survey.question(:overall), 5)
+    response.record_answer(survey.question(:more), "x")
+    assert response.complete!(survey)
+    finished = Studio::SurveyResponse.find(response.id).answers
+
+    ok, error = stale.record_answer(survey.question(:rules), 1)
+
+    refute ok
+    assert_match(/already complete/, error)
+    stored = Studio::SurveyResponse.find(response.id)
+    assert stored.completed?
+    assert_equal finished, stored.answers
+  end
+
+  test "two saves from copies loaded together keep each other's keys" do
+    response = open!
+    first = Studio::SurveyResponse.find(response.id)
+    second = Studio::SurveyResponse.find(response.id)
+
+    first.record_answer(survey.question(:overall), 5)
+    second.record_answer(survey.question(:rules), 4)
+
+    assert_equal %w[overall rules], Studio::SurveyResponse.find(response.id).answers.keys.sort
+  end
+
   test "the user agent is stored as a coarse class only" do
     ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148"
     response = open!(user_agent: ua)
