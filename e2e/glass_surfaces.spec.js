@@ -140,6 +140,11 @@ const lum = ([r, g, b]) => {
   return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
 };
 
+// The lit primary centers on the brand violet (#8E82FE, 3.1:1 under white) so it matches a
+// text-primary word. Alex McRitchie accepted white near 3:1 on the primary for that
+// (lit-button-centers-on-brand); every other fill still holds AA.
+const FLOOR = { primary: 3.0 };
+
 const holdsContrast = async (page, browser, dark) => {
     await open(page);
     await page.evaluate(() => document.body.insertAdjacentHTML("beforeend", ["secondary", "success", "warning"].map((v) =>
@@ -161,13 +166,13 @@ const holdsContrast = async (page, browser, dark) => {
         context.drawImage(image, 0, 0);
         return [...context.getImageData(8, Math.floor(image.height / 2), 1, 1).data].slice(0, 3);
       }, `data:image/png;base64,${shot.toString("base64")}`);
-      expect(1.05 / (lum(pixel) + 0.05), `${id} ${pixel}`).toBeGreaterThanOrEqual(4.5);
+      expect(1.05 / (lum(pixel) + 0.05), `${id} ${pixel}`).toBeGreaterThanOrEqual(FLOOR[id] || 4.5);
     }
     await reader.close();
 };
 
-test("white text holds 4.5:1 at each filled button's midpoint, light", async ({ page, browser }) => holdsContrast(page, browser, false));
-test("white text holds 4.5:1 at each filled button's midpoint, dark", async ({ page, browser }) => holdsContrast(page, browser, true));
+test("white text holds its floor at each filled button's midpoint, light", async ({ page, browser }) => holdsContrast(page, browser, false));
+test("white text holds its floor at each filled button's midpoint, dark", async ({ page, browser }) => holdsContrast(page, browser, true));
 
 test("cards turn translucent, while a modal and a menu stay solid", async ({ page }) => {
   await open(page);
