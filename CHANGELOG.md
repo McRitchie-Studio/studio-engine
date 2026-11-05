@@ -9,8 +9,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **Hold to talk, before the phone test.** Studio's shared voice chat, from the review of
   `engine-chat-takes-voice`:
   - A tap under `TAP_MS` (300ms) on a hold button is now the recorder's `tapped` state: the
-    line says to hold the button, and the chip's silent run does not move, so the help no
-    longer opens by itself. A refused microphone and real silent takes still open it.
+    line says to hold the button, and it does not count as a silent take, so the help no longer
+    opens by itself. A refused microphone and two real silent takes in a row still open it; a
+    tap between two silent takes ends the run.
   - A held button keeps its whole box through a hold at phone width, stuck or not. The status
     line reserves two lines (one in a composer 36rem wide) and fixes its height for the hold,
     the chip stays one line, the timer sits on the button, and the recorder's own failed and
@@ -25,6 +26,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   - A key held on the talk button no longer dismisses the refused-microphone help.
   - The composer's picker scrolls within a short window, so the chip stays on screen.
   - Firefox's `AbortError` reads as a busy microphone, and Esc in the open picker stops there.
+
 ### Added
 
 - **Link sidebar: a section may show its header.** A section in `Studio.sidebar_sections` with

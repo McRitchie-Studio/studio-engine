@@ -35,8 +35,9 @@ silence with nothing on the page saying which microphone was used. So:
   Two silent takes in a row on one microphone open the help.
 - In hold mode, a press let go in under **300ms** (`TAP_MS`), or before the microphone
   opened, is the `tapped` state: the line says to hold the button (`tapped.status`). A tap
-  records too little to judge a microphone by, so the chip hears nothing of it. A refused
-  microphone is still `denied`, and opens the help.
+  records too little to judge a microphone by, so it is not a silent take. It does end a run:
+  the two silent takes must be in a row. A refused microphone is still `denied`, and opens
+  the help.
 - A key held on the button when a refusal opens the help does not press its Close: only a
   key pressed since the dialog opened counts.
 - A microphone another app holds (`NotReadableError`, Chrome's older
