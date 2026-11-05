@@ -28,6 +28,7 @@ const SPECIMENS = `
   <div id="ringed" class="card ring-2 ring-primary">Selected</div>
   <div id="panel" class="bg-surface rounded-xl border border-subtle border-primary/60 ring-1 ring-primary/30">Panel</div>
   <div id="field" class="card focus-within:border-primary"><input id="fieldInput"></div>
+  <label id="address" class="flex rounded-xl border border-subtle bg-surface focus-within:border-primary"><input id="addressInput"></label>
   <button id="ringbtn" class="btn btn-neutral ring-2 ring-primary">Go</button>
   <input id="ringinput" class="input-field ring-2 ring-primary">
 `;
@@ -219,6 +220,10 @@ test("a card's focus-within border still shows", async ({ page }) => {
   await page.locator("#fieldInput").focus();
 
   expect(await css(page, "field", "borderTopColor")).not.toBe(rest);
+
+  const panelRest = await css(page, "address", "borderTopColor");
+  await page.locator("#addressInput").focus();
+  expect(await css(page, "address", "borderTopColor"), "the /build address field shows its focus").not.toBe(panelRest);
 });
 
 test("badges and inputs take their own light, and a stuck header is a glass bar", async ({ page }) => {
