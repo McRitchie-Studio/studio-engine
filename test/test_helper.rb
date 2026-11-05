@@ -93,6 +93,7 @@ module Studio
   mattr_accessor :page_transition_direction, default: nil
   mattr_accessor :nav_spinner_min_ms,   default: 2500
   mattr_accessor :sidebar_sections,     default: []
+  mattr_accessor :sidebar_geo_signpost, default: true
   mattr_accessor :navbar_links,         default: []
   # Mirrors lib/studio.rb (whose writers validate; the mirror does not).
   mattr_accessor :navbar_user_name,     default: nil
