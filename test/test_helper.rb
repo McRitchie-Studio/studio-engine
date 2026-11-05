@@ -92,6 +92,7 @@ module Studio
   mattr_accessor :smooth_load,          default: false
   # Mirrors lib/studio.rb (whose writer validates; the mirror does not).
   mattr_accessor :page_transition_direction, default: nil
+  mattr_accessor :page_transition_style, default: :slide
   mattr_accessor :nav_spinner_min_ms,   default: 2500
   mattr_accessor :sidebar_sections,     default: []
   mattr_accessor :sidebar_geo_signpost, default: true
