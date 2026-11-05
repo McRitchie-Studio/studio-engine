@@ -91,6 +91,7 @@ class EngineClassVocabularyTest < ActiveSupport::TestCase
   # is the decision that its consumers must opt in. The style guide (style/) is
   # exempt: it is the showcase for this layer by design.
   OPT_IN_DEPENDENTS = %w[
+    studio/_fizz.html.erb
     studio/_fizz_layer.html.erb
     studio/agent_chat/_typing.html.erb
     studio/_hold_button.html.erb

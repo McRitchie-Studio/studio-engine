@@ -1,0 +1,26 @@
+<%#
+  Fizz around any button: bubbles that rise from behind it. Render it as a layout,
+  with the button as the block.
+
+    render layout: "studio/fizz", locals: { seed: "save" } do
+      <button class="btn btn-primary">Save</button>
+    end
+
+  Locals:
+    seed   - the string the bubble table is seeded from, so the scatter is stable
+             for this button and differs from its neighbours
+    level  - :lively (default), which boils at rest and adds a layer on hover, or
+             :calm, which simmers at rest and boils on hover
+    colors - optional palette, up to 18, three per zone (--fizz-c-1..18)
+
+  Decoration only. The hold button keeps its own stack (studio/_hold_button).
+%>
+<% lively = local_assigns.fetch(:level, :lively).to_s == "lively" %>
+<% fizz_style = fizz_palette_style(local_assigns[:colors]) %>
+<span class="fizz-stack<%= " fizz-lively" if lively %>"<% if fizz_style.present? %> style="<%= fizz_style %>"<% end %>>
+  <%= render "studio/fizz_layer", seed: seed, neutral: true %>
+  <% if lively %>
+    <%= render "studio/fizz_layer", seed: "#{seed}~extra", extra: true, neutral: true %>
+  <% end %>
+  <%= yield %>
+</span>

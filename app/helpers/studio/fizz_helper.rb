@@ -73,6 +73,11 @@ module Studio
         "--fd:#{bit[:delay]}s;--ft:#{bit[:duration]}s;--fc:#{fizz_color(bit)}"
     end
 
+    # A fixed palette as the inline style a stack carries: `--fizz-c-1:red;...`.
+    def fizz_palette_style(colors)
+      Array(colors).first(SLOTS).each_with_index.map { |c, i| "--fizz-c-#{i + 1}:#{c}" }.join(";")
+    end
+
     private
 
     # Where in its own zone a bubble sits. The outer columns each throw one
