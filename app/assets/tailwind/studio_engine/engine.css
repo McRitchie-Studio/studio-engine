@@ -804,8 +804,9 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
    flip. The whole page changes in one crossfade, whatever its size: no element
    runs its own transition, no named element keeps its own picture, and nothing
    here moves. !important because a wildcard pseudo-element is weaker than the
-   rules above and than a host's rule for a name. Clicks pass through the crossfade
-   to the page, so a second toggle lands. */
+   rules above and than a host's rule for a name. A pointer's click during the
+   crossfade hits the root, not the page (Chromium ignores pointer-events on these
+   pseudo-elements); a key press still reaches the focused toggle. */
 html[data-theme-flip],
 html[data-theme-flip] *,
 html[data-theme-flip] *::before,
@@ -820,7 +821,6 @@ html[data-theme-flip] * {
 
 html[data-theme-flip]::view-transition {
   background: none !important;
-  pointer-events: none;
 }
 
 html[data-theme-flip]::view-transition-group(*) {
@@ -830,15 +830,14 @@ html[data-theme-flip]::view-transition-group(*) {
 html[data-theme-flip]::view-transition-old(*),
 html[data-theme-flip]::view-transition-new(*) {
   mix-blend-mode: plus-lighter !important;
-  animation: 160ms linear both !important;
 }
 
 html[data-theme-flip]::view-transition-old(*) {
-  animation-name: vt-theme-out !important;
+  animation: vt-theme-out 160ms linear both !important;
 }
 
 html[data-theme-flip]::view-transition-new(*) {
-  animation-name: vt-theme-in !important;
+  animation: vt-theme-in 160ms linear both !important;
 }
 
 @keyframes vt-theme-out {

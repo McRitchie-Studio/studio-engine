@@ -5,7 +5,10 @@ const { blockOffsiteRequests } = require("./helpers");
 // data-theme-flip). Which animations ran is observable only in a browser. No host rule lives in
 // this lab, so the page carries the hub's theme-transition rule and 200 elements that would show
 // it: going back to the old class reddens the transition count here, not only a string match.
+// morph=both puts named elements on the page, which the flip must fold into the one picture. A
+// shared name also makes a visit fade, so the visit cases leave it out to see the slide.
 const LAB = "/lab/page_transitions?direction=left&morph=both";
+const LAB_NO_MORPH = "/lab/page_transitions?direction=left";
 const TOGGLE = "header button[title='Toggle theme']:visible";
 
 async function record(page) {
@@ -80,7 +83,11 @@ const noCrossfadeRunning = (page) => page.waitForFunction(() =>
 
 test("a toggle is one root crossfade under 200ms: no element transition, no page motion", async ({ page }) => {
   await open(page);
-  await page.locator(TOGGLE).first().click();
+  // Through the store, the toggle's one call, with no pointer or focus on the page. A pointer on
+  // the toggle loses :hover while the crossfade stands, since the root takes the hit test, and
+  // gets it back after; a key press draws its focus ring. Each is one button's own transition,
+  // and neither is the flip's.
+  await page.evaluate(() => { window.Alpine.store("theme").toggle(); });
   await expect.poll(() => state(page)).toEqual(agreed("light"));
   await noCrossfadeRunning(page);
 
@@ -146,18 +153,31 @@ test("a browser with no view transitions flips at once, with no transition of an
   expect(transitions).toEqual([]);
 });
 
-test("two real clicks inside one crossfade both land, and the three agree", async ({ page }) => {
+test("a key press during the crossfade lands, and the three agree", async ({ page }) => {
   await open(page);
-  const button = page.locator(TOGGLE).first();
-  const box = await button.boundingBox();
-  const x = box.x + box.width / 2;
-  const y = box.y + box.height / 2;
-  await page.mouse.click(x, y);
-  await page.waitForFunction(() => !document.documentElement.classList.contains("dark"));
-  await page.mouse.click(x, y);
+  await page.locator(TOGGLE).first().focus();
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => document.getAnimations().some((a) => (a.effect && a.effect.pseudoElement || "").startsWith("::view-transition")));
+  await page.keyboard.press("Enter");
   await expect.poll(() => state(page)).toEqual(agreed("dark"));
   await noCrossfadeRunning(page);
   expect(await page.evaluate(() => window.__rejections)).toEqual([]);
+});
+
+test("a pointer click during the crossfade leaves the three agreeing, and the next one flips", async ({ page }) => {
+  await open(page);
+  const box = await page.locator(TOGGLE).first().boundingBox();
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.click(x, y);
+  await page.mouse.click(x, y); // hits the root in Chromium, while the pseudo-elements stand
+  await expect.poll(async () => (await state(page)).flip).toBe("off");
+  const middle = await state(page);
+  expect(middle.dark).toBe(middle.value);
+  expect(middle.stored).toBe(middle.value);
+  await page.mouse.click(x, y);
+  const flipped = middle.value === "dark" ? "light" : "dark";
+  await expect.poll(() => state(page)).toEqual(agreed(flipped));
 });
 
 test("two toggles in one tick skip a transition with no rejection reaching the console", async ({ page }) => {
@@ -185,7 +205,7 @@ test("set by value lands on that theme and opens nothing when it is there alread
 });
 
 test("a toggle during a slow Turbo visit flips at once, and the slide still plays", async ({ page }) => {
-  await open(page, `${LAB}&slow=400`);
+  await open(page, `${LAB_NO_MORPH}&slow=400`);
   const load = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
   await page.locator('[data-test="other"]').first().click();
   await page.waitForFunction(() => document.documentElement.dataset.turboVisitDirection !== undefined);
@@ -199,7 +219,7 @@ test("a toggle during a slow Turbo visit flips at once, and the slide still play
 });
 
 test("a visit started right after a toggle plays its slide, in the new theme", async ({ page }) => {
-  await open(page);
+  await open(page, LAB_NO_MORPH);
   const load = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
   await page.evaluate(() => {
     window.Alpine.store("theme").toggle();
