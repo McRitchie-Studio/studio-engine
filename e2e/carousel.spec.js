@@ -143,6 +143,14 @@ test("a focused track shows a ring on its region, where the edge mask cannot cli
   expect(ring).toBe("solid");
 });
 
+test("an arrow key with a modifier is the browser's, not the row's", async ({ page }) => {
+  await open(page);
+  const row = track(page, "quotes");
+  await row.focus();
+  await page.keyboard.press("Alt+ArrowRight");
+  expect(await settled(row)).toBeLessThan(2);
+});
+
 test("a row that fits shows no controls", async ({ page }) => {
   await open(page);
   await expect(region(page, "pair")).toHaveAttribute("data-carousel-static", "");

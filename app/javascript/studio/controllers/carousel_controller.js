@@ -93,6 +93,8 @@ export default class extends Controller {
 
   key(event) {
     if (event.target.closest?.(TYPING)) return
+    // Alt+Left is Back, Cmd+Left a line start: a held modifier leaves the key alone.
+    if (event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) return
     const action = keyAction(event.key)
     if (!action) return
     event.preventDefault()
