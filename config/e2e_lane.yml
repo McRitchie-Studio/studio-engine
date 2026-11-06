@@ -1511,8 +1511,15 @@
 #   npx playwright test --list                                             -> 542 tests, 75 files
 # Retired here at 542: the census computes it.
 
-# The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
-# unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
-# arrived", a real property that catches a webServer that died after the health probe
-# or an upload step that wrote nothing.
-shards: 1
+# The shard matrix in .github/workflows/engine-ci.yml. The gate BINDS this number: every
+# receipt must report this shard total, and one receipt must arrive from each shard, so
+# a matrix entry deleted, or a denominator edited, goes red (bin/lib/e2e_executed_set.rb).
+# test/lib/e2e_lane_contract_test.rb pins the workflow matrix to it as well.
+#
+# 1 -> 3 on 2026-11-06 (ci-retry-killers). The lane outgrew the engine suite, which is
+# the trigger the workflow named for sharding. Run 42299310246: the specs took 17m27s
+# (750 tests, 93 files) after 2m13s of setup, against 9m09s for the engine suite. The
+# split, simulated from that run's own receipt by file, is about 6.4 / 5.6 / 5.2 min,
+# so each shard should finish near 8.5 min, inside the suite's wall time. Playwright
+# shards by FILE here (no fullyParallel), so the floor `executed >= shards` still holds.
+shards: 3
