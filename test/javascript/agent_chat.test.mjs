@@ -773,12 +773,12 @@ test("renderMarkdown builds nodes: bold, a list, a safe link", () => {
   assert.equal(el.textContent, "Pro is $49.onesee docs", "no break added beside a list")
 })
 
-// CONTROL: build the nodes from an HTML string (or drop safeHref from the link)
-// and this fails: an IMG, a SCRIPT or a javascript: href appears.
+// CONTROL: drop the safeHref check from markdownInline and this fails: an A with
+// a javascript: href appears. The module test above keeps innerHTML out entirely.
 test("renderMarkdown: an XSS attempt shows as its own characters", () => {
   const d = fakeDocument()
   const el = d.createElement("div")
-  const attack = `<img src=x onerror=alert(1)> **<script>alert(2)</script>** [click](javascript:alert(3)) [ok](https://a.example/"onmouseover="alert(4)) \`<b>\``
+  const attack = `<img src=x onerror=alert(1)> **<script>alert(2)</script>** [click](javascript:alert(3)) [a](javascript:void0) [b](data:text/html;base64,PHNjcmlwdD4=) [c](https://a.example/"onmouseover=x) \`<b>\``
   renderMarkdown(el, attack, d)
   const elements = allElements(el)
   assert.deepEqual(elements.map((e) => e.tagName), ["STRONG", "CODE"], "no IMG, SCRIPT, A or B element")
