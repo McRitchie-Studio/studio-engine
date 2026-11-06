@@ -103,10 +103,13 @@ jobs:
     timeout-minutes: 45
 
     steps:
+      # fetch-depth 2: on a pull_request the checkout is GitHub's merge commit, so
+      # HEAD^1 is the base tip and `bin/changelog-check` can diff the PR against it.
       - name: Checkout engine
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 2
 
       # Gemfile.lock MUST keep the `x86_64-linux` platform or this step fails
       # with "your bundle only supports platforms [arm64-darwin-*]" — the lock
@@ -128,6 +131,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .tool-versions
+
+      # Changelog fragments (changelog.d/README.md): a PR adds changelog.d/<slug>.<kind>.md
+      # and never writes under CHANGELOG.md's '## Unreleased', so parallel PRs cannot
+      # conflict on it. Pull requests only: a push has no PR base, and the release's own
+      # version commit compiles the fragments.
+      - name: Check the changelog fragment
+        if: github.event_name == 'pull_request'
+        run: bin/changelog-check
 
       - name: Run the engine suite
         run: bin/release-check
