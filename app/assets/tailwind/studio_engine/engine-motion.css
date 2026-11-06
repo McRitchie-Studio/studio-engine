@@ -33,6 +33,9 @@
   Loader:
     .studio-loader        the app's icon as a branded loader   (Loader Lab picks)
     .studio-loader-overlay  the page-load overlay around it    (docs/LOADER.md)
+    .studio-skeleton      the content's shape while it loads   (loader family)
+    .studio-infinite-scroll  the next page near the end        (loader family)
+    .studio-pull-refresh  pull down to reload, phones only     (loader family)
 
   Leveling:
     .level-badge(-1..-10) progressive level pill ladder       (ported, TM)
@@ -2482,6 +2485,38 @@ body.modal-open { overflow: visible; }
     animation-delay: calc(var(--studio-loader-i, 0) * 0.6s - var(--studio-loader-sparks, 5) * 0.6s);
   }
 
+  /* ---- The plain styles: no icon, only the theme's colours ----------------
+     spinner, dots and bar wrap the canonical .spinner, .loading-dots and
+     .progress-meter rules (sections 2, 3 and 7 above) and only set their knobs,
+     so the family and those classes stay one set of rules. */
+  .studio-loader[data-loader-style="spinner"] .spinner {
+    --spinner-size: var(--studio-loader-size);
+    --spinner-thickness: max(2px, calc(var(--studio-loader-size) * 0.1));
+    --spinner-color: var(--studio-loader-color);
+    --spinner-track: color-mix(in srgb, var(--studio-loader-color) 22%, transparent);
+  }
+
+  .studio-loader[data-loader-style="dots"] { height: calc(var(--studio-loader-size) * 0.5); }
+  .studio-loader[data-loader-style="dots"] .loading-dots {
+    --loading-dots-size: calc(var(--studio-loader-size) * 0.22);
+    --loading-dots-gap: calc(var(--studio-loader-size) * 0.11);
+    --loading-dots-color: var(--studio-loader-color);
+  }
+
+  .studio-loader[data-loader-style="bar"] {
+    display: block;
+    height: var(--studio-loader-bar-height, 6px);
+    max-width: 100%;
+  }
+  .studio-loader[data-loader-style="bar"] .progress-meter {
+    --progress-height: 100%;
+    --progress: calc(var(--studio-loader-percent, 0) * 1%);
+    --progress-fill: var(--studio-loader-color);
+    --progress-track: color-mix(in srgb, var(--studio-loader-color) 16%, transparent);
+    display: block;
+    width: 100%;
+  }
+
   /* ---- Pending: inside a button, shown only while it or its form is busy --- */
   .studio-loader[data-loader-pending] { display: none; }
   :where(form, button)[aria-busy="true"] .studio-loader[data-loader-pending] { display: inline-grid; }
@@ -2576,5 +2611,126 @@ body.modal-open { overflow: visible; }
     0% { transform: scale(0.8); opacity: 0; }
     9% { transform: scale(1.7) rotate(25deg); opacity: 1; animation-timing-function: ease-in; }
     26%, 100% { transform: scale(0.8); opacity: 0; }
+  }
+}
+
+/* =============================================================================
+   LOADER FAMILY — skeleton, infinite scroll and pull to refresh (docs/LOADER.md).
+   The branded loader above draws a wait; these three hold a page's shape while
+   it waits. Markup: app/views/studio/loader/_skeleton, _infinite_scroll and
+   _pull_to_refresh, through Studio::LoaderHelper. Behaviour:
+   studio/infinite_scroll and studio/pull_to_refresh (lazy controllers).
+
+   Tune:  --studio-skeleton-bone    a bone's fill (default text at 9%)
+          --studio-skeleton-shine   the shimmer's highlight (default text at 7%)
+          --studio-skeleton-width   one line's width (the helper varies them)
+          --studio-skeleton-speed   one shimmer pass (default 1.6s)
+
+   The bones are tints of --color-text over whatever sits behind them, so one
+   rule reads on a dark, light or glass surface. Under prefers-reduced-motion a
+   skeleton is still and the pull indicator does not spin.
+   ========================================================================== */
+@layer components {
+  .studio-skeleton {
+    --studio-skeleton-bone: color-mix(in srgb, var(--color-text) 9%, transparent);
+    --studio-skeleton-shine: color-mix(in srgb, var(--color-text) 7%, transparent);
+    --studio-skeleton-speed: 1.6s;
+    position: relative;
+    display: grid;
+    gap: 1rem;
+  }
+
+  .studio-skeleton-item { display: grid; gap: 0.6rem; align-content: start; }
+  .studio-skeleton-item[data-skeleton-kind="avatar"] {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    column-gap: 0.85rem;
+  }
+  .studio-skeleton-item[data-skeleton-kind="avatar"] > .studio-skeleton-lines { display: grid; gap: 0.5rem; }
+  .studio-skeleton-lines { display: grid; gap: 0.55rem; }
+
+  .studio-skeleton-bone {
+    display: block;
+    border-radius: 0.375rem;
+    background:
+      linear-gradient(90deg, transparent 0%, var(--studio-skeleton-shine) 50%, transparent 100%) 0 0 / 200% 100% no-repeat,
+      var(--studio-skeleton-bone);
+    background-position: 150% 0, 0 0;
+    animation: studio-skeleton-shimmer var(--studio-skeleton-speed) ease-in-out infinite;
+  }
+
+  .studio-skeleton-bone[data-bone="line"] {
+    height: 0.75rem;
+    width: var(--studio-skeleton-width, 100%);
+  }
+  .studio-skeleton-bone[data-bone="title"] { height: 1.1rem; width: var(--studio-skeleton-width, 55%); }
+  .studio-skeleton-bone[data-bone="avatar"] { width: 2.75rem; height: 2.75rem; border-radius: 9999px; }
+  .studio-skeleton-bone[data-bone="media"] { width: 100%; aspect-ratio: 16 / 9; border-radius: 0.75rem; }
+
+  .studio-skeleton-item[data-skeleton-kind="card"] {
+    padding: 0.85rem;
+    border-radius: 1rem;
+    border: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);
+  }
+
+  @keyframes studio-skeleton-shimmer {
+    from { background-position: 150% 0, 0 0; }
+    to { background-position: -50% 0, 0 0; }
+  }
+
+  /* ---- Infinite scroll ----------------------------------------------------
+     Each page arrives inside a <turbo-frame> nested in the one before. The
+     frames take no box (display: contents), so the items flow into the
+     list's own grid or stack as if they were one list. */
+  .studio-infinite-scroll turbo-frame { display: contents; }
+  .studio-infinite-scroll-more,
+  .studio-infinite-scroll-end {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: center;
+    padding-block: 1rem;
+  }
+  .studio-infinite-scroll-end { margin: 0; font-size: 0.875rem; color: var(--color-text-secondary); }
+  /* Turbo marks the frame aria-busy while it fetches: the button keeps its
+     place and shows a spinner instead of its words. */
+  .studio-infinite-scroll-next[aria-busy="true"] .studio-loader[data-loader-pending] { display: inline-grid; }
+  .studio-infinite-scroll-next[aria-busy="true"] [data-loader-idle] { display: none; }
+
+  /* ---- Pull to refresh ----------------------------------------------------
+     Phone widths and touch only: the controller arms itself there and nowhere
+     else, so on a desktop the indicator never shows. --studio-pull is how far
+     the finger has pulled, 0..1 of the threshold. */
+  .studio-pull-refresh { position: relative; }
+  .studio-pull-refresh-indicator {
+    --studio-pull: 0;
+    position: absolute;
+    top: 0;
+    left: 50%;
+    z-index: var(--z-raised, 10);
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 9999px;
+    background: var(--color-surface);
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--color-text) 18%, transparent);
+    color: var(--color-primary);
+    opacity: min(1, calc(var(--studio-pull) * 1.4));
+    transform: translate(-50%, calc(var(--studio-pull) * 4.5rem - 3rem)) rotate(calc(var(--studio-pull) * 270deg));
+    pointer-events: none;
+  }
+  .studio-pull-refresh-indicator[hidden] { display: none; }
+  .studio-pull-refresh[data-pull-state="settling"] .studio-pull-refresh-indicator { transition: transform 0.2s ease, opacity 0.2s ease; }
+  .studio-pull-refresh[data-pull-state="refreshing"] .studio-pull-refresh-indicator {
+    --studio-pull: 1;
+    transform: translate(-50%, 1.5rem);
+  }
+  .studio-pull-refresh-indicator .spinner { animation-play-state: paused; }
+  .studio-pull-refresh[data-pull-state="refreshing"] .studio-pull-refresh-indicator .spinner { animation-play-state: running; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .studio-skeleton-bone { animation: none; background-position: 150% 0, 0 0; }
+    .studio-pull-refresh-indicator,
+    .studio-pull-refresh-indicator * { transition: none !important; animation: none !important; }
   }
 }

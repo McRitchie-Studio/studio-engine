@@ -13,6 +13,12 @@ module Studio
   #   <%= studio_loader_pending %>                  inside a submit button
   #   <%= studio_loader_overlay %>                  the page-load overlay (layout, once)
   #
+  # The plain styles draw no icon, only theme colours (docs/LOADER.md, "The family"):
+  #
+  #   <%= studio_loader style: :spinner %>          a ring, 20px
+  #   <%= studio_loader style: :dots %>             three pulsing dots
+  #   <%= studio_loader style: :bar, percent: 40 %> a bar; without percent it sweeps
+  #
   # Prefixed names for the reason Studio::GeoHelper gives: every helper module is
   # included into every view.
   module LoaderHelper
@@ -22,7 +28,7 @@ module Studio
     LOADER_BEAD_LAYERS = [[46, 9, 0.5], [30, 9, 0.75], [16, 9, 0.95], [7, 9.5, 1], [2.6, 10, 1], [0.3, 17, 1]].freeze
     LOADER_BEAD_UNIT = 264.3
 
-    def studio_loader(size: 96, style: nil, icon: nil, art: nil, label: "Loading", percent: nil,
+    def studio_loader(size: nil, style: nil, icon: nil, art: nil, label: "Loading", percent: nil,
                       tone: nil, pending: false, **html)
       config = Studio.loader
       style = style ? Studio::Loader.style!(style) : config[:style]
@@ -34,7 +40,7 @@ module Studio
 
       render "studio/loader/loader",
              style: style,
-             size: studio_loader_size(size),
+             size: studio_loader_size(size.nil? ? Studio::Loader.default_size(style) : size),
              icon: icon || Studio.loader_icon,
              art: art_data,
              label: label,
