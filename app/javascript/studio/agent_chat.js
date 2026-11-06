@@ -418,7 +418,7 @@ export function mountAgentChat(root, {
       const agent = turn.role === "agent"
       if (text && state.typing.has(key)) {
         if (state.typing.get(key).words !== words) { stopTyping(key); showWords(text, words, agent) }
-      } else if (text && shownWords(text) !== words) {
+      } else if (text && shownWords(text, agent) !== words) {
         if (typeIn && state.loaded && agent && words && !reducedMotion()) startTyping(key, text, words)
         else showWords(text, words, agent)
       }
@@ -445,8 +445,11 @@ export function mountAgentChat(root, {
     if (agent) renderMarkdown(el, words, doc)
     else el.textContent = words
   }
-  function shownWords(el) {
-    return shown.has(el) ? shown.get(el) : el.textContent
+  // An agent turn the page rendered itself (studio/agent_chat/_turn prints raw
+  // words) has no entry, so it is rendered once as Markdown.
+  function shownWords(el, agent) {
+    if (shown.has(el)) return shown.get(el)
+    return agent ? null : el.textContent
   }
 
   // TYPE-IN: one answer's words, filled in REVEAL_FRAME_MS steps.

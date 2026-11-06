@@ -811,3 +811,21 @@ test("a rendered agent turn shows Markdown; a visitor's turn keeps its asterisks
   assert.equal(agent.textContent, "Yes.")
   assert.deepEqual(allElements(agent).map((e) => e.tagName), ["STRONG"])
 })
+
+// CONTROL: let shownWords read an agent element's textContent and this fails:
+// a reply the page printed itself keeps its raw asterisks.
+test("an agent turn the page rendered itself is upgraded to Markdown once", async () => {
+  const d = fakeDocument()
+  const page = standIn()
+  const text = d.createElement("div")
+  text.textContent = "**Yes.**"
+  const lines = { "[data-agent-chat-text]": text, "[data-agent-chat-failed]": { hidden: true }, "[data-agent-chat-held]": { hidden: true } }
+  const node = { dataset: { turnKey: "1:agent" }, querySelector: (s) => lines[s] || null, after() {} }
+  page.root.querySelector("[data-agent-chat-log]").querySelectorAll = () => [node]
+  const { asks, fetcher } = deferredFetch()
+  mountStandIn(page, fetcher)
+  asks[0].answer([{ id: 1, role: "agent", status: "answered", text: "**Yes.**" }])
+  await flush()
+  assert.deepEqual(allElements(text).map((e) => e.tagName), ["STRONG"])
+  assert.equal(text.textContent, "Yes.")
+})
