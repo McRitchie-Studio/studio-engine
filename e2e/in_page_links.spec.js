@@ -58,6 +58,7 @@ async function watch(page) {
       seen.frames.push({
         y: window.scrollY,
         transition: root.hasAttribute("data-page-transition") || root.hasAttribute("data-page-transition-visit"),
+        loader: [...document.querySelectorAll("[data-studio-loader-overlay]")].some((el) => !el.hidden) || root.hasAttribute("aria-busy"),
         current: current ? current.textContent.trim() : null,
       });
       requestAnimationFrame(tick);
@@ -91,6 +92,7 @@ test("a style tab scrolls down the page, with no Turbo visit and no page transit
   expect(result.visits, "no turbo:visit").toBe(0);
   expect(result.fetches, "the page is not fetched again").toBe(0);
   expect(result.frames.some((f) => f.transition), "no page-transition flag on <html> in any frame").toBe(false);
+  expect(result.frames.some((f) => f.loader), "no loader overlay and no busy page in any frame").toBe(false);
 
   const ys = result.frames.map((f) => f.y);
   const end = ys[ys.length - 1];
@@ -138,6 +140,7 @@ test("Back returns to where the reader was, and Forward to the section, with no 
   await page.waitForFunction(() => location.hash === "#tricks");
   await page.waitForTimeout(300);
   expect(await page.evaluate(() => window.scrollY), "Back lands at Tricks").toBeCloseTo(tricks, -1);
+  await expect(pill(page, "Tricks"), "the highlight follows Back").toHaveAttribute("aria-current", "true");
 
   await page.goBack();
   await page.waitForFunction(() => location.hash === "");
@@ -153,6 +156,7 @@ test("Back returns to where the reader was, and Forward to the section, with no 
   expect(result.visits, "no Turbo restore visit").toBe(0);
   expect(result.fetches).toBe(0);
   expect(result.frames.some((f) => f.transition)).toBe(false);
+  expect(result.frames.some((f) => f.loader)).toBe(false);
 });
 
 test("a link to another page is still a Turbo visit, and data-turbo=false is the browser's", async ({ page }) => {
