@@ -328,6 +328,19 @@ as a layout; the block draws each slide. `per_view:` is the wide row's count
 <% end %>
 ```
 
+`style: :spotlight` snaps each slide to the centre: the centred slide is full size and
+colour, with its `caption:` line (a callable on the item) under it, and its neighbours
+are smaller, faded and grey. The arrows and keys move one slide. Where the browser has
+scroll-driven animations the look follows the scroll; elsewhere the controller marks the
+centred slide (`data-current`) and CSS transitions it. Reduced motion only dims.
+
+```erb
+<%= render layout: "studio/carousel",
+      locals: { label: "Team", items: @people, style: :spotlight, caption: ->(person) { person.title } } do |person| %>
+  <%= render "people/card", person: person %>
+<% end %>
+```
+
 ### The "at" time stamp — `at_time_tag`
 
 Stamps WHEN something happened, on the reader's own clock: `at 3:53p`, gaining a

@@ -257,6 +257,7 @@ class StylePageTest < ActiveSupport::TestCase
     btn-neutral btn-outline btn-google btn-sm btn-lg
     card card-hover badge input-field empty-state label-upper
     studio-border-glow spinner loading-dots sheen ping fade-edge progress-meter
+    carousel-spotlight carousel-spotlight-body carousel-caption
     carousel carousel-track carousel-slide carousel-dot carousel-button
   ].freeze
 
