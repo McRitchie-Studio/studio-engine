@@ -243,8 +243,9 @@ The publisher puts `data-stuck` on the stuck header, and `data-pin-section-stuck
 
 Do not write `scroll-margin-top` by hand: `--nav-h + 5rem` does not know the page row or the bar.
 
-These are CSS alone. No script moves the page after a jump, so a Back, a reload, a Turbo visit
-and a scroll by the reader or the app all keep their place.
+These are CSS alone. A click on a tab is a scroll by `studio/in_page_links` (below), which
+reads the same margin. No script moves the page after a jump has settled, so a Back, a reload,
+a Turbo visit and a scroll by the reader or the app all keep their place.
 
 **A first jump from the top of the page lands low.** The navbar is still tall when the browser
 reads the margin, and it collapses after the jump. So the title lands by the collapse below the
@@ -258,6 +259,37 @@ change up to 80px of scroll before the bar swaps.
 
 A short last section cannot reach the line, so the section above it can keep its bar, with the
 title lower on the screen.
+
+### In-page links
+
+Alex McRitchie, 2026-11-06, on the style guide's tabs: "The system needs to understand when a
+scroll down is the solution rather than a page change." Turbo 8 makes a click on `#tricks` a
+full visit: a fetch, a render, `turbo:visit` and the page transition. So the engine takes that
+click itself, on every page of every app. Code: `app/javascript/studio/in_page_links.js`,
+imported by `studio/application`.
+
+A click is taken when all of these hold:
+
+- It is a plain click: the main button, no modifier key, and no handler took it first.
+- The link's address is this page: the same origin, path and query.
+- The link has a `#fragment`, and an element on the page has that id (or is an `<a name>`).
+- The link has no `target` other than `_self`, no `download`, no `data-turbo="false"` on it
+  or an ancestor, no `data-turbo-method`, `data-method` or `data-turbo-stream`, and no
+  `data-turbo-frame` other than `_top`.
+
+Every other link is left to Turbo or the browser, as before.
+
+| Step | What happens |
+|------|--------------|
+| Scroll | A smooth scroll to the target. Its own `scroll-margin-top` (`section-target`, `section-subtarget`) sets where it stops. With none, it stops under the pinned stack, measured at the click. Under reduced motion, it jumps. |
+| A target that moves | Content that grows on the way (a lazy frame, the navbar's collapse) moves the target, so the scroll aims again until it lands, or until the reader scrolls, touches, presses or types. |
+| History | The fragment is pushed, with Turbo's own state, and `hashchange` fires. Back and Forward between this page's entries scroll to the reader's earlier place, or to the fragment, with no Turbo restore visit. A Back from another page is Turbo's. |
+| Focus | The target takes focus with `preventScroll`. One that is not focusable gets `tabindex="-1"` and `data-in-page-focus` (no ring) until it loses focus. |
+| Events | `studio:in-page-scroll` bubbles from the link when the scroll starts (`detail: { link, target, hash }`). `studio:in-page-scroll-end` fires on the document when it settles or the reader takes over. |
+
+The style guide's tab row holds the clicked tab as current from the first event to the second,
+so the highlight does not run through every tab the scroll passes. A component that changes
+a panel by its hash keeps its own click: its handler runs first and prevents the default.
 
 ## Who has adopted it
 

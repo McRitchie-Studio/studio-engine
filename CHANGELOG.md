@@ -4,6 +4,19 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **A link to a place on the same page scrolls there. It no longer loads the page again.**
+  Alex McRitchie, on the style guide's tabs: "The system needs to understand when a scroll
+  down is the solution rather than a page change." Turbo 8 made a click on `#tricks` a full
+  visit: a fetch, a render and the page transition. `studio/in_page_links` now takes a plain
+  click on a link to this page's path and query with a `#fragment` whose element exists. It
+  smooth-scrolls to the element under the pinned stack (a jump under reduced motion), pushes
+  the fragment so Back and a shared link work, and moves focus to the target. Cross-page
+  links, modifier clicks, `target`, `download` and `data-turbo="false"` are untouched. The
+  style guide's tab highlight holds the clicked tab until the scroll settles
+  (docs/PAGE_HEADER.md, "In-page links"; task `in-page-links-scroll`).
+
 ## 0.132.0 — 2026-11-06
 
 ## 0.131.0 — 2026-11-05
