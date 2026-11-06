@@ -96,4 +96,79 @@ class PageHeaderRenderTest < Minitest::Test
     assert_includes render_row(title: "A").at_css(".page-header")["class"].split, "-mx-4"
     refute_includes render_row(title: "A", row_class: "mb-6").at_css(".page-header")["class"].split, "-mx-4"
   end
+
+  CRUMBS = [{ label: "Admin", href: "/admin" }, { label: "Deployments", href: "/deployments" }].freeze
+
+  def test_crumbs_render_a_trail_that_ends_with_the_page_itself
+    doc = render_row(title: "rel-20261105-9199b4", crumbs: CRUMBS)
+    trail = doc.at_css(".page-header-trail nav.page-header-crumbs[aria-label='Breadcrumb'] ol")
+    links = trail.css("li a.page-header-crumb")
+
+    assert_equal %w[Admin Deployments], links.map(&:text)
+    assert_equal %w[/admin /deployments], links.map { |a| a["href"] }
+    current = trail.at_css("li:last-child .page-header-crumb-current")
+    assert_equal "rel-20261105-9199b4", current.text
+    assert_equal "page", current["aria-current"]
+    assert_nil current.at_css("a"), "the page itself is not a link"
+    assert_equal "rel-20261105-9199b4", doc.at_css("h1").text, "the title stays the one h1"
+  end
+
+  def test_the_trail_comes_before_the_title_and_crumb_label_shortens_the_current_crumb
+    doc = render_row(title: "A very long release title", crumb_label: "Release", crumbs: CRUMBS)
+
+    assert_equal "Release", doc.at_css(".page-header-crumb-current").text
+    row = doc.at_css(".page-header")
+    assert_operator row.css("*").index(row.at_css(".page-header-trail")), :<, row.css("*").index(row.at_css("h1"))
+  end
+
+  # A crumb that leads up the trail is a Back: the page transition plays the app's move
+  # the other way for it (docs/PAGE_TRANSITIONS.md).
+  def test_every_ancestor_and_the_phone_parent_link_are_back_links
+    doc = render_row(title: "Release", crumbs: CRUMBS)
+
+    doc.css("a.page-header-crumb").each { |a| assert a.key?("data-page-transition-back"), a.text }
+    parent = doc.at_css("a.page-header-parent")
+    assert parent.key?("data-page-transition-back")
+    assert_equal "/deployments", parent["href"]
+    assert_equal "Back to Deployments", parent["aria-label"]
+    assert_includes parent.text, "Deployments"
+  end
+
+  def test_no_crumbs_render_no_trail_and_no_parent_link
+    doc = render_row(title: "Models")
+
+    assert_nil doc.at_css(".page-header-trail")
+    assert_nil doc.at_css(".page-header-parent")
+  end
+
+  def test_links_render_on_their_own_line_inside_the_sticky_row
+    doc = render_row(title: "Deployments", links: [{ label: "Epics", href: "/epics" }, { label: "Recent", href: "/tasks/recent", current: "page" }])
+    line = doc.at_css(".page-header > nav.page-header-links")
+
+    assert_equal "More links", line["aria-label"]
+    assert_equal %w[Epics Recent], line.css("a.page-header-link").map(&:text)
+    assert_equal "page", line.css("a").last["aria-current"]
+    assert_nil line.css("a").first["aria-current"]
+  end
+
+  def test_tabs_and_one_action_render_together_on_the_right
+    doc = render_row(title: "Deployments", label: "Views", tabs: TABS, actions_html: "<a href='/new'>New Task</a>".html_safe)
+
+    assert_equal %w[Users Teams], doc.css(".page-header-tabs a").map(&:text)
+    assert_equal "New Task", doc.at_css(".page-header-actions a").text
+    assert_equal doc.at_css(".page-header-tabs"), doc.at_css(".page-header-actions").previous_element
+  end
+
+  # One pill per row, drawn once and anchored by CSS to the tab with aria-current.
+  def test_the_tabs_carry_one_hidden_glide_pill_with_the_primary_look
+    doc = render_row(title: "Style", label: "Sections", tabs: TABS)
+    glides = doc.css(".page-header-track > .page-header-glide")
+
+    assert_equal 1, glides.size
+    assert_equal "true", glides.first["aria-hidden"]
+    assert_includes glides.first["class"].split, "btn-primary"
+    assert_equal glides.first, doc.at_css(".page-header-track").element_children.last, "after the tabs, so it can anchor to any of them"
+    doc.css(".page-header-track > a").each { |tab| assert tab.at_css("span.page-header-tab-label"), tab.text }
+    assert_nil render_row(title: "Plain").at_css(".page-header-glide")
+  end
 end

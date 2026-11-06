@@ -94,6 +94,7 @@ Rails.application.routes.draw do
   get "lab/style_chrome", to: "e2e_lab#style_chrome"
   get "lab/hero_button", to: "e2e_lab#hero_button"
   get "lab/page_header", to: "e2e_lab#page_header"
+  get "lab/carousel", to: "e2e_lab#carousel"
   get "lab/admin_models/:key", to: "e2e_lab_admin_models#show"
   get "lab/board", to: "e2e_lab#board"
   get "lab/chips", to: "e2e_lab#chips"
@@ -170,6 +171,8 @@ Rails.application.routes.draw do
   # which the browser lane does not stand up.
   get "agent_chat_lab", to: "agent_chat_lab#show"
   get "agent_chat_voice_lab", to: "agent_chat_voice_lab#show"
+  # The talk-to-agent modal on a host page (TalkToAgentLabController), same hub.
+  get "talk_to_agent_lab", to: "talk_to_agent_lab#show"
   get "agent_chat_voice_lab/sign_in", to: "agent_chat_voice_lab#sign_in"
 
   get "lab/session", to: "session_lab#show"

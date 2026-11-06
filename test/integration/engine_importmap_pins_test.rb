@@ -84,6 +84,9 @@ class EngineImportmapPinsTest < ActiveSupport::TestCase
     refute_includes boot_graph, "studio/local_path", "a module nothing in the boot imports is not preloaded"
     refute_includes boot_graph, "studio/controllers/board_controller",
                     "the board controller is registered lazily, so it is not preloaded on every page"
+    refute_includes boot_graph, "studio/controllers/carousel_controller",
+                    "the carousel controller is registered lazily, so it is not preloaded on every page"
+    refute_includes boot_graph, "studio/carousel", "only the lazy controller imports the carousel's math"
   end
 
   # The x-data factories a page binds by name are evaluated by Alpine as it

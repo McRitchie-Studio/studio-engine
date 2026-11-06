@@ -122,6 +122,51 @@ own message. A new agent turn is placed right after its own user turn, so a
 visitor who sends A, then B before A is answered, sees A's answer under A.
 `after` is a row id (rows with id > after).
 
+## Talk to an agent in a modal
+
+Any button on a page can open a short conversation with an agent, in a card, with
+the agent answering before the visitor types. It is the chat above in the
+page-scoped modal host, not a second chat: the same thread, proxy, caps and gate.
+
+```erb
+<%= studio_talk_to_agent_link "Talk to us about Pro", href: chat_path, soul: "alex", topic: "Pro",
+                              opener: "I'd like to talk about the Pro plan.", class: "btn btn-primary" %>
+...
+<%= render "studio/agent_chat/talk_modal", soul: "alex", name: "Alex", portrait: image_tag("alex.png") %>
+```
+
+| Piece | What it does |
+|-------|--------------|
+| `studio/agent_chat/_talk_modal` | Render it ONCE per page (locals `soul:`, `name:`, optional `portrait:`, `role:`, `store:`). It holds the card on its own scoped host (store `studioTalkToAgent`) and the compact chat in a `<template>`. The page holds no other `studio/agent_chat/chat`: one page holds one chat. |
+| `studio_talk_to_agent_link` | A real link (`href:` is required) carrying `data-studio-talk-to-agent`, `data-talk-soul`, `data-talk-topic` and an optional `data-talk-opener`. A host may write those attributes by hand. |
+| `studio/talk_to_agent` | The lazy `talk-to-agent` controller. It takes a plain click on a link for its soul, opens the card titled "Talk to <name> about <topic>", and clones a fresh chat into it marked with the opener. |
+
+**The first reply starts as the card opens.** The chat loads the thread, then sends
+the opener as the visitor's message (`data-agent-chat-opener`; default "I'd like to
+talk about <topic>."), so the thinking line shows during the open and the hub's
+dispatcher is already answering. The opener is sent once per soul and topic per tab
+(`sessionStorage`, `data-agent-chat-opener-key`): opening the same topic again shows
+the thread and sends nothing. A send the app refuses (a cap, an expired page) puts the
+words in the box with the reason. The visitor sees the opener as their own bubble: the
+page never sends words on their behalf that they cannot read.
+
+**Not streamed.** The hub answers whole (the hub's `agent-message-loop.md`,
+"Streaming (next step, not built)"), so the chat polls as everywhere and, with
+`data-agent-chat-reveal="true"` (the modal sets it), a NEW answer types itself in at
+about 420 characters a second (0.45s to 2.6s). The thread loaded on open, and every
+answer under `prefers-reduced-motion`, shows at once; while it types the log is
+`aria-busy`.
+
+**Nothing is lost when the modal is not there.** A modified click (a new tab), a page
+whose controller failed to load, a page without the partial, and a viewer
+`Studio.agent_chat_allowed` refuses (the partial renders nothing) all follow the
+link's `href`, so point it at a real chat page.
+
+**Who may use it** is the chat's own gate, unchanged: signed out or in as
+`Studio.agent_chat_allowed` says, answered at the hub's public audience on a
+`chat:<soul>:` thread, under the hub's caps. The opener is an ordinary message, so it
+counts toward those caps, and it is sent only after a click, never on page load.
+
 ## Talking by voice
 
 ```erb
@@ -304,7 +349,10 @@ machine (a developer's local hub).
   (stored by the hub, no agent will answer it), which never asks for a resend. A hub
   that still reports a held message as `failed` gets the failed line;
 - dispatches `studio:agent-chat:sent` on the chat's section, `{ detail: { turn } }`,
-  after a typed send the app took.
+  after a typed send the app took;
+- with `data-agent-chat-opener`, sends it once the thread has loaded, and with
+  `data-agent-chat-reveal="true"`, types a new answer in ("Talk to an agent in a
+  modal").
 
 Turn text is set as text, never HTML. The log is `position: relative` on purpose: a turn's
 screen-reader name is absolutely positioned, and with no positioned ancestor it escapes
@@ -324,6 +372,11 @@ that imports only `engine.css` sees both of its labels.
   agent turn sharing a row id both survive), cursor, cadence and follow rules.
 - `e2e/agent_chat.spec.js`: the chat in a browser against the stand-in hub
   `e2e/boot.rb` runs (`AgentChatStubHub#converse!`, the hub's shared-id shape).
+- `test/javascript/talk_to_agent.test.mjs` and `e2e/talk_to_agent.spec.js`: the
+  talk-to-agent modal (`/talk_to_agent_lab`): which clicks it takes, the opener sent
+  with no typing and once per topic, the answer typing in, the card at 1280px and
+  390px, and a modified click following the link. The opener and type-in rules are
+  also in `test/javascript/agent_chat.test.mjs`.
 - `test/javascript/agent_chat_voice.test.mjs`: every refusal line, the take's body,
   `voice` carrying no name, a queued take, a failed send keeping the words, a tap's
   line, a typed send clearing the old line, the line's height through a hold.

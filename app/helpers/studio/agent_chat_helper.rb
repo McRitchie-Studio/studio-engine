@@ -1,8 +1,21 @@
 # frozen_string_literal: true
 
 module Studio
-  # The agent chat's voice option (docs/AGENT_CHAT.md, "Talking by voice").
+  # The agent chat's voice option (docs/AGENT_CHAT.md, "Talking by voice"), and
+  # the link that opens the talk-to-agent modal ("Talk to an agent in a modal").
   module AgentChatHelper
+    # A link that opens studio/agent_chat/_talk_modal with `soul`, `topic` and
+    # an optional `opener` (the visitor's first message; default "I'd like to
+    # talk about <topic>."). `href` is where the link goes when the modal is not
+    # on the page, did not load, or the click is a modified one (a new tab): a
+    # real chat page, so no click is ever lost. A block replaces `label`.
+    def studio_talk_to_agent_link(label = nil, href:, soul:, topic: nil, opener: nil, **options, &block)
+      data = (options.delete(:data) || {}).merge(studio_talk_to_agent: true, talk_soul: soul.to_s,
+                                                  talk_topic: topic.to_s.presence, talk_opener: opener.to_s.presence).compact
+      options[:aria] = { haspopup: "dialog" }.merge(options[:aria] || {})
+      block ? link_to(href, **options, data: data, &block) : link_to(label, href, **options, data: data)
+    end
+
     # The signed-in user on this page, or nil. A page whose controller has no
     # current_user is a signed-out page.
     def studio_agent_chat_viewer
