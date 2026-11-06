@@ -6,6 +6,14 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **A carousel opens where you tell it: `start:`, and a spotlight opens on its middle
+  slide.** Alex McRitchie saw an empty left half on a spotlight's first slide. `start:`
+  takes an index or `:middle`; it defaults to `:middle` for `style: :spotlight` and to 0
+  for a standard row, so a standard row is unchanged. The slide is the browser's
+  `scroll-initial-target`, so Chromium opens there before the first paint; elsewhere the
+  controller jumps there on connect, with no glide and an empty status line. The dots,
+  `data-current` and both arrows' `aria-disabled` are right from the server. A
+  `#fragment` inside the row wins over the start (task `carousel-start-and-button-glass`).
 - **The loader family: the eight ways a page says wait, in one place.** From the
   reel Alex McRitchie shared (task `engine-loader-family`). `studio_loader` takes
   three plain styles that draw no icon: `style: :spinner`, `style: :dots` and
@@ -78,6 +86,13 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Changed
 
+- **A dark, full-size lit button's fill drops from 0.85 to 0.65 alpha** (`--lit-fill-alpha`),
+  Alex McRitchie's "even more transparent". White label on the primary, measured from painted
+  pixels at the label's median: a dark page 3.95 to 5.62, the lab photo 3.16 to 3.29, a mid-grey
+  backdrop (#808080) 3.25 to 3.42, a lighter one (#a0a0a0) 3.06 to 2.98. Light pages stay solid
+  (3.10).
+- **A spotlight's arrows say "Previous slide" and "Next slide"**: they move one slide. A
+  standard row keeps "slides".
 - **Back plays the app's page move the other way.** Browser Back (a Turbo restore that Turbo
   marks `back`, or a full load that traverses to an earlier entry) and a click on a link with
   `data-page-transition-back` (every ancestor crumb and the phone's parent link) play the
@@ -89,6 +104,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **A standard carousel's `caption:` is a styled line** (small body text under each slide),
+  not bare text; the partial's docs and the README say which style shows which captions.
 - **The talk modal's opener is never dropped.** A visitor who sent a message before the
   thread first loaded lost the opener: `studio/agent_chat` marked it sent, then the
   post returned early because the visitor's send was in flight. Now a send made

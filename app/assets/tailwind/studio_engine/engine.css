@@ -2248,7 +2248,8 @@ html[data-theme-flip]::view-transition-new(*) {
        stop. The violet, centered on the brand colour, is bright enough at its low stop. */
     html.dark[data-surface-style="glass"] :is(.btn-secondary, .btn-danger, .btn-warning, .btn-success) { --lit-glow-stop: var(--lit-top-stop); }
     /* A TOUCH OF TRANSPARENCY on a full-size filled button, dark theme only: a photo behind it
-       shows subtly, and white text holds its contrast at the midpoint. An outer shadow is not painted
+       shows through. At 0.65 (Alex McRitchie, 2026-11-05) white text on the primary measures 5.6:1
+       on a dark page, 3.4:1 over a mid-grey photo and 3.0:1 over a light-mid one (#a0a0a0). An outer shadow is not painted
        under its own box, so the glow never brightens the fill. On a light page the backdrop would
        lift the fill and cost contrast, so it stays solid there. Without a blur, or without relative
        oklch (the gradient would drop out and leave white text on nothing), it stays solid. */

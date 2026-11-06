@@ -328,11 +328,20 @@ as a layout; the block draws each slide. `per_view:` is the wide row's count
 <% end %>
 ```
 
+`caption:` (a callable on the item) writes a small line under each slide.
+
 `style: :spotlight` snaps each slide to the centre: the centred slide is full size and
-colour, with its `caption:` line (a callable on the item) under it, and its neighbours
-are smaller, faded and grey. The arrows and keys move one slide. Where the browser has
-scroll-driven animations the look follows the scroll; elsewhere the controller marks the
-centred slide (`data-current`) and CSS transitions it. Reduced motion only dims.
+colour, with its caption under it (the spotlight shows the centred slide's only), and its
+neighbours are smaller, faded and grey. The arrows ("Previous slide", "Next slide") and
+keys move one slide. Where the browser has scroll-driven animations the look follows the
+scroll; elsewhere the controller marks the centred slide (`data-current`) and CSS
+transitions it. Reduced motion only dims.
+
+`start:` is the slide the row opens on: an index from 0, or `:middle`. A spotlight opens
+on its middle slide by default, so neither half of the row is empty at load; a standard
+row opens on its first. The browser sets it before the first paint where it has
+`scroll-initial-target`; elsewhere the controller jumps there when it connects, with no
+glide and nothing announced. A `#fragment` link to an element inside the row wins.
 
 ```erb
 <%= render layout: "studio/carousel",
