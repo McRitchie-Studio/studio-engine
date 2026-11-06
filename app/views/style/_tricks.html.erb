@@ -175,7 +175,7 @@
   <section class="space-y-5" data-page-header-specimen>
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Page header</h3>
-      <p class="text-muted text-sm"><code class="font-mono text-2xs">studio/_page_header</code>: crumbs above the title, tabs on the right, other links under it; the open pill glides.</p>
+      <p class="text-muted text-sm"><code class="font-mono text-2xs">studio/_page_header</code>: crumbs above the title; tabs or anchors, a Links menu, one action, then tools.</p>
     </div>
     <div class="grid gap-4 lg:grid-cols-2">
       <%# The classes alone, not the partial: the partial's row is sticky, joins the
@@ -212,6 +212,58 @@
           <% end %>
         <% end %>
       <% end %>
+      <%# The four kinds of right-side control, each with its one look: tabs (views of the
+          same thing) or anchors (places on this page) in the pill group, the Links menu
+          (pages elsewhere), the one primary action, then the muted tools. The menu is the
+          browser's popover, so it opens here with no script. %>
+      <div class="lg:col-span-2" data-page-header-kinds-specimen>
+        <%= render layout: "style/specimen",
+              locals: { klass: "studio/_page_header (four kinds)",
+                        note: "A view of the same data: a tab. A place on this page: an anchor. Somewhere else: the Links menu. Makes something: the action. Local-only: a tool.",
+                        usage: %(<%= render "studio/page_header",
+      title: "Deployments", label: "Views",
+      tabs: [{ label: "Deployments", href: deployments_path, current: "page" },
+             { label: "Triage", href: triage_path }],
+      menu: [{ label: "Stages", href: stages_path }, { label: "Docs", href: docs_path }],
+      action: { label: "New Task", href: new_task_path },
+      tools_html: (render("dev_tools") if Rails.env.local?) %\>
+
+<%# A place on this page: anchors: [{ label: "Colors", href: "#colors" }], in place of tabs: %\>) } do %>
+          <div class="w-full space-y-4">
+            <% [["tabs", "Deployments", [["Deployments", true], ["Triage", false]]],
+                ["anchors", "Style", [["Colors", false], ["Buttons", false], ["Forms", false]]]].each do |kind, title, pills| %>
+              <%= tag.div(class: "page-header w-full px-4", data: { stuck: "" }) do %>
+                <div class="page-header-lead">
+                  <p class="page-header-title"><%= title %></p>
+                </div>
+                <div class="page-header-tabs" data-page-header-kind="<%= kind %>">
+                  <div class="page-header-track">
+                    <% pills.each do |label, current| %>
+                      <a href="#tricks" class="page-header-tab btn btn-sm <%= current ? "btn-primary" : "btn-neutral" %>"><span class="page-header-tab-label"><%= label %></span></a>
+                    <% end %>
+                  </div>
+                </div>
+                <div class="page-header-actions">
+                  <div class="page-header-menu" data-page-header-kind="menu">
+                    <button type="button" class="page-header-menu-button btn btn-sm btn-neutral"
+                            popovertarget="style-page-header-menu-<%= kind %>" aria-controls="style-page-header-menu-<%= kind %>">Links<span class="page-header-menu-caret" aria-hidden="true"></span></button>
+                    <div id="style-page-header-menu-<%= kind %>" class="page-header-menu-list" popover="auto">
+                      <ul>
+                        <li><a href="#tricks" class="page-header-menu-item">Stages</a></li>
+                        <li><a href="#tricks" class="page-header-menu-item">Docs</a></li>
+                      </ul>
+                    </div>
+                  </div>
+                  <a href="#tricks" class="page-header-action btn btn-sm btn-primary" data-page-header-kind="action">New Task</a>
+                  <div class="page-header-tools" data-page-header-kind="tools">
+                    <button type="button" class="btn btn-sm btn-neutral">Seed</button>
+                  </div>
+                </div>
+              <% end %>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
     </div>
   </section>
 

@@ -88,8 +88,17 @@ class StylePageTest < ActiveSupport::TestCase
 
     specimen = doc.at_css("[data-page-header-specimen]")
     assert specimen, "the Tricks section documents the primitive"
-    assert_equal 1, specimen.css(".page-header[data-stuck]").size
-    assert_equal 2, specimen.css(".page-header").size
+    assert_equal 3, specimen.css(".page-header[data-stuck]").size, "the stuck card and the two four-kinds rows"
+    assert_equal 4, specimen.css(".page-header").size
+    # The four kinds of right-side control, in their one order, on a tabs row and an
+    # anchors row (docs/PAGE_HEADER.md, "The four kinds of control").
+    kinds = specimen.at_css("[data-page-header-kinds-specimen]")
+    assert kinds, "the specimen shows all four kinds"
+    assert_equal [%w[tabs menu action tools], %w[anchors menu action tools]],
+                 kinds.css(".page-header").map { |row| row.css("[data-page-header-kind]").map { |el| el["data-page-header-kind"] } }
+    kinds.css(".page-header-menu").each do |menu|
+      assert_equal menu.at_css("[popover]")["id"], menu.at_css("button")["popovertarget"]
+    end
     # A specimen draws the classes, not the landmarks: the page's one breadcrumb nav is
     # the real row's, so the specimens add no nav, region or header of their own.
     assert_empty specimen.css(".page-header nav, .page-header [role='navigation'], .page-header [role='region'], .page-header header"),
