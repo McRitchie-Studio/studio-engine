@@ -46,6 +46,26 @@ class LoaderTest < Minitest::Test
     assert_equal %i[weld_bead sparkle], L::ART_STYLES.keys
   end
 
+  def test_the_plain_styles_are_names_a_view_may_use_but_never_the_apps_loader
+    assert_equal %i[spinner dots bar], L::PLAIN_STYLES
+    assert_equal :spinner, L.style!("spinner")
+    assert_equal :bar, L.style!(:bar)
+    assert L.plain_style?(:dots)
+    refute L.plain_style?(:breathe)
+    refute_includes L::STYLES, :spinner, "STYLES stays the set an app may declare"
+
+    error = assert_raises(L::InvalidConfig) { L.normalize(:spinner) }
+    assert_match(/draws no icon/, error.message)
+    assert_raises(L::InvalidConfig) { L.normalize(style: :bar) }
+  end
+
+  def test_each_style_has_a_default_size
+    assert_equal 96, L.default_size(:breathe)
+    assert_equal 20, L.default_size(:spinner)
+    assert_equal 32, L.default_size(:dots)
+    assert_equal "100%", L.default_size(:bar)
+  end
+
   def test_the_art_reader_takes_only_the_marked_layers_with_their_group_transform
     with_public("brand/sparkle.svg" => "studio-sparkle.svg") do |root|
       art = L.art("/brand/sparkle.svg", :sparkle, root: root)
