@@ -5,7 +5,8 @@
 A page has up to four pinned layers, each below the last, and none overlaps another:
 
 1. The navbar (`layouts/_navbar`).
-2. The page row (`studio/_page_header`): the title, then optional meta and tabs.
+2. The page row (`studio/_page_header`): the title, then optional meta and the controls
+   on the right (tabs or anchors, a Links menu, one action, tools).
 3. The section's header (`studio/_section_header`), on a page long enough to want one.
 4. A table's sticky header (`config.sticky_table_headers`).
 
@@ -35,10 +36,14 @@ from the pinned stack ([`NAVBAR_SETUP.md`](NAVBAR_SETUP.md#reading-the-pinned-st
 | `crumbs` | The trail above the title: the page's ancestors, root first, as `[{ label:, href: }]`. Build it with `studio_crumbs` (below). |
 | `crumb_label` | The page's own name at the end of the trail, when the title is too long for it. The default is the title. |
 | `meta`, `meta_title` | Short text beside the title, such as the version, and its `title` attribute. Hidden below 640px. |
-| `label` | The tabs' `<nav>` accessible name. A row with tabs needs it. |
-| `tabs` | `[{ label:, href:, current:, data: }]`. `current` is the `aria-current` value (`"page"`, or `"true"` for a tab that follows the scroll). Leave it blank on the others. |
-| `tabs_data` | Data attributes for the tabs' scroller. |
-| `actions_html` | A control on the right, such as the page's one primary action. With tabs, it comes after them. |
+| `label` | The pill group's `<nav>` accessible name. A row with tabs or anchors needs it. |
+| `tabs` | Views of the same thing, `[{ label:, href:, current:, data: }]`. `current` is the `aria-current` value (`"page"`, or `"true"` for a tab that follows the scroll). Leave it blank on the others. |
+| `anchors` | Sections of this page, `[{ label:, href: "#id", current:, data: }]`. The same pill group as tabs. A row takes `tabs` or `anchors`, never both. |
+| `tabs_data` | Data attributes for the pill group's scroller. |
+| `menu`, `menu_label` | Related pages elsewhere, `[{ label:, href:, data: }]`, behind one neutral button. The label is "Links" by default. |
+| `action` | The page's one primary action, `{ label:, href:, data: }`. Rightmost. |
+| `tools_html` | Local-only and dev controls, after the action, muted. |
+| `actions_html` | **Deprecated.** Free HTML after the pill group. It renders for one more release and warns in development. Use the locals above. |
 | `links` | The page's other links, `[{ label:, href:, current: }]`, on a line of their own at the foot of the row. They stick with it. |
 | `links_label` | That line's accessible name. The default is "More links". |
 | `data` | Data attributes for the row, such as the page's own `studio_controller`. |
@@ -50,12 +55,95 @@ a sticky row can travel only as far as its parent.
 Put the space above the row on the container, as `pt-6` is above. The row carries no
 top margin, because a stuck row is measured from its place in the flow.
 
+## The four kinds of control
+
+Alex McRitchie, 2026-11-06: the controls on the right of a page header follow one
+convention. The /deployments header showed a grey pill, a purple button and a black
+button side by side, three looks for one row. The right side now takes four kinds of
+control, each with one look.
+
+**Which kind is it?** Ask these questions in order, and stop at the first yes:
+
+1. **Does it make or change something?** It is the **action** (`action:`). A page has at
+   most one: "New Task", "Invite". A second action goes on the page, not in the header.
+2. **Is it a view of the same data?** It is a **tab** (`tabs:`): Deployments | Triage,
+   Users | Teams. The tab for this page carries `current: "page"`.
+3. **Is it a place on this page?** It is an **anchor** (`anchors:`), with an `href` of
+   `#id`: the style guide's sections.
+4. **Is it a page somewhere else?** It is a **quick link** (`menu:`), in the Links menu.
+5. **Does only a developer need it** (a local-only seeder, a progression tester)? It is a
+   **tool** (`tools_html:`). Render it only where it applies, for example
+   `(render("dev_tools") if Rails.env.local?)`.
+
+Something that fits none of these, such as a count or a status badge, is not a control.
+Put short text beside the title with `meta:`.
+
+```erb
+<%= render "studio/page_header",
+      title: "Deployments", crumbs: studio_crumbs(:deployments), label: "Views",
+      tabs: [{ label: "Deployments", href: deployments_path, current: "page" },
+             { label: "Triage", href: triage_path }],
+      menu: [{ label: "Stages", href: stages_path }, { label: "Docs", href: docs_path }],
+      action: { label: "New Task", href: new_task_path },
+      tools_html: (render("dev_board_tools") if Rails.env.local?) %>
+```
+
+**One order, one height.** The partial draws them in this order, whatever order the call
+names them in: the pill group (tabs or anchors), the menu, the action, then the tools.
+Every control is a `.btn-sm`. In the row a small primary button takes a clear 1px border,
+the width of a neutral button's, so all four kinds stand at one height (measured at 28px
+against 30px without it).
+
+| Kind | Look | Behaviour |
+|------|------|-----------|
+| Tabs | The pill group, with the gliding pill on the current tab | Links to the other views |
+| Anchors | The same pill group | Same-page links: the browser scrolls, with no visit. A scroll spy can move `aria-current` |
+| Quick links | One neutral "Links" button with a chevron | Opens a list of links under the button's right edge |
+| Action | One primary button, rightmost of the page's own controls | A link to the thing it makes |
+| Tools | Muted, behind a dashed rule, full strength on hover or focus | Whatever the host renders |
+
+A row has one pill group. Passing both `tabs:` and `anchors:` raises `ArgumentError`, and
+so does an `action:` that is not one Hash.
+
+### The Links menu
+
+The menu is a disclosure, not an ARIA menu: a button and a list of links that Tab walks.
+
+- The button opens the list with the browser's popover (`popovertarget`, `popover="auto"`).
+  The browser closes it on Escape and on a click outside, and gives focus back to the
+  button. None of this needs a script, so the menu still works when the `page-header`
+  controller fails to load.
+- The `page-header` controller sets `aria-expanded` on the button and keeps it in step.
+  ArrowDown on the button opens the list and moves focus to the first link.
+- Where the browser has CSS anchor positioning, the list hangs under the button, its right
+  edge on the button's, and flips when there is no room. Elsewhere the controller places it
+  (`menuPlacement` in `studio/page_header`) and moves it on scroll. Chromium was measured in
+  the e2e lane; Safari and Firefox were not measured here.
+
+**The Links menu or the links line?** Both hold pages elsewhere.
+
+- Use the **menu** for a few related pages, about two to six, that a reader wants now and
+  then. It costs one button of width.
+- Use the **links line** (`links:`) for many sibling pages, a section's whole set, that a
+  reader moves between often. It is always visible, on its own line under the title.
+- A page can have both. Do not list one page in both.
+
+### Moving off actions_html
+
+`actions_html` renders for one more release, where it always stood: after the pill group,
+before the menu. In development, the first render that passes it writes one warning to the
+log for each call site (`Studio::PageHeader.deprecate_actions_html`). Other environments
+say nothing. Move each control to its kind: a pill group of views to `tabs:`, a "Links"
+dropdown to `menu:`, a primary button to `action:`, local-only controls to `tools_html:`,
+and a badge or count to `meta:`.
+
 ## Crumbs
 
 Alex McRitchie's ruling of 2026-11-05: every admin page has a standard crumb trail above an
 h2-size title, left-aligned. The page's sub-sections and its most important links go on the
 right, as tabs, with at most one primary action. Its other links go on the line under the
-title, to be organized later.
+title, to be organized later. [The four kinds of control](#the-four-kinds-of-control) is
+that convention in full.
 
 **One parent map.** An app names each page that has children once, in an initializer. Each
 entry names its label, its address and its parent. The trail builds itself up the chain:

@@ -4,6 +4,26 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **The page header's four kinds of control.** Alex McRitchie, 2026-11-06: the
+  /deployments header showed a grey pill, a purple button and a black button side by
+  side. `studio/_page_header` now takes the right side as four kinds, each with one look,
+  in one fixed order and at one height: `tabs:` (views of the same thing) or `anchors:`
+  (sections of this page, the same pill group), `menu:` (pages elsewhere, behind one
+  neutral "Links" button that opens a popover list; Escape closes it and focus returns),
+  `action:` (the one primary button) and `tools_html:` (local-only controls, muted). A
+  small primary button in the row takes a clear 1px border, so it stands at a neutral
+  button's height. `docs/PAGE_HEADER.md` gives the decision rule for which kind a link is,
+  and the style guide's Page header specimen shows all four (task
+  `page-header-control-kinds`).
+
+### Deprecated
+
+- **`studio/_page_header`'s `actions_html:`.** It still renders, before the menu, for one
+  more release. In development the first render from each call site writes one warning to
+  the log. Move each control to `tabs:`, `menu:`, `action:`, `tools_html:` or `meta:`.
+
 ## 0.132.0 — 2026-11-06
 
 ## 0.131.0 — 2026-11-05
