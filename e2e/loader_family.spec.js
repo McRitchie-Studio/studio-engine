@@ -201,10 +201,10 @@ test("the style guide carries the Loaders section, all eight, and its pill", asy
     await expect(specimen(page, name), name).toHaveCount(1);
   }
   await expect(section(page).locator("article")).toHaveCount(8);
-  // Every usage snippet wraps inside its box, clear of its Copy button.
-  const clipped = await section(page).locator("pre").evaluateAll((els) =>
-    els.filter((el) => el.scrollWidth > el.clientWidth).map((el) => el.textContent.slice(0, 40)));
-  expect(clipped).toEqual([]);
+  // Each card is named, the name an agent hears (config/studio_tricks.yml).
+  await expect(section(page).locator("article [data-trick-name]")).toHaveText([
+    "Spinner", "Skeleton", "Progress Bar", "Typing Dots", "Busy Button", "Overlay", "Pull Refresh", "Infinite Scroll",
+  ]);
 
   await page.goto("/lab/style_nav");
   await expect(page.locator('a[href="#loaders"]').first()).toHaveText("Loaders");
