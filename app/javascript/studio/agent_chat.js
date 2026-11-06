@@ -188,7 +188,7 @@ function prefersReducedMotion() {
 // its own text. No _underscore_ italics: snake_case words are common in answers,
 // and the regex stays free of lookbehind, which older Safari cannot parse.
 export const SAFE_LINK = /^https?:\/\/[^\s<>"'`]+$/i
-const INLINE = /\*\*([^*\n]+?)\*\*|__([^_\n]+?)__|\[([^\]\n]+)\]\(([^()\s]+)\)|`([^`\n]+)`|\*([^*\s](?:[^*\n]*?[^*\s])?)\*/g
+const INLINE = /\*\*([^\s*](?:[^\n]*?[^\s*])?)\*\*|__([^\s_](?:[^\n]*?[^\s_])?)__|\[([^\]\n]+)\]\(([^()\s]+)\)|`([^`\n]+)`|\*([^*\s](?:[^*\n]*?[^*\s])?)\*/g
 const BULLET = /^\s{0,3}[-*+]\s+(.*)$/
 const NUMBERED = /^\s{0,3}\d{1,3}[.)]\s+(.*)$/
 const QUOTE = /^\s{0,3}>\s?/
