@@ -917,7 +917,12 @@ class E2eLabController < ActionController::Base
     ] }
   ].freeze
 
+  # `?palette=<name>` paints the page in one consumer palette, as #chips does, so
+  # e2e/sidebar_focus_ring.spec.js grades the focus ring on every app's primary.
   private def sidebar_panels_viewer
+    require_relative "../../../support/consumer_palettes"
+    palette = ConsumerPalettes::ALL[params[:palette].to_s]
+    @palette_css = Studio::ThemeResolver.new(palette).to_css if palette
     if params[:glass].present?
       @lab_sidebar_sections = LAB_SIDEBAR_GLASS_SECTIONS
     elsif params[:sidebar].present?

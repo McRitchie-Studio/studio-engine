@@ -11,6 +11,9 @@
     bridge under test lives inside components/_link_sidebar. The page only supplies
     locals and the Alpine scope a host supplies — `hostOpen` is this page standing in
     for a host's own open/closed state. %>
+<% if @palette_css %>
+  <%= tag.style(@palette_css.html_safe, nonce: content_security_policy_nonce) %>
+<% end %>
 <main class="p-8" x-data="{ hostOpen: false }">
   <p data-test="lab-body">sidebar panels lab</p>
 
