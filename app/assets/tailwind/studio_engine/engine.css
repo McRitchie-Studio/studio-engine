@@ -1037,6 +1037,13 @@ body.modal-open .studio-app-banner {
   scroll-margin-top: calc(var(--nav-h, 5rem) + var(--pin-page-h, 0px) + var(--section-header-h));
 }
 
+/* An in-page link's target takes focus when the jump lands (studio/in_page_links). One that
+   is not focusable of itself gets tabindex=-1 and this mark until it loses focus. Focus is
+   for the next Tab, not a ring round a whole section. */
+[data-in-page-focus]:focus {
+  outline: none;
+}
+
 /* -- Scrims: tints and shades ----------------------------------------------
    A scrim is the wash laid over media (a photo, a video) so text reads on it.
    It comes in two TONES, and the tone is a design decision, not a colour pick:

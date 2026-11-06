@@ -6,8 +6,13 @@
 //       <a href="#theme" data-style-section-nav-target="link">Theme</a>
 //
 // Registered by studio/style_guide, which only the style guide loads.
+//
+// A tab's click is studio/in_page_links': a smooth scroll down the page. The clicked tab
+// holds the highlight until that scroll settles, so the row does not run through every tab
+// the scroll passes on its way.
 import { Controller } from "@hotwired/stimulus"
 import { activeIndex } from "studio/style_section_nav"
+import { SCROLL_EVENT, SCROLL_END_EVENT } from "studio/in_page_links"
 
 const ACTIVE = "btn-primary"
 const REST = "btn-neutral"
@@ -22,14 +27,21 @@ export default class extends Controller {
 
   connect() {
     this.schedule = this.schedule.bind(this)
+    this.hold = this.hold.bind(this)
+    this.release = this.release.bind(this)
     window.addEventListener("scroll", this.schedule, { passive: true })
     window.addEventListener("resize", this.schedule)
+    this.element.addEventListener(SCROLL_EVENT, this.hold)
+    document.addEventListener(SCROLL_END_EVENT, this.release)
     this.sync()
   }
 
   disconnect() {
     window.removeEventListener("scroll", this.schedule)
     window.removeEventListener("resize", this.schedule)
+    this.element.removeEventListener(SCROLL_EVENT, this.hold)
+    document.removeEventListener(SCROLL_END_EVENT, this.release)
+    this.held = null
     if (this.frame) cancelAnimationFrame(this.frame)
     this.frame = null
   }
@@ -42,7 +54,21 @@ export default class extends Controller {
     })
   }
 
+  hold(event) {
+    const link = event.detail && event.detail.link
+    if (!this.linkTargets.includes(link)) return
+    this.held = link
+    this.highlight(link)
+  }
+
+  release() {
+    if (!this.held) return
+    this.held = null
+    this.sync()
+  }
+
   sync() {
+    if (this.held) return
     const links = this.linkTargets
     const tops = links.map((link) => {
       const section = document.getElementById(link.getAttribute("href").slice(1))
