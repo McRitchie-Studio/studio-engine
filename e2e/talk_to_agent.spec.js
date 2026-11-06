@@ -20,8 +20,8 @@ const { blockOffsiteRequests, watchPageErrors } = require("./helpers");
 
 const PAGE = "/talk_to_agent_lab";
 
-for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
-  test(`a link opens the modal and the agent starts answering the opener (${viewport.width}px)`, async ({ page }) => {
+// The lane's census counts bare test( declarations, so each viewport is its own test.
+async function opensAndAnswers(page, viewport) {
     await page.setViewportSize(viewport);
     await blockOffsiteRequests(page);
     const errors = watchPageErrors(page);
@@ -54,8 +54,15 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(0);
     expect(errors).toEqual([]);
-  });
 }
+
+test("a link opens the modal and the agent starts answering the opener (1280px)", async ({ page }) => {
+  await opensAndAnswers(page, { width: 1280, height: 800 });
+});
+
+test("a link opens the modal and the agent starts answering the opener (390px)", async ({ page }) => {
+  await opensAndAnswers(page, { width: 390, height: 844 });
+});
 
 test("closing and reopening the same topic shows the thread and sends nothing new", async ({ page }) => {
   await blockOffsiteRequests(page);
