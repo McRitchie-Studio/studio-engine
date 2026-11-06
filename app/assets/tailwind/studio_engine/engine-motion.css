@@ -2570,6 +2570,9 @@ body.modal-open { overflow: visible; }
     .studio-loader-orb,
     .studio-loader-art { display: none; }
     .studio-loader-fill { --studio-loader-level: 0.45; }
+    /* A still band would read as a percent; a still bar with no percent is a
+       faint full fill instead. */
+    .studio-loader[data-loader-style="bar"] .progress-meter--indeterminate .progress-meter-fill { width: 100%; opacity: 0.35; }
   }
 
   @keyframes studio-loader-breathe {

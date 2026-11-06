@@ -95,7 +95,7 @@
                     note: "On a phone, pull down from the top of the page to reload it.",
                     usage: [erb.call('studio_pull_to_refresh frame: "feed" do'), "  ...", erb_end].join("\n") } do %>
       <%# Drawn still, mid-refresh: this wrapper has no controller, so it never arms. %>
-      <div data-loader-specimen="pull" class="studio-pull-refresh w-40 h-32 overflow-hidden rounded-2xl border border-subtle bg-surface pt-14 px-3" data-pull-state="refreshing">
+      <div data-loader-specimen="pull" class="studio-pull-refresh w-40 h-32 overflow-hidden rounded-2xl border border-subtle bg-surface pt-20 px-3" data-pull-state="refreshing">
         <span class="studio-pull-refresh-indicator" aria-hidden="true">
           <span class="spinner" style="--spinner-size: 1.25rem; --spinner-color: currentColor; --spinner-track: color-mix(in srgb, currentColor 22%, transparent)"></span>
         </span>
