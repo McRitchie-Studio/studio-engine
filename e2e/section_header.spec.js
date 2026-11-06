@@ -54,7 +54,7 @@ const stack = (page) => page.evaluate(() => window.studioPinnedStack.read());
 // Polled: the navbar's collapse takes a moment to settle after a jump.
 const expectUnder = (lower, upper) => expect.poll(async () => Math.abs((await topOf(lower)) - (await bottomOf(upper)))).toBeLessThanOrEqual(1);
 
-test("the style guide: Style stays, Tricks sits directly under it, and Modals takes its place", async ({ page }) => {
+test("the style guide: Style stays, Tricks sits directly under it, and Loaders takes its place", async ({ page }) => {
   const errors = watchPageErrors(page);
   for (const viewport of [DESKTOP, PHONE]) {
     await open(page, STYLE, viewport);
@@ -69,20 +69,20 @@ test("the style guide: Style stays, Tricks sits directly under it, and Modals ta
 
     // The last of Tricks: still its header.
     const rowBottom = await bottomOf(row);
-    await scrollTo(page, "#modals", rowBottom + 120);
+    await scrollTo(page, "#loaders", rowBottom + 120);
     await expect(tricks).toHaveAttribute("data-stuck", "");
-    await expect(header(page, "modals")).not.toHaveAttribute("data-stuck", "");
+    await expect(header(page, "loaders")).not.toHaveAttribute("data-stuck", "");
 
-    // Modals has reached the line.
-    await scrollTo(page, "#modals", -40);
-    const modals = header(page, "modals");
-    await expect(modals).toHaveAttribute("data-stuck", "");
+    // Loaders has reached the line.
+    await scrollTo(page, "#loaders", -40);
+    const loaders = header(page, "loaders");
+    await expect(loaders).toHaveAttribute("data-stuck", "");
     await expect(tricks).not.toHaveAttribute("data-stuck", "");
-    await expectUnder(modals, row);
+    await expectUnder(loaders, row);
     expect(await page.locator("[data-pin-section][data-stuck]").count()).toBe(1);
-    await expect(row.locator("a[aria-current='true']")).toHaveText("Modals");
+    await expect(row.locator("a[aria-current='true']")).toHaveText("Loaders");
 
-    const bleed = await modals.boundingBox();
+    const bleed = await loaders.boundingBox();
     expect(bleed.x, "the bar's bleed stays on the page").toBeGreaterThanOrEqual(0);
     expect(bleed.x + bleed.width, "the bar's bleed stays on the page").toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth));
   }

@@ -1,0 +1,20 @@
+<%# locals: (frame:, label:, body:, html: {}) %>
+<%#
+  Pull to refresh (Studio::LoaderHelper#studio_pull_to_refresh, docs/LOADER.md).
+  The indicator is hidden until a finger pulls; studio/pull_to_refresh arms only
+  on a phone-width touch screen, so elsewhere this is a plain wrapper. The
+  status line says the label while a refresh runs.
+%>
+<%
+  extra = html.dup
+  data = (extra.delete(:data) || {}).merge(studio_controller: "pull-to-refresh", pull_to_refresh_label: label)
+  data[:pull_to_refresh_frame] = frame if frame.present?
+  classes = [ "studio-pull-refresh", extra.delete(:class) ].compact.join(" ")
+%>
+<%= tag.div(class: classes, data: data, **extra) do %>
+  <span class="studio-pull-refresh-indicator" aria-hidden="true" hidden>
+    <span class="spinner studio-pull-refresh-spinner" style="--spinner-size: 1.25rem; --spinner-color: currentColor; --spinner-track: color-mix(in srgb, currentColor 22%, transparent)"></span>
+  </span>
+  <p class="sr-only" role="status" data-pull-to-refresh-status></p>
+  <%= body %>
+<% end %>

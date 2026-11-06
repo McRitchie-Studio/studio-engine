@@ -1,0 +1,16 @@
+<%# locals: (page:, feed_path:) %>
+<%# One page of the Loaders section's live infinite-scroll specimen: four demo
+    items a page, three pages. The section renders page 1; the demo feed renders
+    the rest (StyleController#loaders_feed), and Turbo lifts each one into the
+    frame the page before left for it. %>
+<%
+  pages = Studio::Loader::DEMO_FEED_PAGES
+  per_page = Studio::Loader::DEMO_FEED_PER_PAGE
+  next_url = page < pages ? "#{feed_path}?page=#{page + 1}" : nil
+%>
+<%= studio_infinite_scroll id: "style-loaders-feed", page: page, next_url: next_url,
+      announce: "%{count} more items loaded", class: "grid grid-cols-2 gap-2" do %>
+  <% ((page - 1) * per_page + 1).upto(page * per_page) do |n| %>
+    <div class="rounded-lg bg-inset px-3 py-2 text-sm text-body" data-feed-item>Item <%= n %></div>
+  <% end %>
+<% end %>

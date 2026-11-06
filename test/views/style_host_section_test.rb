@@ -53,7 +53,7 @@ class StyleHostSectionTest < ActiveSupport::TestCase
   MARKER = "HOST-SECTION-MARKER"
 
   # The engine's own sections, in the order the page publishes them.
-  ENGINE_SECTIONS = %w[theme tricks modals tasks components].freeze
+  ENGINE_SECTIONS = %w[theme tricks loaders modals tasks components].freeze
 
   # --- absent: the page is what it was ------------------------------------
 
@@ -68,14 +68,14 @@ class StyleHostSectionTest < ActiveSupport::TestCase
                      "a base app's page must carry no trace of the host anchor"
   end
 
-  def test_a_base_app_renders_exactly_the_five_engine_sections
+  def test_a_base_app_renders_exactly_the_six_engine_sections
     # Catches the empty container the seam must never emit: a wrapper with a
     # different id, or none at all, passes the string refutes above.
     assert_equal ENGINE_SECTIONS, top_section_ids(base_html)
   end
 
-  def test_a_base_app_navs_exactly_the_five_engine_pills
-    assert_equal [%w[#theme Theme], %w[#tricks Tricks], %w[#modals Modals], %w[#tasks Tasks],
+  def test_a_base_app_navs_exactly_the_six_engine_pills
+    assert_equal [%w[#theme Theme], %w[#tricks Tricks], %w[#loaders Loaders], %w[#modals Modals], %w[#tasks Tasks],
                   %w[#components Components]],
                  nav_pills(base_html)
   end
@@ -105,13 +105,13 @@ class StyleHostSectionTest < ActiveSupport::TestCase
   end
 
   def test_the_section_lands_between_modals_and_tasks
-    assert_equal %w[theme tricks modals host-modals tasks components], top_section_ids(host_html)
+    assert_equal %w[theme tricks loaders modals host-modals tasks components], top_section_ids(host_html)
   end
 
   # --- the nav pill follows the section ------------------------------------
 
   def test_the_nav_grows_one_pill_for_the_host_section_in_the_same_place
-    assert_equal [["#theme", "Theme"], ["#tricks", "Tricks"], ["#modals", "Modals"],
+    assert_equal [["#theme", "Theme"], ["#tricks", "Tricks"], ["#loaders", "Loaders"], ["#modals", "Modals"],
                   ["##{ANCHOR}", Studio.app_name],
                   ["#tasks", "Tasks"], ["#components", "Components"]],
                  nav_pills(host_html)

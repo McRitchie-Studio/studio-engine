@@ -24,6 +24,20 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   moving rainbow ring and its halo, with the heading ink as the label (16:1 light, 18:1 dark,
   measured). `<button class="btn studio-border-glow studio-border-glow--clear">`. Under
   reduced motion the ring and halo of every `.studio-border-glow` stand still.
+- **The loader family: the eight ways a page says wait, in one place.** From the
+  reel Alex McRitchie shared (task `engine-loader-family`). `studio_loader` takes
+  three plain styles that draw no icon: `style: :spinner`, `style: :dots` and
+  `style: :bar` (a progressbar; `percent:` is its value, and with none it sweeps).
+  They wrap the canonical `.spinner`, `.loading-dots` and `.progress-meter` rules,
+  so there is one set of rules; an app's own `config.loader` still refuses them.
+  New: `studio_skeleton` (`:lines`, `:avatar`, `:card`, `:media`; aria-busy, shapes
+  hidden from assistive tech, a shimmer that stops under reduced motion),
+  `studio_infinite_scroll` (the next page loads in a Turbo frame as the list's end
+  nears, "Load more" stays visible, and a polite status line counts what came) and
+  `studio_pull_to_refresh` (phones with touch only). `/admin/style` has a Loaders
+  section with all eight, and a live infinite scroll from an admin-only demo feed
+  (`/admin/style/loaders_feed`). Busy buttons can show their busy words with
+  `data-loader-busy`. Docs: `docs/LOADER.md`, "The family".
 - **Agent replies show a small, safe Markdown subset.** In `studio/agent_chat`, an agent
   turn's `**bold**`, `*italics*`, `` `code` ``, http(s) links, `- ` and `1. ` lists and
   line breaks render as such, and a leading `> ` is dropped. The nodes are built with
@@ -98,8 +112,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   test; elsewhere it logs to ErrorLog and draws no trail, not a 500. The dead redirect guard
   in `studio/page_transitions` is gone.
 - **`/admin/style`: Tricks is second, and nothing in the header is cut off.** The sections and
-  their pills run Theme, Tricks, Modals, Tasks, Components (a host's own modals still follow
-  Modals). The tab scroller gives its pills 4px of room on every side, so their shadow, lit
+  their pills run Theme, Tricks, Loaders, Modals, Tasks, Components (a host's own modals still
+  follow Modals). The tab scroller gives its pills 4px of room on every side, so their shadow, lit
   edge and focus ring show, and the last pill's right edge too; phones still scroll sideways.
   Each specimen card has one Copy (the snippet's, or the class name's when there is no
   snippet), and the code wraps clear of it.

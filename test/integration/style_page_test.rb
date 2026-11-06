@@ -69,7 +69,7 @@ class StylePageTest < ActiveSupport::TestCase
     assert_nil doc.at_css("header"), "no separate header above the row"
 
     links = row.css("[data-style-section-nav-target='link']")
-    assert_equal %w[#theme #tricks #modals #tasks #components], links.map { |a| a["href"] }
+    assert_equal %w[#theme #tricks #loaders #modals #tasks #components], links.map { |a| a["href"] }
     assert_equal ["#theme"], row.css("a[aria-current='true']").map { |a| a["href"] }, "Theme starts active"
     assert_includes links.first["class"].split, "btn-primary"
     assert_includes links.last["class"].split, "btn-neutral"
@@ -111,7 +111,7 @@ class StylePageTest < ActiveSupport::TestCase
 
   test "every section's title is a section header, first in its section, and joins no data-pin" do
     doc = Nokogiri::HTML.fragment(render_index)
-    { "theme" => "Theme", "tricks" => "Tricks", "modals" => "Modals", "tasks" => "Tasks", "components" => "Components" }.each do |id, title|
+    { "theme" => "Theme", "tricks" => "Tricks", "loaders" => "Loaders", "modals" => "Modals", "tasks" => "Tasks", "components" => "Components" }.each do |id, title|
       section = doc.at_css("section##{id}")
       first = section.element_children.first
 
@@ -268,7 +268,7 @@ class StylePageTest < ActiveSupport::TestCase
   ].freeze
 
   # Theme is the landing section; the section order the nav pills follow.
-  SECTION_ANCHORS = %w[theme tricks modals tasks].freeze
+  SECTION_ANCHORS = %w[theme tricks loaders modals tasks].freeze
 
   # solana-studio's app/views. The guide's THREE web3 specimens (Connect wallet
   # and the two Sign Wallet cards) render from that gem since the two-template
@@ -623,6 +623,29 @@ class StylePageTest < ActiveSupport::TestCase
     refute_includes positions, nil, "every section anchor must be present"
     assert_equal positions, positions.sort,
       "sections must appear in order Theme, Tricks, Modals, Tasks"
+  end
+
+  # [integration] The Loaders section (style/_loaders, docs/LOADER.md "The family"):
+  # all eight loaders from the reel, each one specimen, each from the engine's own
+  # helper, with a live infinite scroll pointed at the demo feed.
+  test "the Loaders section shows all eight loaders, each from the engine's helper" do
+    section = Nokogiri::HTML.fragment(render_index).at_css("section#loaders")
+    refute_nil section
+
+    names = section.css("[data-loader-specimen]").map { |el| el["data-loader-specimen"] }
+    assert_equal %w[spinner skeleton bar dots button overlay pull infinite], names
+    assert_equal 8, section.css("article").size
+    assert section.at_css("[data-loader-specimen='spinner'] .studio-loader[data-loader-style='spinner']")
+    assert section.at_css("[data-loader-specimen='dots'] .studio-loader[data-loader-style='dots']")
+    assert section.at_css("[data-loader-specimen='bar'] .studio-loader[role='progressbar'][aria-valuenow='62']")
+    assert section.at_css("[data-loader-specimen='skeleton'] .studio-skeleton[aria-busy='true']")
+    assert section.at_css("[data-loader-specimen='button'] .studio-loader[data-loader-pending]")
+    more = section.at_css("[data-loader-specimen='infinite'] a[data-infinite-scroll-more]")
+    assert_equal "/admin/style/loaders_feed?page=2", more["href"]
+    assert_equal 4, section.css("[data-feed-item]").size
+    section.css("article").each do |card|
+      assert_equal 1, card.css("p.text-sm").size, "each loader has one sentence"
+    end
   end
 
   test "the color role tokens live in the Theme section, not Tricks" do

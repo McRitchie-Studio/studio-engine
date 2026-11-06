@@ -19,4 +19,10 @@ class StyleController < ApplicationController
   rescue StandardError => e
     Rails.logger.warn("[style] theme preload skipped: #{e.message}")
   end
+
+  # One page of the Loaders section's demo feed, at /admin/style/loaders_feed?page=N
+  # (style/_loaders_feed_page; Studio::Loader::DEMO_FEED_PAGES pages).
+  def loaders_feed
+    @page = params[:page].to_i.clamp(1, Studio::Loader::DEMO_FEED_PAGES)
+  end
 end
