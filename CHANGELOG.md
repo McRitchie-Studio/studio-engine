@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.131.0 — 2026-11-05
+
 ### Added
 
 - **`.studio-border-glow--clear`.** The border glow on a clear button: no fill, only the
