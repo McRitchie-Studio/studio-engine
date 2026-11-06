@@ -268,10 +268,12 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
   # --- RETIRED 2026-09-09: the AUTH modal's Solana button ------------------
   #
   # SEVEN TESTS LIVED HERE and all seven read style/modals/_auth, a MIRROR of
-  # turf-monster's sign-in card. The engine ships no auth card — a sign-in modal
-  # is a product decision (which methods, whose terms, whose legal copy) — so
-  # turf owns one and cards it against its real partial on its own host section.
-  # The mirror is gone and these went with it.
+  # turf-monster's sign-in card. The engine shipped no auth card then — a sign-in
+  # modal was a product decision (which methods, whose terms, whose legal copy) —
+  # so turf owns one and cards it against its real partial on its own host section.
+  # The mirror is gone and these went with it. (Since 2026-11-06 the engine ships
+  # a standard card, studio/auth/_sign_in_modal, with no wallet button of its
+  # own: an app passes one in through its extras: local.)
   #
   # WHAT THEY WERE GUARDING, AND WHERE IT STILL LIVES. Their subject was one
   # rule: A TRIGGER MUST CARRY AT LEAST THE GATE ITS TARGET'S REGISTRATION
