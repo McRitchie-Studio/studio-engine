@@ -19,6 +19,10 @@ module Studio
   module MagicLinkIssuing
     extend ActiveSupport::Concern
 
+    # Shown when a link could not be minted or mailed. The same words for every
+    # address, known or new, so a failure reveals no more than a success does.
+    DELIVERY_FAILED = "We could not send your sign-in email just now. Please try again in a few minutes.".freeze
+
     private
 
     # Mint a token. `return_to` is sanitized to a same-origin path by the store.

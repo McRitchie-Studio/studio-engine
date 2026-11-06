@@ -30,6 +30,16 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `createElement` and text nodes, never HTML; any other markup, and any link that is not
   http or https, shows as its own characters. A visitor's words stay plain text. Detail:
   `docs/AGENT_CHAT.md`, "The page's script".
+- **A spotlight style for the carousel: `studio/_carousel`, `style: :spotlight`.** The
+  same carousel, arrows, dots and keys, but each slide snaps to the centre. The centred
+  slide is full size and colour, with an optional `caption:` line under it (a callable on
+  the item); its neighbours are smaller (0.75), faded and grey, and the next ones peek at
+  the edges. An arrow or key moves one slide, and every slide gets a dot. Where the browser
+  has scroll-driven animations (`animation-timeline: view()`), each slide's own view
+  timeline drives the look, so it follows the finger; elsewhere the controller marks the
+  centred slide `data-current` and CSS transitions it. Reduced motion scales and greys
+  nothing: the neighbours are only dimmed. An unknown `style:` raises. Specimen on
+  `/admin/style`, Tricks.
 - **Talk to an agent in a modal: `studio/agent_chat/_talk_modal`.** Render it once on a page,
   then mark any link with `studio_talk_to_agent_link(label, href:, soul:, topic:, opener:)`. A
   click opens the shared agent chat in a card on the page-scoped modal host and sends the
@@ -103,6 +113,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   edge and focus ring show, and the last pill's right edge too; phones still scroll sideways.
   Each specimen card has one Copy (the snippet's, or the class name's when there is no
   snippet), and the code wraps clear of it.
+- **The talk modal's opener is never dropped.** A visitor who sent a message before the
+  thread first loaded lost the opener: `studio/agent_chat` marked it sent, then the
+  post returned early because the visitor's send was in flight. Now a send made
+  before the load posts the opener first, then the visitor's words; a send made while
+  the opener is in flight waits for it; and the tab remembers the opener only as its
+  POST starts, forgetting it if the POST fails. It is never sent twice.
+- **`e2e/talk_to_agent.spec.js`'s modified-click spec no longer flakes.** It waited for
+  the new tab a Ctrl+click opens, which on CI's headless Linux Chromium stayed at
+  `about:blank` (it read "blank", and a wait for its URL timed out), so it measured the
+  browser rather than the modal. It now asserts what the modal owes a modified click:
+  the click is not prevented (the browser follows the `href`) and no card opens.
 - **A signup that cannot send its email no longer fails silently.** `RegistrationsController#create`
   ended in a `rescue StandardError` that logged nothing and rendered `registrations/new`. On a
   passwordless app `@user` was never set, so a failed link mint or mail raised `NoMethodError` on
@@ -115,17 +136,22 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   longer names the unsaved user as its target: ErrorLog's `belongs_to` autosaved it, which ran the
   failing save again inside the logger. That second raise skipped the logged mark, so the
   catch-all wrote the same failure twice.
-- **The talk modal's opener is never dropped.** A visitor who sent a message before the
-  thread first loaded lost the opener: `studio/agent_chat` marked it sent, then the
-  post returned early because the visitor's send was in flight. Now a send made
-  before the load posts the opener first, then the visitor's words; a send made while
-  the opener is in flight waits for it; and the tab remembers the opener only as its
-  POST starts, forgetting it if the POST fails. It is never sent twice.
-- **`e2e/talk_to_agent.spec.js`'s modified-click spec no longer flakes.** It waited for
-  the new tab a Ctrl+click opens, which on CI's headless Linux Chromium stayed at
-  `about:blank` (it read "blank", and a wait for its URL timed out), so it measured the
-  browser rather than the modal. It now asserts what the modal owes a modified click:
-  the click is not prevented (the browser follows the `href`) and no card opens.
+- **`rescue_and_log` writes one ErrorLog row per failure, also for an unsaved target.** It
+  linked `target:` with ErrorLog's `belongs_to`, which saves a new record. With an unsaved
+  record, the logger ran the failing save a second time. That raise skipped the logged mark,
+  so the catch-all wrote the same failure again, and a save that could pass created the
+  record. Now an unsaved target or parent is named on the row by its slug (else
+  `unsaved User`) and not linked. This covers the SSO, wallet and link sign-ups and the theme save. When the
+  ErrorLog write itself fails, in `rescue_and_log` or in the catch-all, `Rails.logger.error`
+  records both errors. `rescue_and_log` still raises the original error, and the catch-all
+  still gives its friendly reply. Before, the logger's error replaced both.
+- **`POST /magic_link` answers a failed mint or mail the same way for every address.** The
+  raise went to the catch-all: "Something went wrong" on the home page, or a JSON 500. Now
+  the failure is logged once and the visitor goes back to `/login` with one alert. JSON gets
+  `503` with `{ success: false, error: "delivery_failed", message: … }`: the input was
+  fine and a retry can work, so it is not a 4xx. The body does not carry the internal
+  message, and the action never looks an account up, so it reveals nothing about which
+  emails have accounts. `Studio::MagicLinkIssuing::DELIVERY_FAILED` holds the words.
 
 ## 0.130.0 — 2026-11-05
 

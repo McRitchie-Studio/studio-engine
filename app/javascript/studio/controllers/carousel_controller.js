@@ -14,6 +14,12 @@
 // A lazy controller (studio/stimulus): only a page with a carousel fetches it.
 // Until it connects the controls stay hidden and the row keeps a thin scrollbar,
 // so a carousel whose controller failed is still a row that scrolls.
+//
+// A SPOTLIGHT row (class carousel-spotlight) snaps each slide to the centre: every
+// slide is a stop, an arrow moves one slide, and the slide nearest the centre
+// carries data-current, which the CSS styles where scroll-driven animations are
+// missing and under reduced motion.
+import { centerStops } from "studio/carousel"
 import { Controller } from "@hotwired/stimulus"
 import { currentStop, hiddenEnds, keyAction, ownsKey, perPage, positionText, stops, targetStop } from "studio/carousel"
 
@@ -49,6 +55,11 @@ export default class extends Controller {
   measure() {
     const track = this.trackTarget
     const slides = this.slideTargets
+    if (this.element.classList.contains("carousel-spotlight")) {
+      const max = Math.max(0, track.scrollWidth - track.clientWidth)
+      const boxes = slides.map((slide) => ({ left: slide.offsetLeft, width: slide.offsetWidth }))
+      return { positions: centerStops(boxes, track.clientWidth, max), page: 1 }
+    }
     const origin = slides[0]?.offsetLeft || 0
     const max = Math.max(0, track.scrollWidth - track.clientWidth)
     const gap = parseFloat(getComputedStyle(track).columnGap) || 0
@@ -72,6 +83,9 @@ export default class extends Controller {
     track.toggleAttribute("data-fade-end", ends.end)
     if (this.hasPrevTarget) this.prevTarget.setAttribute("aria-disabled", String(!ends.start))
     if (this.hasNextTarget) this.nextTarget.setAttribute("aria-disabled", String(!ends.end))
+    if (this.element.classList.contains("carousel-spotlight")) {
+      this.slideTargets.forEach((slide, index) => slide.toggleAttribute("data-current", index === this.current))
+    }
     this.dotTargets.forEach((dot, index) => {
       dot.hidden = index >= positions.length
       if (index === this.current) dot.setAttribute("aria-current", "true")
