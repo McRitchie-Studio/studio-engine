@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.133.0 — 2026-11-06
+
 ### Deprecated
 
 - **`studio/_page_header`'s `actions_html:`.** It still renders, before the menu, for one
