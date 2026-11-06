@@ -44,8 +44,10 @@
   # The section chrome and the consumer contract live in style/_host.html.erb.
   host_modals = lookup_context.exists?("modals", ["style/host"], true)
 
+  # Tricks second, after the landing Theme (Alex McRitchie, 2026-11-05).
   sections = [
     ["theme",  "Theme"],
+    ["tricks", "Tricks"],
     ["modals", "Modals"]
   ]
   # Adjacent to Modals, not appended: this page groups by SUBJECT, and a host's
@@ -53,7 +55,6 @@
   # name, so the pill says whose section it is.
   sections << ["host-modals", Studio.app_name] if host_modals
   sections += [
-    ["tricks", "Tricks"],
     ["tasks",  "Tasks"],
     ["components", "Components"]
   ]
@@ -84,11 +85,11 @@
       (76px on the hub at phone width). %>
   <div class="space-y-24 pt-10">
     <%= render "style/theme" %>
+    <%= render "style/tricks" %>
     <%= render "style/modals" %>
     <% if host_modals %>
       <%= render "style/host" %>
     <% end %>
-    <%= render "style/tricks" %>
     <%= render "style/tasks" %>
     <%= render "style/components" %>
   </div>

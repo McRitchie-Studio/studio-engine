@@ -347,6 +347,11 @@ body.modal-open .studio-app-banner {
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
+  /* A sideways scroller clips both axes, so the pills get room inside it: their contact
+     shadow (3px below), the lit edge (1px) and a focus ring (2px). The negative margin
+     gives the room back, so the row's box does not move. */
+  padding: 0.25rem;
+  margin: -0.25rem;
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--page-header-fade-start), #000 calc(100% - var(--page-header-fade-end)), transparent 100%);
           mask-image: linear-gradient(to right, transparent 0, #000 var(--page-header-fade-start), #000 calc(100% - var(--page-header-fade-end)), transparent 100%);
 

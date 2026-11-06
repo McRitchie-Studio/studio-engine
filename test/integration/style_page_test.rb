@@ -22,7 +22,7 @@ require "nokogiri"
 #   3. StyleController wires that gate as a before_action.
 #   4. The view is a bare content wrapper that REFERENCES every primitive family
 #      (buttons, surfaces/text/form, motion, effect), wires the four-section nav
-#      in order (Theme landing / Modals / Tricks / Tasks) with matching anchor
+#      in order (Theme landing / Tricks / Modals / Tasks) with matching anchor
 #      targets, and keeps the color role tokens in the Theme section (Theme owns
 #      "the colors"). The dummy app does not compile the engine CSS, so specimens
 #      are unstyled here by design — this asserts the classes/contract.
@@ -69,7 +69,7 @@ class StylePageTest < ActiveSupport::TestCase
     assert_nil doc.at_css("header"), "no separate header above the row"
 
     links = row.css("[data-style-section-nav-target='link']")
-    assert_equal %w[#theme #modals #tricks #tasks #components], links.map { |a| a["href"] }
+    assert_equal %w[#theme #tricks #modals #tasks #components], links.map { |a| a["href"] }
     assert_equal ["#theme"], row.css("a[aria-current='true']").map { |a| a["href"] }, "Theme starts active"
     assert_includes links.first["class"].split, "btn-primary"
     assert_includes links.last["class"].split, "btn-neutral"
@@ -111,7 +111,7 @@ class StylePageTest < ActiveSupport::TestCase
 
   test "every section's title is a section header, first in its section, and joins no data-pin" do
     doc = Nokogiri::HTML.fragment(render_index)
-    { "theme" => "Theme", "modals" => "Modals", "tricks" => "Tricks", "tasks" => "Tasks", "components" => "Components" }.each do |id, title|
+    { "theme" => "Theme", "tricks" => "Tricks", "modals" => "Modals", "tasks" => "Tasks", "components" => "Components" }.each do |id, title|
       section = doc.at_css("section##{id}")
       first = section.element_children.first
 
@@ -267,7 +267,7 @@ class StylePageTest < ActiveSupport::TestCase
   ].freeze
 
   # Theme is the landing section; the section order the nav pills follow.
-  SECTION_ANCHORS = %w[theme modals tricks tasks].freeze
+  SECTION_ANCHORS = %w[theme tricks modals tasks].freeze
 
   # solana-studio's app/views. The guide's THREE web3 specimens (Connect wallet
   # and the two Sign Wallet cards) render from that gem since the two-template
@@ -614,12 +614,12 @@ class StylePageTest < ActiveSupport::TestCase
     end
   end
 
-  test "the sections render in order: Theme (landing), Modals, Tricks, Tasks" do
+  test "the sections render in order: Theme (landing), Tricks, Modals, Tasks" do
     html = render_index
     positions = SECTION_ANCHORS.map { |id| html.index(%(id="#{id}")) }
     refute_includes positions, nil, "every section anchor must be present"
     assert_equal positions, positions.sort,
-      "sections must appear in order Theme, Modals, Tricks, Tasks"
+      "sections must appear in order Theme, Tricks, Modals, Tasks"
   end
 
   test "the color role tokens live in the Theme section, not Tricks" do
@@ -712,11 +712,12 @@ class StylePageTest < ActiveSupport::TestCase
   # and the longer name was describing a subset of its own cards. What has held
   # across both renames is the ORDER, which is what this asserts.
   def modals_subheadings(html)
+    # Tricks now comes before Modals; the next section is a host's own modals, or Tasks.
     modals_start = html.index('id="modals"')
-    tricks_start = html.index('id="tricks"')
+    next_start = html.index('id="host-modals"') || html.index('id="tasks"')
     refute_nil modals_start, "the Modals section anchor must exist"
-    refute_nil tricks_start, "the Tricks section anchor must exist"
-    slice = html[modals_start...tricks_start]
+    refute_nil next_start, "the section after Modals must exist"
+    slice = html[modals_start...next_start]
     slice.scan(%r{type-h4 text-heading">([^<]+)</h3>}).flatten
   end
 

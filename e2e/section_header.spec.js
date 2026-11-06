@@ -54,35 +54,35 @@ const stack = (page) => page.evaluate(() => window.studioPinnedStack.read());
 // Polled: the navbar's collapse takes a moment to settle after a jump.
 const expectUnder = (lower, upper) => expect.poll(async () => Math.abs((await topOf(lower)) - (await bottomOf(upper)))).toBeLessThanOrEqual(1);
 
-test("the style guide: Style stays, Modals sits directly under it, and Tricks takes its place", async ({ page }) => {
+test("the style guide: Style stays, Tricks sits directly under it, and Modals takes its place", async ({ page }) => {
   const errors = watchPageErrors(page);
   for (const viewport of [DESKTOP, PHONE]) {
     await open(page, STYLE, viewport);
     const row = styleRow(page);
 
-    await scrollTo(page, "#modals", -600);
-    const modals = header(page, "modals");
-    await expect(modals).toHaveAttribute("data-stuck", "");
-    await expect(modals).toHaveText("Modals");
-    await expectUnder(modals, row);
-    await expect(row).toHaveAttribute("data-stuck", "");
-
-    // The last of Modals: still its header.
-    const rowBottom = await bottomOf(row);
-    await scrollTo(page, "#tricks", rowBottom + 120);
-    await expect(modals).toHaveAttribute("data-stuck", "");
-    await expect(header(page, "tricks")).not.toHaveAttribute("data-stuck", "");
-
-    // Tricks has reached the line.
-    await scrollTo(page, "#tricks", -40);
+    await scrollTo(page, "#tricks", -600);
     const tricks = header(page, "tricks");
     await expect(tricks).toHaveAttribute("data-stuck", "");
-    await expect(modals).not.toHaveAttribute("data-stuck", "");
+    await expect(tricks).toHaveText("Tricks");
     await expectUnder(tricks, row);
-    expect(await page.locator("[data-pin-section][data-stuck]").count()).toBe(1);
-    await expect(row.locator("a[aria-current='true']")).toHaveText("Tricks");
+    await expect(row).toHaveAttribute("data-stuck", "");
 
-    const bleed = await tricks.boundingBox();
+    // The last of Tricks: still its header.
+    const rowBottom = await bottomOf(row);
+    await scrollTo(page, "#modals", rowBottom + 120);
+    await expect(tricks).toHaveAttribute("data-stuck", "");
+    await expect(header(page, "modals")).not.toHaveAttribute("data-stuck", "");
+
+    // Modals has reached the line.
+    await scrollTo(page, "#modals", -40);
+    const modals = header(page, "modals");
+    await expect(modals).toHaveAttribute("data-stuck", "");
+    await expect(tricks).not.toHaveAttribute("data-stuck", "");
+    await expectUnder(modals, row);
+    expect(await page.locator("[data-pin-section][data-stuck]").count()).toBe(1);
+    await expect(row.locator("a[aria-current='true']")).toHaveText("Modals");
+
+    const bleed = await modals.boundingBox();
     expect(bleed.x, "the bar's bleed stays on the page").toBeGreaterThanOrEqual(0);
     expect(bleed.x + bleed.width, "the bar's bleed stays on the page").toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth));
   }
@@ -135,17 +135,18 @@ async function backKeepsPlace(page, url) {
   await page.goto(url);
   await page.waitForFunction(() => document.documentElement.hasAttribute("data-pin-live"));
   const row = styleRow(page);
-  await row.locator("a", { hasText: "Modals" }).click();
-  await page.waitForFunction(() => location.hash === "#modals");
-  await page.waitForTimeout(300);
-  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
-  await page.waitForTimeout(300);
+  // Tricks comes before Modals, so the second jump lands further down.
   await row.locator("a", { hasText: "Tricks" }).click();
   await page.waitForFunction(() => location.hash === "#tricks");
   await page.waitForTimeout(300);
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+  await page.waitForTimeout(300);
+  await row.locator("a", { hasText: "Modals" }).click();
+  await page.waitForFunction(() => location.hash === "#modals");
+  await page.waitForTimeout(300);
   const before = await page.evaluate(() => window.scrollY);
   await page.goBack();
-  await page.waitForFunction(() => location.hash === "#modals");
+  await page.waitForFunction(() => location.hash === "#tricks");
   await page.waitForTimeout(800);
   const held = await page.evaluate(() => window.scrollY);
   await page.waitForTimeout(800);

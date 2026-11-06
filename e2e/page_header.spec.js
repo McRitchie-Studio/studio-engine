@@ -25,6 +25,7 @@ const { watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive } = requ
 //     the bar at rest.
 //   - anchor-scope removed from the track: 1 red, each row's own pill.
 //   - font-weight 600 removed from the current link: 1 red, the current link.
+//   - the tab scroller's padding removed: 1 red, the scroller's room (0px below, 0px right).
 
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
@@ -417,6 +418,41 @@ test("each row's pill anchors to its own current tab, not a later row's", async 
     return { left: Math.round(glide.left - tab.left), top: Math.round(glide.top - tab.top) };
   });
   expect(copyGap).toEqual({ left: 0, top: 0 });
+});
+
+// Alex McRitchie, 2026-11-05: "there is a cut off at the bottom". A sideways scroller
+// clips both axes, so a pill's contact shadow (3px below), its lit edge and the last pill's
+// right border must sit inside the scroller's box, not on its edge.
+const pillRoom = (page) => page.evaluate(() => {
+  const tabs = document.querySelector("[data-pin='page'] .page-header-tabs");
+  const box = tabs.getBoundingClientRect();
+  const pills = [...tabs.querySelectorAll(".page-header-track > a")].map((a) => a.getBoundingClientRect());
+  const last = pills[pills.length - 1];
+  return {
+    below: Math.min(...pills.map((p) => box.bottom - p.bottom)),
+    above: Math.min(...pills.map((p) => p.top - box.top)),
+    right: Math.round(box.right - last.right),
+    scrolls: tabs.scrollWidth > tabs.clientWidth,
+  };
+});
+
+test("the tab scroller leaves the pills their shadow and edges, desktop and phone", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.setViewportSize(DESKTOP);
+  await page.goto(STYLE);
+  await page.waitForFunction(() => document.documentElement.hasAttribute("data-pin-live"));
+  await page.evaluate(() => { document.documentElement.dataset.surfaceStyle = "glass"; });
+  const desktop = await pillRoom(page);
+  expect(desktop.below, "room under every pill for its 3px contact shadow").toBeGreaterThanOrEqual(3);
+  expect(desktop.above).toBeGreaterThanOrEqual(1);
+  expect(desktop.right, "the last pill's right edge inside the box").toBeGreaterThanOrEqual(1);
+
+  await page.setViewportSize(PHONE);
+  await page.locator("[data-pin='page'] .page-header-tabs").evaluate((el) => { el.scrollLeft = el.scrollWidth; });
+  const phone = await pillRoom(page);
+  expect(phone.scrolls, "the phone's tabs still scroll sideways").toBe(true);
+  expect(phone.below).toBeGreaterThanOrEqual(3);
+  expect(phone.right, "scrolled to the end, the last pill shows whole").toBeGreaterThanOrEqual(1);
 });
 
 test("a wide group of actions wraps inside the row on a phone, and the page does not scroll sideways", async ({ page }) => {
