@@ -4,6 +4,20 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **The talk modal's opener is never dropped.** A visitor who sent a message before the
+  thread first loaded lost the opener: `studio/agent_chat` marked it sent, then the
+  post returned early because the visitor's send was in flight. Now a send made
+  before the load posts the opener first, then the visitor's words; a send made while
+  the opener is in flight waits for it; and the tab remembers the opener only as its
+  POST starts, forgetting it if the POST fails. It is never sent twice.
+- **`e2e/talk_to_agent.spec.js`'s modified-click spec no longer flakes.** It waited for
+  the new tab a Ctrl+click opens, which on CI's headless Linux Chromium stayed at
+  `about:blank` (it read "blank", and a wait for its URL timed out), so it measured the
+  browser rather than the modal. It now asserts what the modal owes a modified click:
+  the click is not prevented (the browser follows the `href`) and no card opens.
+
 ### Added
 
 - **The loader family: the eight ways a page says wait, in one place.** From the
@@ -20,6 +34,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   section with all eight, and a live infinite scroll from an admin-only demo feed
   (`/admin/style/loaders_feed`). Busy buttons can show their busy words with
   `data-loader-busy`. Docs: `docs/LOADER.md`, "The family".
+- **Agent replies show a small, safe Markdown subset.** In `studio/agent_chat`, an agent
+  turn's `**bold**`, `*italics*`, `` `code` ``, http(s) links, `- ` and `1. ` lists and
+  line breaks render as such, and a leading `> ` is dropped. The nodes are built with
+  `createElement` and text nodes, never HTML; any other markup, and any link that is not
+  http or https, shows as its own characters. A visitor's words stay plain text. Detail:
+  `docs/AGENT_CHAT.md`, "The page's script".
 - **Talk to an agent in a modal: `studio/agent_chat/_talk_modal`.** Render it once on a page,
   then mark any link with `studio_talk_to_agent_link(label, href:, soul:, topic:, opener:)`. A
   click opens the shared agent chat in a card on the page-scoped modal host and sends the
@@ -70,6 +90,21 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `docs/PAGE_TRANSITIONS.md`, "Back".
 - **The page header's title is the type scale's h2 from 40rem** (30px, weight 800), Alex
   McRitchie's "H2 header"; a phone keeps 1.5x the base. It is still the page's one `h1`.
+
+### Fixed
+
+- **A signup that cannot send its email no longer fails silently.** `RegistrationsController#create`
+  ended in a `rescue StandardError` that logged nothing and rendered `registrations/new`. On a
+  passwordless app `@user` was never set, so a failed link mint or mail raised `NoMethodError` on
+  nil in that view, and no ErrorLog row named the first failure. Now a passwordless failure is
+  logged through `rescue_and_log` and redirects to `/signup` with one friendly alert for every
+  address, so it reveals nothing about which emails have accounts. The account is still created
+  only when the link is used. A password signup re-renders the form on a validation error and
+  writes no ErrorLog row. A POST with no `user` params gets the form too, not a
+  `ParameterMissing`. Any other raise is logged once and goes to the catch-all. The rescue no
+  longer names the unsaved user as its target: ErrorLog's `belongs_to` autosaved it, which ran the
+  failing save again inside the logger. That second raise skipped the logged mark, so the
+  catch-all wrote the same failure twice.
 
 ## 0.130.0 — 2026-11-05
 
