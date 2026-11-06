@@ -40,19 +40,8 @@ test("Tricks opens with Buttons, then Button tricks", async ({ page }) => {
   const titles = await page.locator("section#tricks h3").allInnerTexts();
   expect(titles.slice(0, 3)).toEqual(["Buttons", "Button tricks", "Page header"]);
 
-  const names = await page.locator("section#button-tricks article code[x-ref=klass]").allInnerTexts();
-  expect(names).toEqual([
-    expect.stringContaining(".edge-rotate-glow"),
-    expect.stringContaining(".studio-border-glow"),
-    expect.stringContaining(".studio-border-glow--clear"),
-    expect.stringContaining(".sheen"),
-    expect.stringContaining(".pulse-cta"),
-    expect.stringContaining(".fizz-stack"),
-    expect.stringContaining(".hold-btn"),
-    expect.stringContaining(".hold-btn"),
-    expect.stringContaining("burst"),
-    expect.stringContaining("cannons"),
-  ]);
+  const names = await page.locator("section#button-tricks article [data-trick-name]").allInnerTexts();
+  expect(names).toEqual(["Edge Glow", "Border Glow", "Sheen", "Pulse", "Fizz", "Hold", "Burst"]);
   expect(errors).toEqual([]);
 });
 

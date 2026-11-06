@@ -1,13 +1,15 @@
 <%#  Specimen card for the living style guide (admin/style).
-     Reusable chrome around ONE primitive, framed for copy-paste-for-an-agent:
-       stage - the rendered primitive (yielded from the caller block)
-       meta  - its class name and a copyable usage snippet; one Copy per card (the
-               snippet's, else the class name's)
+     Reusable chrome around ONE primitive, named so Alex McRitchie can say it to an
+     agent ("add a Sheen"):
+       stage - the rendered primitive (yielded from the caller block), with its
+               variants side by side when the card folds them in
+       label - the trick's name, a one-line note and its class or helper, read from
+               config/studio_tricks.yml by key (style/_trick_label), with one Copy
+               that copies the agent line, never a markup snippet
      locals:
-       klass          (String, required) - the class label, shown prominently with a
-                       copy button so an agent can grab the exact class list.
-       usage          (String, optional) - a copyable usage snippet.
-       note           (String, optional) - one short sentence on what it does.
+       trick          (String, required) - the registry key (config/studio_tricks.yml).
+       variant        (String, optional) - a variant with a card of its own
+                       ("Loader · orbit"); the card is then named for the variant.
        disabled       (Boolean, optional) - render "disabled but present": the
                        primitive stays visible + previewable but is muted/greyed
                        and flagged, for a capability the host app has turned off
@@ -30,7 +32,7 @@
   # utilities and lift the opacity a touch so the trigger reads as tappable.
   inner_cls = openable ? "opacity-60 grayscale" : "opacity-40 grayscale select-none pointer-events-none"
 %>
-<article class="card overflow-hidden flex flex-col h-full<%= " opacity-95" if disabled %>" <%= 'aria-disabled="true"'.html_safe if disabled %>>
+<article class="card overflow-hidden flex flex-col h-full<%= " opacity-95" if disabled %>" <%= tag.attributes(data: { trick: local_assigns.fetch(:trick), trick_variant: local_assigns[:variant] }, aria: { disabled: ("true" if disabled) }) %>>
   <div class="relative flex flex-1 flex-wrap items-center justify-center gap-4 p-6 bg-surface-alt min-h-32">
     <% if disabled %>
       <span class="absolute top-2 right-2 badge z-10" style="color: var(--color-warning); border-color: var(--color-warning)"><%= disabled_label %></span>
@@ -39,37 +41,7 @@
       <%= yield %>
     <% end %>
   </div>
-  <div class="border-t border-subtle p-3 space-y-2">
-    <% if local_assigns[:note].present? %>
-      <p class="text-sm text-body"><%= local_assigns[:note] %></p>
-    <% end %>
-    <%# ONE Copy per card. With a usage snippet, the snippet's Copy is the one: it holds
-        the class too. Without one, the class name carries the Copy. %>
-    <% snippet = local_assigns[:usage] %>
-    <div class="flex items-start justify-between gap-2" x-data="{ copied: false }">
-      <code x-ref="klass" class="font-mono text-xs font-bold text-heading break-all leading-relaxed flex-1 min-w-0"><%= local_assigns[:klass] %></code>
-      <% unless snippet.present? %>
-        <button type="button"
-                class="btn btn-neutral btn-sm shrink-0"
-                aria-label="Copy class name"
-                @click="navigator.clipboard?.writeText($refs.klass.innerText); copied = true; setTimeout(() => copied = false, 1200)">
-          <span x-text="copied ? 'Copied' : 'Copy'">Copy</span>
-        </button>
-      <% end %>
-    </div>
-    <% if snippet.present? %>
-      <%# The code wraps inside its box, and pr-24 keeps every line clear of the Copy
-          button, "Copied" included: 74px with its inset on macOS, 3px wider in CI's
-          Linux fonts, so pr-20 was not enough. %>
-      <div class="relative" x-data="{ copied: false }">
-        <pre class="bg-inset text-body text-2xs rounded-lg px-3 py-2 pr-24 whitespace-pre-wrap break-words"><code x-ref="snippet"><%= snippet %></code></pre>
-        <button type="button"
-                class="btn btn-neutral btn-sm absolute top-2 right-2"
-                aria-label="Copy usage snippet"
-                @click="navigator.clipboard?.writeText($refs.snippet.innerText); copied = true; setTimeout(() => copied = false, 1200)">
-          <span x-text="copied ? 'Copied' : 'Copy'">Copy</span>
-        </button>
-      </div>
-    <% end %>
+  <div class="border-t border-subtle p-3">
+    <%= render "style/trick_label", trick: local_assigns.fetch(:trick), variant: local_assigns[:variant] %>
   </div>
 </article>

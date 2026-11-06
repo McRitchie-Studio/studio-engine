@@ -11,8 +11,11 @@ const { blockOffsiteRequests } = require("./helpers");
 //   - the modifier's background-color: transparent removed: the fill spec, the face
 //     painted the lit violet.
 //   - the reduced-motion rule removed: the reduced-motion spec, the ring still animated.
-//   - the class name's Copy kept beside a snippet: the one-Copy spec, 2 on a card.
-//   - the snippet back on pr-16: the clear-of-the-button spec, "Copied" over the code.
+//   - a second Copy on a card: the one-Copy spec, 2 on a card.
+//   - shrink-0 off the Copy button: the clear-of-the-button spec, "Copied" over the token.
+//
+// The snippet boxes went on 2026-11-06 (task tricks-named-not-snippets): a card now
+// shows its trick name, a note and the token, and its one Copy copies the agent line.
 
 const STYLE = "/lab/style_nav";
 const CLEAR = "[data-border-glow-clear]";
@@ -89,26 +92,30 @@ test("under reduced motion the glow's ring and halo stand still", async ({ page 
   expect(names).toEqual(["none", "none"]);
 });
 
-test("each specimen card has one Copy, and no code line runs under it", async ({ page }) => {
+test("each specimen card has one Copy, and no name, note or token runs under it", async ({ page }) => {
   await open(page);
   const cards = await page.evaluate(() => [...document.querySelectorAll("#tricks article.card")].map((card) => {
     const copies = [...card.querySelectorAll("button")].filter((b) => /^Cop(y|ied)$/.test(b.textContent.trim()));
-    const pre = card.querySelector("pre");
     let clear = null;
-    if (pre && copies.length === 1) {
-      // "Copied" is the wider label: measure the button wearing it.
+    if (copies.length === 1) {
+      // "Copied" is the wider label: measure the button wearing it, against the
+      // right edge of the widest text line beside it.
       const button = copies[0];
       const label = button.querySelector("span");
       const was = label.textContent;
       label.textContent = "Copied";
-      const box = pre.getBoundingClientRect();
-      const text = box.right - parseFloat(getComputedStyle(pre).paddingRight);
-      clear = Math.round(button.getBoundingClientRect().left - text);
+      const right = Math.max(...[...card.querySelectorAll("[data-trick-name], [data-trick-note], [data-trick-token]")].map((el) => {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        return Math.max(...[...range.getClientRects()].map((r) => r.right));
+      }));
+      clear = Math.round(button.getBoundingClientRect().left - right);
       label.textContent = was;
     }
-    return { name: card.querySelector("code")?.textContent.trim().slice(0, 40), copies: copies.length, clear };
+    return { name: card.querySelector("[data-trick-name]")?.textContent.trim(), copies: copies.length, clear };
   }));
   expect(cards.length).toBeGreaterThan(10);
+  expect(cards.filter((c) => !c.name), "cards with no name").toEqual([]);
   expect(cards.filter((c) => c.copies !== 1), "cards with other than one Copy").toEqual([]);
-  expect(cards.filter((c) => c.clear !== null && c.clear < 0), "code lines under the Copy button").toEqual([]);
+  expect(cards.filter((c) => c.clear === null || c.clear < 0), "text under the Copy button").toEqual([]);
 });

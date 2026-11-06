@@ -1,0 +1,33 @@
+<%#  A trick's name, note and token, with one Copy (config/studio_tricks.yml).
+     The name is the heading because it is what a person says to an agent ("add a
+     Sheen"); the token is what the agent writes, so it sits under it, small and
+     muted. Copy puts the agent line on the clipboard: the name and the token,
+     variants included (Studio::Tricks.agent_line). No markup snippet: an agent can
+     read the markup from the engine, and only the name has to travel by word.
+     locals:
+       trick   (String, required) - the registry key.
+       variant (String, optional) - one variant's own label. %>
+<% t = Studio::Tricks.fetch(trick, local_assigns[:variant]) %>
+<div class="flex items-start justify-between gap-3" x-data="{ copied: false }">
+  <div class="min-w-0 flex-1 space-y-1">
+    <h4 class="type-h4 text-heading" data-trick-name><%= t.name %></h4>
+    <p class="text-sm text-body" data-trick-note><%= t.note %></p>
+    <code class="block font-mono text-2xs text-muted break-words" data-trick-token><%= t.token %></code>
+    <% if t.variants.any? %>
+      <%# The variants by name, so "Sheen · loop" is on the card and not only on the
+          clipboard. %>
+      <ul class="space-y-0.5" data-trick-variants>
+        <% t.variants.each do |v| %>
+          <li class="text-2xs leading-snug"><span class="text-body font-semibold" data-trick-variant-name><%= v.name %></span> <code class="font-mono text-muted break-words"><%= v.token %></code></li>
+        <% end %>
+      </ul>
+    <% end %>
+  </div>
+  <button type="button"
+          class="btn btn-neutral btn-sm shrink-0"
+          aria-label="Copy the name for an agent"
+          data-trick-copy="<%= Studio::Tricks.agent_line(trick, local_assigns[:variant]) %>"
+          @click="navigator.clipboard?.writeText($el.dataset.trickCopy); copied = true; setTimeout(() => copied = false, 1200)">
+    <span x-text="copied ? 'Copied' : 'Copy'">Copy</span>
+  </button>
+</div>
