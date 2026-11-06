@@ -88,6 +88,7 @@ Rails.application.routes.draw do
   get "lab/geo_settings", to: "e2e_lab#geo_settings"
   get "lab/site_identity", to: "e2e_lab#site_identity"
   get "lab/style_modals", to: "e2e_lab#style_modals"
+  get "lab/sign_in_card", to: "e2e_lab#sign_in_card"
   get "lab/style_theme", to: "e2e_lab#style_theme"
   get "lab/style_nav", to: "e2e_lab#style_nav"
   get "lab/section_header", to: "e2e_lab#section_header"

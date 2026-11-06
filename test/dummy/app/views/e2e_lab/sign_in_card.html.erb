@@ -1,0 +1,5 @@
+<%# The engine's standard sign-in card, live, for e2e/style_sign_in_card.spec.js.
+    THE LAB RULE: this page sets up the partial's locals and nothing else. %>
+<main class="max-w-5xl mx-auto px-4 py-10">
+  <%= render "studio/auth/sign_in_card", return_to: "/lab/after-sign-in", google: true, magic_link: true %>
+</main>

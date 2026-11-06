@@ -114,7 +114,7 @@
            await this.post();
            this.step = 'sent';
            this.startCooldown();
-           this.$nextTick(() => this.$refs.sentHeading && this.$refs.sentHeading.focus());
+           this.focusSoon(() => this.$refs.sentHeading);
          } catch (e) {
            this.error = e.message || this.cfg.messages.generic;
          } finally { this.props.submitting = null; }
@@ -132,7 +132,19 @@
          this.props.resendCooldown = 0;
          this.props.resendError = '';
          this.step = 'email';
-         this.$nextTick(() => this.$refs.emailForm && this.$refs.emailForm.querySelector('input[type=email]').focus());
+         this.focusSoon(() => this.$refs.emailForm && this.$refs.emailForm.querySelector('input[type=email]'));
+       },
+       // Focus follows the step, for a keyboard or screen-reader user: the
+       // pressed button is hidden with its step. A hidden node cannot take
+       // focus, and x-show can reveal the new step a frame or more after the
+       // change (measured: still display none in the first frame), so wait
+       // frame by frame until it is rendered, ten frames at most.
+       focusSoon(target, tries = 10) {
+         requestAnimationFrame(() => {
+           const el = target();
+           if (el && el.offsetParent !== null) el.focus();
+           else if (tries > 1) this.focusSoon(target, tries - 1);
+         });
        },
        destroy() { clearInterval(this._timer); }
      }">
