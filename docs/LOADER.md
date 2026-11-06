@@ -6,7 +6,8 @@ the style rides `data-loader-style`. Code: `lib/studio/loader.rb` (config and
 art), `app/helpers/studio/loader_helper.rb`, `app/views/studio/loader/`,
 `engine-motion.css` ("BRANDED LOADER") and `app/javascript/studio/loader.js`.
 The six styles are the ones Alex McRitchie picked from the Loader Lab
-(task `branded-app-loader`, 2026-10-28).
+(task `branded-app-loader`, 2026-10-28). The branded loader is one member of a
+family of eight; the rest are in [The family](#the-family) below.
 
 ## Declare the style
 
@@ -140,6 +141,128 @@ Measured in the lab, Chromium, from the click (`e2e/loader_pace.spec.js`):
   does not drive, `studio/loader` marks the submitter.
 - **Percent.** `StudioLoader.setPercent(el, n)` moves a `percent:` loader.
 
+## The family
+
+Every app has eight ways to say "wait". Pick the one that matches the wait
+(task `engine-loader-family`, from a reel Alex McRitchie shared). `/admin/style`
+shows all eight in its Loaders section.
+
+| Loader | Use it for | Code |
+|---|---|---|
+| Spinner | A short wait beside text or in a control | `studio_loader style: :spinner` |
+| Skeleton | Content that is on its way; the page keeps its layout | `studio_skeleton :card, count: 3` |
+| Progress bar | A wait you can measure; with no percent it sweeps | `studio_loader style: :bar, percent: 40` |
+| Pulsing dots | A reply on its way, such as a chat answer | `studio_loader style: :dots` |
+| Button loader | A submit in flight | `studio_loader_pending` in the button |
+| Full screen | A page load longer than 350ms | the overlay, above |
+| Pull to refresh | Reloading a feed on a phone | `studio_pull_to_refresh` |
+| Infinite scroll | A long list, one page at a time | `studio_infinite_scroll` |
+
+### Plain styles: spinner, dots and bar
+
+They draw no icon, only the theme's colours: `--studio-loader-color` is the
+primary ink (`--color-primary-ink`, the primary checked for contrast against the
+page), so a dark primary never sinks into a dark page. In a button they take the
+button's text colour. They are styles of `studio_loader`, not new classes: each wraps the
+engine's canonical motion rule (`.spinner`, `.loading-dots`, `.progress-meter`)
+and only sets its knobs. Those classes still work alone; a later adoption task
+moves the hub and Turf onto the helper. An app's own `config.loader` refuses a
+plain style, because the app's loader draws its icon.
+
+```erb
+<%= studio_loader style: :spinner %>                     <%# 20px %>
+<%= studio_loader style: :dots, label: "Alex is typing" %> <%# 32px wide %>
+<%= studio_loader style: :bar, percent: 62, label: "Uploading" %>
+<%= studio_loader style: :bar %>                         <%# no percent: it sweeps %>
+```
+
+- **Size.** `size:` is the ring's diameter, the dots' row width, or the bar's
+  width (default `100%`; its height is `--studio-loader-bar-height`, 6px).
+- **The bar is a progressbar.** Its label is its accessible name. A percent is
+  its `aria-valuenow`; with none it has no value, which is how an indeterminate
+  progressbar reads. `StudioLoader.setPercent(el, n)` moves it, sets the value,
+  and stops the sweep.
+- **In a button.** `studio_loader_pending style: :spinner` is the spinner in the
+  button's text colour. Words the button says only while busy ("Saving…") go
+  in an element marked `data-loader-busy`; what they replace is `data-loader-idle`.
+
+### Skeleton
+
+Grey shapes of the content to come. The wrapper is `aria-busy="true"`; every
+shape is `aria-hidden`; one screen-reader line (`label:`, default "Loading")
+names the wait. The shapes are tints of `--color-text`, so one rule reads on a
+dark, light or glass surface. The shimmer stops under reduced motion.
+
+```erb
+<%= studio_skeleton %>                                     <%# three lines %>
+<%= studio_skeleton :avatar, count: 4 %>                   <%# list rows %>
+<%= studio_skeleton :card, count: 3, class: "sm:grid-cols-3" %>
+<%= studio_skeleton :media, lines: 2 %>
+```
+
+The wrapper is a grid, and any html option lands on it. A natural home is the
+placeholder of a lazy frame: Turbo marks the frame busy and swaps the skeleton
+out when the content arrives.
+
+```erb
+<turbo-frame id="feed" src="<%= feed_path %>" loading="lazy">
+  <%= studio_skeleton :card, count: 3 %>
+</turbo-frame>
+```
+
+### Infinite scroll
+
+The view renders the same call for every page. The block is one page of items:
+
+```erb
+<%= studio_infinite_scroll id: "posts", page: @page,
+      next_url: (posts_path(page: @page + 1) if @more),
+      announce: "%{count} more posts loaded", class: "grid gap-4" do %>
+  <% @posts.each do |post| %><%= render post %><% end %>
+<% end %>
+```
+
+- **How it grows.** After its items, a page leaves a `<turbo-frame>` for the
+  next page, holding a "Load more" link to `next_url`. Page 2 and later render
+  their items inside that frame, so Turbo lifts just the frame out of the
+  response and the list grows in place. The frames take no box
+  (`display: contents`), so the items flow into the list's own grid. Use a
+  `div` list, not a `ul`.
+- **When it loads.** `studio/infinite_scroll` (a lazy controller) watches the
+  button's row and loads the frame once it comes within 600px of the viewport.
+  No click is needed, and each page loads once.
+- **The button stays.** "Load more" is always visible. While a page loads,
+  Turbo marks the frame busy and the button shows a spinner. A keyboard press
+  moves focus to the first new item. With no script, the link opens the next
+  page as an ordinary page, so every page must render the whole view.
+- **Announced.** A polite status line says how many items came, and, on the
+  last page, `end_label:` ("That is everything").
+- **Cheaper frames.** A frame request renders the whole page; a host may skip its
+  layout when `turbo_frame_request?`.
+
+### Pull to refresh
+
+```erb
+<%= studio_pull_to_refresh do %>          <%# reloads the page (a replace visit) %>
+  ...
+<% end %>
+<%= studio_pull_to_refresh frame: "feed" do %>  <%# reloads one frame %>
+  ...
+<% end %>
+```
+
+Phone widths and touch only (`(pointer: coarse) and (max-width: 640px)`):
+elsewhere the wrapper does nothing. A pull from the top of the page past the
+threshold refreshes; a short pull settles back. While it is armed, the browser's
+own pull (Chrome on Android) is off, so one pull never refreshes twice. The
+refresh is a `replace` visit, so the page-load overlay never shows for it.
+It is an extra, never the only way: the browser's reload still works, and a
+keyboard user never needs it.
+
+**Not yet verified on a real phone.** The browser lane drives it with synthetic
+touch events in Chromium at phone width. iOS Safari's own rubber-band scroll and
+a real Android Chrome have not been tried; that is a follow-up.
+
 ## Colours
 
 `--studio-loader-color` (halo, frame, sparkle tint) is `--color-primary` and
@@ -152,6 +275,10 @@ Under `prefers-reduced-motion: reduce` every loader is a still icon: no
 animation, and the halo, orbit spark, bead and sparkle flares are not drawn.
 
 ## Lab
+
+`/lab/loaders` is the style guide's own Loaders section, with its demo feed at
+`/lab/loaders_feed`; `/lab/pull_to_refresh` stamps each render so a pull shows
+(`e2e/loader_family.spec.js`, `LoaderLabController`).
 
 `/lab/loader` in the dummy app (`e2e/loader.spec.js`) shows every style on its
 brand from `test/fixtures/files/loader`. `/lab/loader_visits` puts the overlay

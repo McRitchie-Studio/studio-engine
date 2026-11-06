@@ -4,8 +4,42 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **The talk modal's opener is never dropped.** A visitor who sent a message before the
+  thread first loaded lost the opener: `studio/agent_chat` marked it sent, then the
+  post returned early because the visitor's send was in flight. Now a send made
+  before the load posts the opener first, then the visitor's words; a send made while
+  the opener is in flight waits for it; and the tab remembers the opener only as its
+  POST starts, forgetting it if the POST fails. It is never sent twice.
+- **`e2e/talk_to_agent.spec.js`'s modified-click spec no longer flakes.** It waited for
+  the new tab a Ctrl+click opens, which on CI's headless Linux Chromium stayed at
+  `about:blank` (it read "blank", and a wait for its URL timed out), so it measured the
+  browser rather than the modal. It now asserts what the modal owes a modified click:
+  the click is not prevented (the browser follows the `href`) and no card opens.
+
 ### Added
 
+- **The loader family: the eight ways a page says wait, in one place.** From the
+  reel Alex McRitchie shared (task `engine-loader-family`). `studio_loader` takes
+  three plain styles that draw no icon: `style: :spinner`, `style: :dots` and
+  `style: :bar` (a progressbar; `percent:` is its value, and with none it sweeps).
+  They wrap the canonical `.spinner`, `.loading-dots` and `.progress-meter` rules,
+  so there is one set of rules; an app's own `config.loader` still refuses them.
+  New: `studio_skeleton` (`:lines`, `:avatar`, `:card`, `:media`; aria-busy, shapes
+  hidden from assistive tech, a shimmer that stops under reduced motion),
+  `studio_infinite_scroll` (the next page loads in a Turbo frame as the list's end
+  nears, "Load more" stays visible, and a polite status line counts what came) and
+  `studio_pull_to_refresh` (phones with touch only). `/admin/style` has a Loaders
+  section with all eight, and a live infinite scroll from an admin-only demo feed
+  (`/admin/style/loaders_feed`). Busy buttons can show their busy words with
+  `data-loader-busy`. Docs: `docs/LOADER.md`, "The family".
+- **Agent replies show a small, safe Markdown subset.** In `studio/agent_chat`, an agent
+  turn's `**bold**`, `*italics*`, `` `code` ``, http(s) links, `- ` and `1. ` lists and
+  line breaks render as such, and a leading `> ` is dropped. The nodes are built with
+  `createElement` and text nodes, never HTML; any other markup, and any link that is not
+  http or https, shows as its own characters. A visitor's words stay plain text. Detail:
+  `docs/AGENT_CHAT.md`, "The page's script".
 - **Talk to an agent in a modal: `studio/agent_chat/_talk_modal`.** Render it once on a page,
   then mark any link with `studio_talk_to_agent_link(label, href:, soul:, topic:, opener:)`. A
   click opens the shared agent chat in a card on the page-scoped modal host and sends the

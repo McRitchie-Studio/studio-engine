@@ -145,6 +145,24 @@ test("setPercent marks the loader and sets its percent variable", () => {
   assert.equal(props["--studio-loader-percent"], "100")
 })
 
+test("setPercent makes a bar determinate and gives it a value", () => {
+  const props = {}
+  const attrs = { role: "progressbar" }
+  const removed = []
+  const sweep = { classList: { remove: (c) => removed.push(c) } }
+  const loader = {
+    classList: { contains: (c) => c === "studio-loader" },
+    getAttribute: (k) => (k in attrs ? attrs[k] : null),
+    setAttribute: (k, v) => { attrs[k] = v },
+    querySelector: (s) => (s === ".progress-meter--indeterminate" ? sweep : null),
+    style: { setProperty: (k, v) => { props[k] = v } }
+  }
+  setPercent(loader, 42.5)
+  assert.equal(attrs["aria-valuenow"], "42.5")
+  assert.equal(props["--studio-loader-percent"], "42.5")
+  assert.deepEqual(removed, ["progress-meter--indeterminate"])
+})
+
 test("only a submitter holding a pending loader counts", () => {
   const withLoader = { querySelector: () => ({}) }
   const without = { querySelector: () => null }

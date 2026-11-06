@@ -96,6 +96,8 @@ class EngineClassVocabularyTest < ActiveSupport::TestCase
     studio/_hold_button.html.erb
     studio/loader/_loader.html.erb
     studio/loader/_overlay.html.erb
+    studio/loader/_pull_to_refresh.html.erb
+    studio/loader/_skeleton.html.erb
     studio/modals/auth/_resend_footer.html.erb
     studio/modals/blocks/_birthday.html.erb
     studio/modals/blocks/_card_header.html.erb

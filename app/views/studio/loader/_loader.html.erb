@@ -7,6 +7,12 @@
 
   A pending loader sits inside a button: hidden from assistive tech (the button
   carries aria-busy) and from sight until the button or its form is busy.
+
+  The plain styles (spinner, dots, bar) draw no icon. They wrap the engine's
+  canonical motion primitives (.spinner, .loading-dots, .progress-meter), so the
+  family and those classes are one set of rules. A bar is a progressbar: its
+  label is its name, and a percent is its value; with none it sweeps and has no
+  value, which is how an indeterminate progressbar reads.
 %>
 <%
   extra = html.dup
@@ -28,9 +34,14 @@
       tag.img(src: icon, alt: "", class: css, draggable: "false", decoding: "async")
     end
   end
-  aria = pending ? { hidden: "true" } : { live: "polite" }
+  bar = style == :bar
+  role = pending ? nil : (bar ? "progressbar" : "status")
+  aria = if pending then { hidden: "true" }
+         elsif bar then { label: label.presence || "Loading", valuemin: 0, valuemax: 100, valuenow: (percent && (percent % 1).zero? ? percent.to_i : percent) }.compact
+         else { live: "polite" }
+         end
 %>
-<%= tag.span(class: classes, role: (pending ? nil : "status"), aria: aria, data: data, style: vars.join("; "), **extra) do %>
+<%= tag.span(class: classes, role: role, aria: aria, data: data, style: vars.join("; "), **extra) do %>
   <% case style %>
   <% when :breathe %>
     <span class="studio-loader-halo" aria-hidden="true"></span>
@@ -62,6 +73,12 @@
         <% end %>
       <% end %>
     </svg>
+  <% when :spinner %>
+    <span class="spinner" aria-hidden="true"></span>
+  <% when :dots %>
+    <span class="loading-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+  <% when :bar %>
+    <span class="progress-meter<%= " progress-meter--indeterminate" if percent.nil? %>" aria-hidden="true"><span class="progress-meter-fill"></span></span>
   <% when :sparkle %>
     <%= draw_icon.call %>
     <svg class="studio-loader-art" viewBox="<%= art[:view_box] %>" aria-hidden="true">
@@ -71,5 +88,5 @@
       <% end %>
     </svg>
   <% end %>
-  <% unless pending || label.blank? %><span class="sr-only"><%= label %></span><% end %>
+  <% unless pending || bar || label.blank? %><span class="sr-only"><%= label %></span><% end %>
 <% end %>

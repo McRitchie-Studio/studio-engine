@@ -270,8 +270,13 @@ export function setPercent(el, value) {
   if (!el) return
   var loader = el.classList && el.classList.contains('studio-loader') ? el : el.querySelector('.studio-loader')
   if (!loader) return
+  var percent = clampPercent(value)
   loader.setAttribute('data-loader-percent', '')
-  loader.style.setProperty('--studio-loader-percent', String(clampPercent(value)))
+  loader.style.setProperty('--studio-loader-percent', String(percent))
+  // A bar is a progressbar: a percent makes it determinate and is its value.
+  if (loader.getAttribute && loader.getAttribute('role') === 'progressbar') loader.setAttribute('aria-valuenow', String(percent))
+  var sweep = loader.querySelector && loader.querySelector('.progress-meter--indeterminate')
+  if (sweep) sweep.classList.remove('progress-meter--indeterminate')
 }
 
 // A submitter that carries a pending loader.

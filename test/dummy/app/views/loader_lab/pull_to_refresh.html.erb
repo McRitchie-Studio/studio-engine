@@ -1,0 +1,8 @@
+<%# Pull to refresh around a page that stamps each render (LoaderLabController). %>
+<%= studio_pull_to_refresh label: "Refreshing the lab" do %>
+  <main class="px-4 py-8 space-y-4" data-test="pull-lab">
+    <h1 class="type-h3 text-heading">Pull to refresh</h1>
+    <p class="text-body" data-test="pull-stamp"><%= @stamp %></p>
+    <%= studio_skeleton :avatar, count: 6 %>
+  </main>
+<% end %>

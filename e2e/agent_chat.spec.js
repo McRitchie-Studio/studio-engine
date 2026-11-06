@@ -102,3 +102,28 @@ test("an answer lands under its own message when the visitor sent another before
   ]);
   expect(errors).toEqual([]);
 });
+
+// The agent's words render a safe Markdown subset in a real browser; the
+// visitor's own bubble keeps its characters. CONTROL: set every turn's words with
+// textContent again (showWords) and the STRONG never appears.
+test("an agent answer renders bold and a safe link, and shows HTML as text", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  const errors = watchPageErrors(page);
+  await page.goto(PAGE);
+  await expect(page.locator('[data-test="agent-chat"]')).toHaveAttribute("data-agent-chat-ready", "true");
+  const words = "**Pro** <img src=x onerror=window.__xss=1> [see](https://example.com/p) [bad](javascript:void0)";
+  const input = page.locator('[data-test="agent-chat-input"]');
+  await input.fill(words);
+  await input.press("Enter");
+
+  const reply = page.locator('[data-role="agent"] [data-agent-chat-text]');
+  await expect(reply.locator("strong")).toHaveText("Pro", { timeout: 15000 });
+  await expect(reply.locator("a")).toHaveCount(1);
+  await expect(reply.locator("a")).toHaveAttribute("href", "https://example.com/p");
+  await expect(reply.locator("img")).toHaveCount(0);
+  await expect(reply).toContainText("<img src=x onerror=window.__xss=1>");
+  await expect(reply).toContainText("[bad](javascript:void0)");
+  await expect(page.locator('[data-test="agent-chat-sent"]')).toHaveText(words);
+  expect(await page.evaluate(() => window.__xss)).toBeUndefined();
+  expect(errors).toEqual([]);
+});
