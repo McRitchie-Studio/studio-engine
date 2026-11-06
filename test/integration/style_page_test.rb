@@ -84,6 +84,7 @@ class StylePageTest < ActiveSupport::TestCase
     assert_includes row["style"], "--pin-page-top"
     assert_equal ["page"], doc.css("[data-pin]").map { |el| el["data-pin"] }, "a specimen must not join the stack"
     assert_equal "scroller", row.at_css(".page-header-tabs")["data-style-section-nav-target"]
+    assert_equal "anchors", row.at_css(".page-header-tabs")["data-page-header-kind"], "the sections are places on this page"
     assert_includes row.at_css(".page-header-lead .page-header-meta").text, Studio::VERSION
 
     specimen = doc.at_css("[data-page-header-specimen]")

@@ -69,7 +69,8 @@ control, each with one look.
 2. **Is it a view of the same data?** It is a **tab** (`tabs:`): Deployments | Triage,
    Users | Teams. The tab for this page carries `current: "page"`.
 3. **Is it a place on this page?** It is an **anchor** (`anchors:`), with an `href` of
-   `#id`: the style guide's sections.
+   `#id`: the style guide's sections. The engine's same-page link handler
+   (`studio/in_page_links`, below) scrolls to it, with no visit.
 4. **Is it a page somewhere else?** It is a **quick link** (`menu:`), in the Links menu.
 5. **Does only a developer need it** (a local-only seeder, a progression tester)? It is a
    **tool** (`tools_html:`). Render it only where it applies, for example
@@ -97,7 +98,7 @@ against 30px without it).
 | Kind | Look | Behaviour |
 |------|------|-----------|
 | Tabs | The pill group, with the gliding pill on the current tab | Links to the other views |
-| Anchors | The same pill group | Same-page links: the browser scrolls, with no visit. A scroll spy can move `aria-current` |
+| Anchors | The same pill group | Same-page links: `studio/in_page_links` scrolls, with no visit. A scroll spy can move `aria-current` |
 | Quick links | One neutral "Links" button with a chevron | Opens a list of links under the button's right edge |
 | Action | One primary button, rightmost of the page's own controls | A link to the thing it makes |
 | Tools | Muted, behind a dashed rule, full strength on hover or focus | Whatever the host renders |
@@ -383,6 +384,7 @@ a panel by its hash keeps its own click: its handler runs first and prevents the
 
 The page row: `style/index`, `studio/admin_models/show` and `studio/admin_surveys/index`.
 The section header: `style/index`, every section.
+The four kinds of control: `style/index` passes its sections as `anchors:`.
 
 These engine pages have not adopted the row. Each needs more than the row has today:
 

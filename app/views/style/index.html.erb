@@ -63,7 +63,7 @@
   ]
 %>
 <div class="max-w-6xl mx-auto px-4 pt-6 pb-16" data-type-ladder>
-  <%# The page's title and its section tabs: studio/_page_header, the row of the
+  <%# The page's title and its section anchors: studio/_page_header, the row of the
       pinned stack (docs/PAGE_HEADER.md). It sits at --z-sticky, above --z-raised,
       so the live hold button's portal bubbles scroll under it rather than over it.
 
@@ -78,7 +78,7 @@
         label: "Style guide sections",
         data: { studio_controller: "style-section-nav" },
         tabs_data: { style_section_nav_target: "scroller" },
-        tabs: sections.each_with_index.map { |(anchor, label), index|
+        anchors: sections.each_with_index.map { |(anchor, label), index|
           { label: label, href: "##{anchor}", current: (index.zero? ? "true" : nil),
             data: { style_section_nav_target: "link" } }
         } %>
