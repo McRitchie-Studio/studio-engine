@@ -378,14 +378,21 @@ test("a click on a back link turns its visit around, and an ordinary link or a r
   assert.equal(visitTo("https://app.test/deployments", "restore", "forward"), "slide-left")
 })
 
-test("the second half of a redirect keeps the first half's way", async () => {
-  const { on, root } = await installed("/a", { motion: true })
-  clickOn(on, link("https://app.test/b", true))
-  on.doc["turbo:visit"]({ detail: { url: "https://app.test/b", action: "advance" } })
-  assert.equal(render(on, root), "slide-right")
-  on.doc["turbo:render"]({})
-  on.doc["turbo:visit"]({ detail: { url: "https://app.test/c", action: "replace" } })
-  assert.equal(render(on, root), STILL)
+// The first half plays the way the click asked; the second half, Turbo's replace to the
+// final address, draws nothing whichever way that was. (An `if (!redirected)` guard once
+// kept `back` across the second half. Turbo follows a redirect with willRender: false, so
+// no render reads it before turbo:load, and the guard was dead: it is gone, and this
+// test pins what it claimed to protect.)
+test("a redirect plays its first half's way once, and its second half draws nothing", async () => {
+  for (const [backLink, way] of [[true, "slide-right"], [false, "slide-left"]]) {
+    const { on, root } = await installed("/a", { motion: true })
+    clickOn(on, link("https://app.test/b", backLink))
+    on.doc["turbo:visit"]({ detail: { url: "https://app.test/b", action: "advance" } })
+    assert.equal(render(on, root), way)
+    on.doc["turbo:render"]({})
+    on.doc["turbo:visit"]({ detail: { url: "https://app.test/c", action: "replace" } })
+    assert.equal(render(on, root), STILL, `after a ${way} first half`)
+  }
 })
 
 test("pageswap on a traverse to an earlier entry leaves the reverse style", async () => {

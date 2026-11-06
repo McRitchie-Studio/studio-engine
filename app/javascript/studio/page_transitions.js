@@ -220,8 +220,9 @@ export function installPageTransitions(doc) {
     const action = event.detail.action
     const redirected = rendered && action === "replace"
     if (redirected) from = target
-    // The second half of a redirect keeps the first half's way.
-    if (!redirected) back = visitIsBack({ action, turboDirection: root.dataset.turboVisitDirection, url: event.detail.url, backHref })
+    // No guard keeps the first half's way here: Turbo follows a redirect with willRender:
+    // false, so the second half draws nothing and nothing reads `back` before turbo:load.
+    back = visitIsBack({ action, turboDirection: root.dataset.turboVisitDirection, url: event.detail.url, backHref })
     backHref = null
     rendered = false
     advance = action === "advance"
