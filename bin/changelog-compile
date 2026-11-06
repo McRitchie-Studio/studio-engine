@@ -1,0 +1,59 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Folds every changelog.d/<slug>.<kind>.md fragment into CHANGELOG.md's
+# `## Unreleased`, grouped by kind, and deletes the compiled fragments.
+#
+# The release runs this in its version commit, BEFORE it rolls `## Unreleased` into
+# the allocated version heading, so the fragments land under the new version and
+# leave the tree in the same commit. Format and reasons: bin/lib/changelog_fragments.rb
+# and changelog.d/README.md.
+#
+#   bin/changelog-compile             compile and delete (writes the tree)
+#   bin/changelog-compile --dry-run   print the compiled '## Unreleased'; write nothing
+#   bin/changelog-compile --root DIR  run against another checkout (a release workspace)
+#
+# Exit 0 on success or when there is nothing to compile; 1 on an invalid fragment or
+# an uncompilable CHANGELOG.md, with nothing written; 64 on bad usage.
+
+require_relative "lib/changelog_fragments"
+
+root = File.expand_path("..", __dir__)
+dry_run = false
+args = ARGV.dup
+until args.empty?
+  case (arg = args.shift)
+  when "--dry-run" then dry_run = true
+  when "--root" then root = File.expand_path(args.shift.to_s)
+  else
+    warn "usage: bin/changelog-compile [--dry-run] [--root DIR] (unknown: #{arg})"
+    exit 64
+  end
+end
+
+begin
+  result = ChangelogFragments.compile_dir!(root, dry_run: dry_run)
+rescue ChangelogFragments::Error => e
+  warn "changelog-compile: #{e.message} — nothing written"
+  exit 1
+end
+
+unless result.errors.empty?
+  warn "changelog-compile: invalid fragment(s) — nothing written:"
+  result.errors.each { |e| warn "  - #{e}" }
+  exit 1
+end
+
+if result.fragments.empty?
+  puts "changelog-compile: no fragments in #{ChangelogFragments::DIR}/ — nothing to compile"
+  exit 0
+end
+
+names = result.fragments.map(&:name)
+if dry_run
+  puts "changelog-compile: DRY RUN — would compile #{names.size} fragment(s) and delete them: #{names.join(', ')}"
+  puts
+  puts ChangelogFragments.unreleased_section(result.text)
+else
+  puts "changelog-compile: compiled #{names.size} fragment(s) into '## Unreleased' and deleted them: #{names.join(', ')}"
+end

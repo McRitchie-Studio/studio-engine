@@ -1,0 +1,69 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# The PR half of changelog fragments. Fails when a PR:
+#
+#   - carries a changelog.d/ file that is not a well-formed fragment,
+#   - adds lines under CHANGELOG.md's '## Unreleased' (write a fragment instead), or
+#   - changes what the gem ships (lib/, app/, config/, db/, the gemspec) and adds no
+#     changelog.d/<slug>.<kind>.md fragment.
+#
+# A diff that sets lib/studio/version.rb is the release's own version commit, which
+# compiles and rolls CHANGELOG.md, so the last two rules pass it.
+#
+#   bin/changelog-check                       base HEAD^1, head HEAD (a PR merge commit, as CI checks out)
+#   bin/changelog-check --base REF [--head REF]
+#
+# Engine CI runs it on every pull_request (engine-ci.yml, engine-suite job).
+# Exit 0 clean, 1 on a finding, 64 on bad usage or an unreadable ref.
+
+require "open3"
+require_relative "lib/changelog_fragments"
+
+root = File.expand_path("..", __dir__)
+base = "HEAD^1"
+head = "HEAD"
+args = ARGV.dup
+until args.empty?
+  case (arg = args.shift)
+  when "--base" then base = args.shift.to_s
+  when "--head" then head = args.shift.to_s
+  else
+    warn "usage: bin/changelog-check [--base REF] [--head REF] (unknown: #{arg})"
+    exit 64
+  end
+end
+
+def git(root, *args)
+  out, status = Open3.capture2("git", "-C", root, *args)
+  [out, status.success?]
+end
+
+diff, ok = git(root, "diff", "--name-status", "--no-renames", base, head)
+unless ok
+  warn "changelog-check: cannot diff #{base}..#{head} (fetch both refs; CI checks out with fetch-depth: 2)"
+  exit 64
+end
+changes = diff.lines(chomp: true).filter_map do |line|
+  status, path = line.split("\t", 2)
+  [status, path] if path
+end
+
+show = ->(rev) { (text, found = git(root, "show", "#{rev}:CHANGELOG.md")) && found ? text : "" }
+
+# Fragment files as they stand at head.
+listing, = git(root, "ls-tree", "--name-only", "#{head}:#{ChangelogFragments::DIR}")
+files = listing.lines(chomp: true).to_h do |name|
+  body, = git(root, "show", "#{head}:#{ChangelogFragments::DIR}/#{name}")
+  [name, body.force_encoding("UTF-8")]
+end
+_, errors = ChangelogFragments.build(files)
+errors += ChangelogFragments.pr_errors(changes, base_changelog: show.call(base), head_changelog: show.call(head))
+
+if errors.empty?
+  puts "changelog-check: ok (#{changes.size} changed path(s), #{base}..#{head})"
+  exit 0
+end
+warn "changelog-check: #{errors.size} finding(s):"
+errors.each { |e| warn "  - #{e}" }
+exit 1
