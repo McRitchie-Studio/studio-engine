@@ -1,7 +1,9 @@
 <%#  Tricks section of the living style guide (admin/style). Buttons come first,
      then what you can add to a button, then the other primitives. Each specimen
-     (the shared _specimen partial) shows the real engine class live, with its name
-     and a usage snippet to copy.
+     (the shared _specimen partial) shows the real engine class live under its
+     trick name from config/studio_tricks.yml ("Sheen", "Border Glow · clear"), the
+     name Alex McRitchie says to an agent. Variants of one primitive share a card
+     and stand side by side on its stage. The glossary is docs/TRICKS.md.
 
      The Leveling group is gated by Studio.feature?(:leveling). With it off, its
      specimens render "disabled but present": visible, greyed and flagged, never hidden. %>
@@ -20,12 +22,6 @@
   }
 
   leveling_on = Studio.feature?(:leveling)
-
-  # An ERB snippet cannot be written literally inside an ERB template: the scanner
-  # closes the tag at the first `%` + `>` it sees, whatever Ruby string it sits in.
-  # So assemble the markers: the raw template never contains one.
-  erb = ->(code) { "<" + "%= " + code + " %" + ">" }
-  erb_end = "<" + "% end %" + ">"
 %>
 <section id="tricks" class="section-target space-y-12">
   <%= render "studio/section_header", title: "Tricks" %>
@@ -37,18 +33,14 @@
       <h3 class="type-h4 text-heading">Buttons</h3>
       <p class="text-muted text-sm"><code class="font-mono text-2xs">.btn</code> plus one role and one size.</p>
     </div>
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <% button_variants.each do |name, label| %>
-        <%= render layout: "style/specimen",
-              locals: { klass: ".btn .#{name}",
-                        usage: %(<button class="btn #{name}">#{label}</button>) } do %>
+    <div class="grid gap-4 sm:grid-cols-2">
+      <%= render layout: "style/specimen", locals: { trick: "button" } do %>
+        <% button_variants.each do |name, label| %>
           <button type="button" class="btn <%= name %>"><%= label %></button>
         <% end %>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: ".btn-sm / .btn (default) / .btn-lg",
-                      usage: %(<button class="btn btn-primary btn-sm">Small</button>\n<button class="btn btn-primary">Default</button>\n<button class="btn btn-primary btn-lg">Large</button>) } do %>
+      <%= render layout: "style/specimen", locals: { trick: "button", variant: "size" } do %>
         <div class="flex flex-wrap items-center justify-center gap-3">
           <button type="button" class="btn btn-primary btn-sm">Small</button>
           <button type="button" class="btn btn-primary">Default</button>
@@ -69,51 +61,28 @@
           rings, because the primitive punches the host's box out of both wedge
           layers. The WRAPPER shape (bare host + opaque child) is staged by the
           Modals section's glow cards. engine-motion.css section 9b has both. %>
-      <%= render layout: "style/specimen",
-            locals: { klass: ".edge-rotate-glow  (knobs: --edge-rotate-glow-color / -color-b)",
-                      note: "Adds a glow that rotates around the button's edge.",
-                      usage: %(<button class="btn btn-primary edge-rotate-glow">Save</button>\n<button class="btn btn-primary edge-rotate-glow"\n        style="--edge-rotate-glow-color: #F08030; --edge-rotate-glow-color-b: #6890F0">Two colors</button>) } do %>
+      <%= render layout: "style/specimen", locals: { trick: "edge_glow" } do %>
         <button type="button" class="btn btn-primary edge-rotate-glow">Save</button>
         <button type="button" class="btn btn-primary edge-rotate-glow"
                 style="--edge-rotate-glow-color: #F08030; --edge-rotate-glow-color-b: #6890F0">Two colors</button>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: ".studio-border-glow",
-                      note: "Adds a moving rainbow border with a soft halo.",
-                      usage: %(<button class="btn btn-primary studio-border-glow">Save</button>) } do %>
+      <%= render layout: "style/specimen", locals: { trick: "border_glow" } do %>
         <button type="button" class="btn btn-primary studio-border-glow">Save</button>
+        <button type="button" class="btn studio-border-glow studio-border-glow--clear" data-border-glow-clear>Clear</button>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: ".studio-border-glow--clear",
-                      note: "The same rainbow ring and halo on a clear button.",
-                      usage: %(<button class="btn studio-border-glow studio-border-glow--clear">Save</button>) } do %>
-        <button type="button" class="btn studio-border-glow studio-border-glow--clear" data-border-glow-clear>Save</button>
-      <% end %>
-
-      <%= render layout: "style/specimen",
-            locals: { klass: ".sheen .sheen--loop",
-                      note: "Adds a band of light that sweeps across the button.",
-                      usage: %(<button class="btn btn-primary sheen">Once</button>\n<button class="btn btn-primary sheen sheen--loop">Loop</button>) } do %>
+      <%= render layout: "style/specimen", locals: { trick: "sheen" } do %>
         <button type="button" class="btn btn-primary sheen">Once</button>
         <button type="button" class="btn btn-primary sheen sheen--loop">Loop</button>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: ".pulse-cta  (knobs: --pulse-cta-color / -speed / -scale)",
-                      note: "Adds a slow beat with a ring that spreads from the edge.",
-                      usage: %(<button class="btn btn-primary pulse-cta">Save</button>\n<button class="btn btn-success pulse-cta" style="--pulse-cta-color: var(--color-success)">Go</button>) } do %>
+      <%= render layout: "style/specimen", locals: { trick: "pulse" } do %>
         <button type="button" class="btn btn-primary pulse-cta">Save</button>
         <button type="button" class="btn btn-success pulse-cta" style="--pulse-cta-color: var(--color-success)">Go</button>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: ".fizz-stack  (studio/fizz)",
-                      note: "Adds bubbles that rise from behind the button.",
-                      usage: [erb.call(%(render layout: "studio/fizz", locals: { seed: "save" } do)),
-                              %(  <button class="btn btn-primary">Save</button>),
-                              erb_end].join("\n") } do %>
+      <%= render layout: "style/specimen", locals: { trick: "fizz" } do %>
         <%= render layout: "studio/fizz", locals: { seed: "style-fizz" } do %>
           <button type="button" class="btn btn-primary">Save</button>
         <% end %>
@@ -122,25 +91,17 @@
         <% end %>
       <% end %>
 
-      <%# The live button: press and hold for two seconds. The card clips, so this one
-          sets fizz_portal and its bubbles rise past the card's edge. %>
-      <%= render layout: "style/specimen",
-            locals: { klass: ".hold-btn  (studio/hold_button)",
-                      note: "Makes the button confirm only after a two-second hold.",
-                      usage: %(render "studio/hold_button", hold_id: "confirm", duration: 2000, fizz_portal: true) } do %>
+      <%# Hold and its recolor, side by side. The live button: press and hold for two
+          seconds. The card clips, so it sets fizz_portal and its bubbles rise past the
+          card's edge. The recolor is the same button re-themed from an ancestor: no
+          new CSS. %>
+      <%= render layout: "style/specimen", locals: { trick: "hold" } do %>
         <div class="w-full max-w-xs" x-data="{ submitting: false }">
           <%= render "studio/hold_button", hold_id: "style-hold", duration: 2000, fizz_portal: true,
                 default_text: "Hold to Confirm", hold_text: "Almost there…", success_text: "Confirmed!" %>
           <button type="button" class="btn btn-neutral btn-sm mt-3 mx-auto block"
                   @click="document.querySelector('.hold-btn[data-hold-id=style-hold]').classList.remove('process','success','error','loading')">Reset</button>
         </div>
-      <% end %>
-
-      <%# The same button, re-themed from an ancestor: no new CSS. %>
-      <%= render layout: "style/specimen",
-            locals: { klass: ".hold-btn  (--hold-* overrides)",
-                      note: "Recolors a hold button from any parent element.",
-                      usage: %(<div style="--hold-bg-from:#f0abfc;--hold-success-to:#4c1d95">…</div>) } do %>
         <div class="w-full max-w-xs" x-data="{ submitting: false }"
              style="--hold-bg-from:#f0abfc;--hold-bg-mid:#a855f7;--hold-bg-to:#6b21a8;
                     --hold-success-from:#c4b5fd;--hold-success-to:#4c1d95;--hold-success-glow-rgb:139 92 246">
@@ -153,18 +114,9 @@
         </div>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: "window.studioConfetti.burst(el)",
-                      note: "Fires confetti out from behind the button.",
-                      usage: %(<button class="btn btn-primary" x-data @click="window.studioConfetti.burst($el)">Save</button>) } do %>
+      <%= render layout: "style/specimen", locals: { trick: "burst" } do %>
         <button type="button" class="btn btn-primary" x-data
                 @click="window.studioConfetti && window.studioConfetti.burst($el)">Burst</button>
-      <% end %>
-
-      <%= render layout: "style/specimen",
-            locals: { klass: "window.studioConfetti.cannons()",
-                      note: "Fires confetti in from both sides of the screen.",
-                      usage: %(<button class="btn btn-success" x-data @click="window.studioConfetti.cannons()">Done</button>) } do %>
         <button type="button" class="btn btn-success" x-data
                 @click="window.studioConfetti && window.studioConfetti.cannons()">Cannons</button>
       <% end %>
@@ -177,13 +129,14 @@
       <h3 class="type-h4 text-heading">Page header</h3>
       <p class="text-muted text-sm"><code class="font-mono text-2xs">studio/_page_header</code>: crumbs above the title; tabs or anchors, a Links menu, one action, then tools.</p>
     </div>
-    <div class="grid gap-4 lg:grid-cols-2">
-      <%# The classes alone, not the partial: the partial's row is sticky, joins the
-          pinned stack and holds the page's h1, and a page has one of each. %>
-      <% [["At rest", {}], ["Stuck", { stuck: "" }]].each do |state, data| %>
-        <%= render layout: "style/specimen",
-              locals: { klass: "studio/_page_header (#{state.downcase})",
-                        usage: %(<%= render "studio/page_header",\n      title: "Models", meta: "v1.2.3", label: "Models",\n      crumbs: studio_crumbs(parent: :admin),\n      tabs: [{ label: "Users", href: users_path, current: "page" }, { label: "Teams", href: teams_path }],\n      links: [{ label: "Sessions", href: sessions_path }] %\>) } do %>
+    <%# The classes alone, not the partial: the partial's row is sticky, joins the
+        pinned stack and holds the page's h1, and a page has one of each. One card,
+        the row at rest above the row stuck (Page Header · stuck). %>
+    <%= render layout: "style/specimen", locals: { trick: "page_header" } do %>
+      <div class="w-full space-y-4">
+      <% [["at rest", {}], ["stuck", { stuck: "" }]].each do |state, data| %>
+        <div class="space-y-1">
+          <p class="label-upper"><%= state %></p>
           <%= tag.div(class: "page-header w-full px-4", data: data) do %>
             <div class="page-header-trail">
               <%# A div, not the partial's <nav>: a specimen adds no landmark to the page. %>
@@ -210,60 +163,50 @@
               <a href="#tricks" class="page-header-link">Invites</a>
             </div>
           <% end %>
-        <% end %>
+        </div>
       <% end %>
-      <%# The four kinds of right-side control, each with its one look: tabs (views of the
-          same thing) or anchors (places on this page) in the pill group, the Links menu
-          (pages elsewhere), the one primary action, then the muted tools. The menu is the
-          browser's popover, so it opens here with no script. %>
-      <div class="lg:col-span-2" data-page-header-kinds-specimen>
-        <%= render layout: "style/specimen",
-              locals: { klass: "studio/_page_header (four kinds)",
-                        note: "A view of the same data: a tab. A place on this page: an anchor. Somewhere else: the Links menu. Makes something: the action. Local-only: a tool.",
-                        usage: %(<%= render "studio/page_header",
-      title: "Deployments", label: "Views",
-      tabs: [{ label: "Deployments", href: deployments_path, current: "page" },
-             { label: "Triage", href: triage_path }],
-      menu: [{ label: "Stages", href: stages_path }, { label: "Docs", href: docs_path }],
-      action: { label: "New Task", href: new_task_path },
-      tools_html: (render("dev_tools") if Rails.env.local?) %\>
-
-<%# A place on this page: anchors: [{ label: "Colors", href: "#colors" }], in place of tabs: %\>) } do %>
-          <div class="w-full space-y-4">
-            <% [["tabs", "Deployments", [["Deployments", true], ["Triage", false]]],
-                ["anchors", "Style", [["Colors", false], ["Buttons", false], ["Forms", false]]]].each do |kind, title, pills| %>
-              <%= tag.div(class: "page-header w-full px-4", data: { stuck: "" }) do %>
-                <div class="page-header-lead">
-                  <p class="page-header-title"><%= title %></p>
-                </div>
-                <div class="page-header-tabs" data-page-header-kind="<%= kind %>">
-                  <div class="page-header-track">
-                    <% pills.each do |label, current| %>
-                      <a href="#tricks" class="page-header-tab btn btn-sm <%= current ? "btn-primary" : "btn-neutral" %>"><span class="page-header-tab-label"><%= label %></span></a>
-                    <% end %>
-                  </div>
-                </div>
-                <div class="page-header-actions">
-                  <div class="page-header-menu" data-page-header-kind="menu">
-                    <button type="button" class="page-header-menu-button btn btn-sm btn-neutral"
-                            popovertarget="style-page-header-menu-<%= kind %>" aria-controls="style-page-header-menu-<%= kind %>">Links<span class="page-header-menu-caret" aria-hidden="true"></span></button>
-                    <div id="style-page-header-menu-<%= kind %>" class="page-header-menu-list" popover="auto">
-                      <ul>
-                        <li><a href="#tricks" class="page-header-menu-item">Stages</a></li>
-                        <li><a href="#tricks" class="page-header-menu-item">Docs</a></li>
-                      </ul>
-                    </div>
-                  </div>
-                  <a href="#tricks" class="page-header-action btn btn-sm btn-primary" data-page-header-kind="action">New Task</a>
-                  <div class="page-header-tools" data-page-header-kind="tools">
-                    <button type="button" class="btn btn-sm btn-neutral">Seed</button>
-                  </div>
-                </div>
-              <% end %>
-            <% end %>
-          </div>
-        <% end %>
       </div>
+    <% end %>
+    <%# The four kinds of right-side control, each with its one look: tabs (views of the
+        same thing) or anchors (places on this page) in the pill group, the Links menu
+        (pages elsewhere), the one primary action, then the muted tools. The menu is the
+        browser's popover, so it opens here with no script (Page Header · controls). %>
+    <div data-page-header-kinds-specimen>
+      <%= render layout: "style/specimen", locals: { trick: "page_header", variant: "controls" } do %>
+        <div class="w-full space-y-4">
+          <% [["tabs", "Deployments", [["Deployments", true], ["Triage", false]]],
+              ["anchors", "Style", [["Colors", false], ["Buttons", false], ["Forms", false]]]].each do |kind, title, pills| %>
+            <%= tag.div(class: "page-header w-full px-4", data: { stuck: "" }) do %>
+              <div class="page-header-lead">
+                <p class="page-header-title"><%= title %></p>
+              </div>
+              <div class="page-header-tabs" data-page-header-kind="<%= kind %>">
+                <div class="page-header-track">
+                  <% pills.each do |label, current| %>
+                    <a href="#tricks" class="page-header-tab btn btn-sm <%= current ? "btn-primary" : "btn-neutral" %>"><span class="page-header-tab-label"><%= label %></span></a>
+                  <% end %>
+                </div>
+              </div>
+              <div class="page-header-actions">
+                <div class="page-header-menu" data-page-header-kind="menu">
+                  <button type="button" class="page-header-menu-button btn btn-sm btn-neutral"
+                          popovertarget="style-page-header-menu-<%= kind %>" aria-controls="style-page-header-menu-<%= kind %>">Links<span class="page-header-menu-caret" aria-hidden="true"></span></button>
+                  <div id="style-page-header-menu-<%= kind %>" class="page-header-menu-list" popover="auto">
+                    <ul>
+                      <li><a href="#tricks" class="page-header-menu-item">Stages</a></li>
+                      <li><a href="#tricks" class="page-header-menu-item">Docs</a></li>
+                    </ul>
+                  </div>
+                </div>
+                <a href="#tricks" class="page-header-action btn btn-sm btn-primary" data-page-header-kind="action">New Task</a>
+                <div class="page-header-tools" data-page-header-kind="tools">
+                  <button type="button" class="btn btn-sm btn-neutral">Seed</button>
+                </div>
+              </div>
+            <% end %>
+          <% end %>
+        </div>
+      <% end %>
     </div>
   </section>
 
@@ -277,17 +220,18 @@
         The rule is in <code class="font-mono text-2xs">docs/PAGE_HEADER.md</code>.
       </p>
     </div>
-    <div class="grid gap-4 lg:grid-cols-2">
-      <%# The classes alone, not the partial: the partial's header sticks and joins the
-          pinned stack, and a specimen must do neither. %>
-      <% [["At rest", {}], ["Stuck", { stuck: "" }]].each do |state, data| %>
-        <%= render layout: "style/specimen",
-              locals: { klass: "studio/_section_header (#{state.downcase})",
-                        usage: %(<section id="modals" class="section-target">\n  <%= render "studio/section_header", title: "Modals" %\>\n  ...\n</section>) } do %>
-          <%= tag.p("Modals", class: "section-header px-4", data: data) %>
+    <%# The classes alone, not the partial: the partial's header sticks and joins the
+        pinned stack, and a specimen must do neither. %>
+    <%= render layout: "style/specimen", locals: { trick: "section_header" } do %>
+      <div class="w-full grid gap-4 sm:grid-cols-2">
+        <% [["at rest", {}], ["stuck", { stuck: "" }]].each do |state, data| %>
+          <div class="space-y-1">
+            <p class="label-upper"><%= state %></p>
+            <%= tag.p("Modals", class: "section-header px-4", data: data) %>
+          </div>
         <% end %>
-      <% end %>
-    </div>
+      </div>
+    <% end %>
   </section>
 
   <!-- Carousel -->
@@ -299,10 +243,7 @@
     <%# The live partial: a carousel joins no stack and holds no title, so the
         specimen is the real thing. Swipe it, press its arrows, or focus it and
         use the arrow keys. %>
-    <%= render layout: "style/specimen",
-          locals: { klass: "studio/_carousel",
-                    note: "Shows a set too long to grid, a few slides at a time.",
-                    usage: %(<%= render layout: "studio/carousel",\n      locals: { label: "Portfolio", items: @apps, per_view: 3 } do |app| %\>\n  <%= render "apps/card", app: app %\>\n<% end %\>) } do %>
+    <%= render layout: "style/specimen", locals: { trick: "carousel" } do %>
       <div class="w-full min-w-0">
         <%= render layout: "studio/carousel",
               locals: { label: "Specimen slides", items: (1..7).to_a, per_view: 3, id: "style-carousel-specimen" } do |n| %>
@@ -314,10 +255,7 @@
       </div>
     <% end %>
 
-    <%= render layout: "style/specimen",
-          locals: { klass: "studio/_carousel (style: :spotlight)",
-                    note: "Centres one slide at full size and colour, with its caption, and shrinks, fades and greys its neighbours as they scroll by. It opens on its middle slide; start: takes an index instead.",
-                    usage: %(<%= render layout: "studio/carousel",\n      locals: { label: "Team", items: @people, style: :spotlight,\n                caption: ->(person) { person.title } } do |person| %\>\n  <%= render "people/card", person: person %\>\n<% end %\>) } do %>
+    <%= render layout: "style/specimen", locals: { trick: "spotlight" } do %>
       <div class="w-full min-w-0" data-carousel-spotlight-specimen>
         <%= render layout: "studio/carousel",
               locals: { label: "Spotlight specimen", items: (1..7).to_a, per_view: 3, style: :spotlight,
@@ -337,18 +275,13 @@
       <h3 class="type-h4 text-heading">Surfaces, text &amp; form</h3>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%= render layout: "style/specimen",
-            locals: { klass: ".card", usage: %(<div class="card p-5">...</div>) } do %>
-        <div class="card p-5 text-sm text-body w-full max-w-xs text-center">Surface card</div>
+      <%= render layout: "style/specimen", locals: { trick: "card" } do %>
+        <div class="card p-5 text-sm text-body text-center">Surface card</div>
+        <div class="card-hover p-5 text-sm text-body text-center">Hover me</div>
       <% end %>
 
       <%= render layout: "style/specimen",
-            locals: { klass: ".card-hover", usage: %(<div class="card-hover p-5">...</div>) } do %>
-        <div class="card-hover p-5 text-sm text-body w-full max-w-xs text-center">Hover me</div>
-      <% end %>
-
-      <%= render layout: "style/specimen",
-            locals: { klass: ".badge", usage: %(<span class="badge">Neutral</span>) } do %>
+            locals: { trick: "badge" } do %>
         <div class="flex flex-wrap items-center justify-center gap-2">
           <span class="badge text-body">Neutral</span>
           <span class="badge" style="color: var(--color-success-ink); border-color: var(--color-success)">Success</span>
@@ -358,17 +291,17 @@
       <% end %>
 
       <%= render layout: "style/specimen",
-            locals: { klass: ".input-field", usage: %(<input class="input-field" placeholder="you@example.com">) } do %>
+            locals: { trick: "input" } do %>
         <input type="text" class="input-field" placeholder="you@example.com" aria-label="Sample input">
       <% end %>
 
       <%= render layout: "style/specimen",
-            locals: { klass: ".label-upper", usage: %(<p class="label-upper">Section label</p>) } do %>
+            locals: { trick: "label" } do %>
         <p class="label-upper">Section label</p>
       <% end %>
 
       <%= render layout: "style/specimen",
-            locals: { klass: ".empty-state", usage: %(<div class="empty-state">Nothing here yet</div>) } do %>
+            locals: { trick: "empty_state" } do %>
         <div class="empty-state w-full max-w-xs text-sm text-muted">Nothing here yet</div>
       <% end %>
     </div>
@@ -386,52 +319,34 @@
       <p class="text-muted text-sm"><code class="font-mono text-2xs">at_time_tag</code> stamps when something happened, on the reader&rsquo;s own clock.</p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%= render layout: "style/specimen",
-            locals: { klass: "at_time_tag(time)",
-                      usage: erb.call("at_time_tag(release.shipped_at)") } do %>
-        <span class="text-sm text-body"><%= at_time_tag(Time.current) %></span>
-      <% end %>
-
-      <%# The date joins only when the stamp is not today — the rule is easiest to
-          read as two specimens side by side. %>
-      <%= render layout: "style/specimen",
-            locals: { klass: "at_time_tag — not today",
-                      usage: erb.call("at_time_tag(task.created_at)") + "\n# the date joins only when it is not today" } do %>
-        <span class="text-sm text-body"><%= at_time_tag(3.days.ago) %></span>
-      <% end %>
-
-      <%= render layout: "style/specimen",
-            locals: { klass: "at_time_tag — another year",
-                      usage: erb.call("at_time_tag(old_record.created_at)") + "\n# the year joins only when it differs" } do %>
-        <span class="text-sm text-body"><%= at_time_tag(1.year.ago) %></span>
-      <% end %>
-
-      <%= render layout: "style/specimen",
-            locals: { klass: "at_time_tag(time, prefix: nil)",
-                      usage: erb.call("at_time_tag(time, prefix: nil)") + %(\n# bare clock, for a cell that already says "at") } do %>
-        <span class="text-sm text-body"><%= at_time_tag(Time.current, prefix: nil) %></span>
+      <%# The date joins only when the stamp is not today, and the year only when it
+          differs: the rule reads best as the stamps one under another, each beside
+          what it shows. The last row is the first caller's shape, a status badge. %>
+      <%= render layout: "style/specimen", locals: { trick: "time_stamp" } do %>
+        <dl class="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-sm">
+          <dt class="text-muted">today</dt>
+          <dd class="text-body"><%= at_time_tag(Time.current) %></dd>
+          <dt class="text-muted">not today</dt>
+          <dd class="text-body"><%= at_time_tag(3.days.ago) %></dd>
+          <dt class="text-muted">another year</dt>
+          <dd class="text-body"><%= at_time_tag(1.year.ago) %></dd>
+          <dt class="text-muted">bare</dt>
+          <dd class="text-body"><%= at_time_tag(Time.current, prefix: nil) %></dd>
+          <dt class="text-muted">in a badge</dt>
+          <dd><span class="badge" style="color: var(--color-success-ink); border-color: var(--color-success)">Shipped <%= at_time_tag(42.minutes.ago) %></span></dd>
+        </dl>
       <% end %>
 
       <%# STATIC ILLUSTRATION, not the primitive: a reader inside the US never sees
           the flag, so a live specimen cannot show them what it looks like. Hand-built
           to match the hydrated markup exactly (clock, then ml-2, then the flag). %>
-      <%= render layout: "style/specimen",
-            locals: { klass: "outside the US — the flag trails",
-                      usage: %(# The flag is added CLIENT-side from the browser's IANA zone.\n# Inside the US there is no flag at all, and its margin collapses with it.) } do %>
+      <%= render layout: "style/specimen", locals: { trick: "time_stamp", variant: "abroad" } do %>
         <div class="flex flex-col items-start gap-1.5 text-sm text-body">
           <span class="whitespace-nowrap"><span>at 6:50a</span><span class="ml-2">🇯🇵</span></span>
           <span class="whitespace-nowrap"><span>at 10:50p</span><span class="ml-2">🇬🇧</span></span>
           <span class="whitespace-nowrap"><span>at 9:50p</span><span class="ml-2">🌐</span></span>
           <span class="whitespace-nowrap text-muted"><span>at 4:50p</span></span>
         </div>
-      <% end %>
-
-      <%# The first caller's shape, so a host sees the primitive in a real pill
-          rather than only as bare text. %>
-      <%= render layout: "style/specimen",
-            locals: { klass: "in a status badge",
-                      usage: %(<span class="badge">Shipped ) + erb.call("at_time_tag(release.shipped_at)") + "</span>" } do %>
-        <span class="badge" style="color: var(--color-success-ink); border-color: var(--color-success)">Shipped <%= at_time_tag(42.minutes.ago) %></span>
       <% end %>
     </div>
   </section>
@@ -449,37 +364,18 @@
       <p class="text-muted text-sm max-w-2xl">This app's icon in its theme colors, in the <strong><%= loader_config[:style].to_s.tr("_", " ") %></strong> style.</p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%= render layout: "style/specimen",
-            locals: { klass: ".studio-loader (this app's style)",
-                      usage: [erb.call("studio_loader"), erb.call('studio_loader size: 20, label: "Saving"')].join("\n") } do %>
+      <%# This app's own loader. Its busy button and its overlay are the Loaders
+          section's Busy Button and Overlay; this group is the styles. %>
+      <%= render layout: "style/specimen", locals: { trick: "loader" } do %>
         <%= studio_loader %>
         <%= studio_loader size: 32 %>
         <%= studio_loader size: 20 %>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: "studio_loader_pending (inside a busy button)",
-                      usage: ["<button class=\"btn btn-primary\">", "  <span data-loader-idle>Save</span>", "  #{erb.call('studio_loader_pending')}", "</button>"].join("\n") } do %>
-        <button type="button" class="btn btn-primary" aria-busy="true">
-          <%= studio_loader_pending %><span class="ml-2">Saving…</span>
-        </button>
-      <% end %>
-
-      <%= render layout: "style/specimen",
-            locals: { klass: "studio_loader_overlay (the page-load overlay)",
-                      usage: ["#{erb.call('studio_loader_overlay')}  (once, in the layout body)", 'window.StudioLoader.show("Caption") / .hide()'].join("\n") } do %>
-        <button type="button" class="btn btn-secondary" data-test="style-show-loader-overlay"
-                x-data x-on:click="window.StudioLoader && window.StudioLoader.show('Loading your page…'); setTimeout(() => window.StudioLoader && window.StudioLoader.hide(), 3000)">
-          Show the overlay for 3 seconds
-        </button>
-      <% end %>
-
       <% Studio::Loader::STYLES.each do |style| %>
-        <% signature = Studio::Loader.art_style?(style) %>
-        <% unavailable = signature && !loader_art_styles.include?(style) %>
+        <% unavailable = Studio::Loader.art_style?(style) && !loader_art_styles.include?(style) %>
         <%= render layout: "style/specimen",
-              locals: { klass: %(style: :#{style}#{signature ? " (signature, needs art)" : ""}),
-                        usage: %(config.loader = #{signature ? "{ style: :#{style}, art: \"/brand/loader-#{style}.svg\" }" : ":#{style}"}),
+              locals: { trick: "loader", variant: style.to_s,
                         disabled: unavailable, disabled_label: "needs this app's art file" } do %>
           <%= studio_loader style: style, size: 72 %>
           <%= studio_loader style: style, size: 28 %>
@@ -495,9 +391,8 @@
       <p class="text-muted text-sm">Tune any knob inline with <code class="font-mono text-2xs">style="--knob: value"</code>.</p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%= render layout: "style/specimen",
-            locals: { klass: ".spinner  (knob: --spinner-size)",
-                      usage: %(<span class="spinner"></span>\n<span class="spinner" style="--spinner-size: 2rem"></span>) } do %>
+      <%# The bare classes under the Loaders section's helpers, tuned inline. %>
+      <%= render layout: "style/specimen", locals: { trick: "spinner", variant: "css" } do %>
         <span class="spinner"></span>
         <span class="spinner" style="--spinner-size: 1.6rem"></span>
         <span class="spinner" style="--spinner-size: 2.4rem; --spinner-thickness: 3px"></span>
@@ -507,24 +402,18 @@
         </button>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: ".loading-dots  (3 span children)",
-                      usage: %(<span class="loading-dots"><span></span><span></span><span></span></span>) } do %>
+      <%= render layout: "style/specimen", locals: { trick: "typing_dots", variant: "css" } do %>
         <span class="loading-dots"><span></span><span></span><span></span></span>
         <span class="loading-dots" style="--loading-dots-size: 12px; --loading-dots-color: var(--color-cta)"><span></span><span></span><span></span></span>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: ".ping .ping--dot  (knob: --ping-color)",
-                      usage: %(<span class="ping ping--dot"></span>) } do %>
+      <%= render layout: "style/specimen", locals: { trick: "ping" } do %>
         <span class="ping ping--dot"></span>
         <span class="ping ping--dot" style="--ping-color: var(--color-success)"></span>
         <span class="ping ping--dot" style="--ping-color: var(--color-danger); --ping-size: 0.9rem"></span>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: ".fade-edge-{t,b,l,r,x,y}  (knob: --fade-edge-size)",
-                      usage: %(<div class="fade-edge-y overflow-y-auto">...long content...</div>) } do %>
+      <%= render layout: "style/specimen", locals: { trick: "edge_fade" } do %>
         <div class="fade-edge-y overflow-y-auto h-32 w-full max-w-xs bg-surface rounded-lg p-3 text-sm text-body space-y-2">
           <p>Scroll me - the top and bottom edges dissolve.</p>
           <p>The mask softens content near either end of the container.</p>
@@ -534,9 +423,7 @@
         </div>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: ".progress-meter  (knob: --progress)",
-                      usage: %(<div class="progress-meter" style="--progress: 62%">\n  <div class="progress-meter-track"><span class="progress-meter-label">62%</span></div>\n  <div class="progress-meter-fill"><span class="progress-meter-label">62%</span></div>\n</div>) } do %>
+      <%= render layout: "style/specimen", locals: { trick: "progress_bar", variant: "css" } do %>
         <div class="w-full max-w-xs space-y-3">
           <div class="progress-meter" style="--progress: 25%">
             <div class="progress-meter-track"><span class="progress-meter-label">25%</span></div>
@@ -565,18 +452,14 @@
       <h3 class="type-h4 text-heading">Effects</h3>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%= render layout: "style/specimen",
-            locals: { klass: ".text-gradient  (knobs: --text-gradient-from / -to / -angle)",
-                      usage: %(<h2 class="text-gradient text-3xl font-extrabold">Level up</h2>) } do %>
+      <%= render layout: "style/specimen", locals: { trick: "gradient_text" } do %>
         <div class="text-center space-y-2">
           <p class="text-gradient text-3xl font-extrabold">Level up</p>
           <p class="text-gradient text-xl font-bold" style="--text-gradient-from: var(--color-success); --text-gradient-to: var(--color-cta)">Season complete</p>
         </div>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: ".studio-glow / .studio-glow--pulse  (knob: --studio-glow-color)",
-                      usage: %(<button class="btn btn-primary studio-glow">Launch</button>) } do %>
+      <%= render layout: "style/specimen", locals: { trick: "glow" } do %>
         <div class="flex flex-wrap items-center justify-center gap-6">
           <button type="button" class="btn btn-primary studio-glow">Launch</button>
           <span class="studio-glow studio-glow--pulse inline-flex h-12 w-12 items-center justify-center rounded-full text-white font-extrabold"
@@ -584,17 +467,13 @@
         </div>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: ".surface-glass  (knobs: --surface-glass-opacity / -blur)",
-                      usage: %(<div class="surface-glass rounded-xl p-4">...</div>) } do %>
+      <%= render layout: "style/specimen", locals: { trick: "frost" } do %>
         <div class="conic-surface w-full max-w-xs rounded-2xl p-4" style="--conic-surface-duration: 22s">
           <div class="surface-glass rounded-xl p-4 text-center text-sm text-heading">Frosted panel over a live backdrop</div>
         </div>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: ".conic-surface  (knob: --conic-surface-duration)",
-                      usage: %(<div class="conic-surface rounded-2xl p-8">...</div>) } do %>
+      <%= render layout: "style/specimen", locals: { trick: "conic_wash" } do %>
         <div class="conic-surface w-full max-w-xs rounded-2xl p-8 text-center">
           <p class="text-heading font-bold">Ambient wash</p>
           <p class="text-body text-xs mt-1">Content stays crisp above the rotating gradient.</p>
@@ -617,21 +496,13 @@
       <p class="text-muted text-sm max-w-2xl">Level pills, gated by <code class="font-mono text-2xs">Studio.feature?(:leveling)</code>.</p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%= render layout: "style/specimen",
-            locals: { klass: ".level-badge .level-badge-1 … .level-badge-10",
-                      disabled: !leveling_on,
-                      usage: %(<span class="level-badge level-badge-10">Level 10</span>) } do %>
+      <%# The ten tiers, then two of them in a row, the shape a caller puts them in. %>
+      <%= render layout: "style/specimen", locals: { trick: "level_badge", disabled: !leveling_on } do %>
         <div class="flex flex-wrap items-center justify-center gap-2">
           <% (1..10).each do |lvl| %>
             <span class="level-badge level-badge-<%= lvl %>">Level <%= lvl %></span>
           <% end %>
         </div>
-      <% end %>
-
-      <%= render layout: "style/specimen",
-            locals: { klass: ".level-badge (in a chip context)",
-                      disabled: !leveling_on,
-                      usage: %(<span class="text-heading font-semibold text-sm">Earn a free entry</span>\n<span class="level-badge level-badge-8">Level 8</span>) } do %>
         <div class="w-full max-w-xs space-y-2">
           <div class="card flex items-center justify-between gap-3 px-3 py-2">
             <span class="text-heading font-semibold text-sm">Earn a free entry</span>
@@ -644,10 +515,7 @@
         </div>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: ".level-up-pop  (fires the pop + glow burst)",
-                      disabled: !leveling_on,
-                      usage: %(<span class="level-badge level-badge-10 level-up-pop">Level 10</span>) } do %>
+      <%= render layout: "style/specimen", locals: { trick: "level_pop", disabled: !leveling_on } do %>
         <div x-data="{ pop: true }" class="flex flex-col items-center gap-3 py-2">
           <span class="level-badge level-badge-10" :class="pop && 'level-up-pop'">Level 10</span>
           <button type="button" class="btn btn-neutral btn-sm"

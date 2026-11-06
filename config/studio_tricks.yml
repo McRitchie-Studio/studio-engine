@@ -1,0 +1,470 @@
+# The trick names: one short name for every specimen on /admin/style, so Alex McRitchie
+# can say "add a Sheen" and an agent knows it means `.sheen` on a `.btn`.
+#
+# THE ONE SOURCE OF TRUTH. The style guide's cards read their name, note and token from
+# here by key (render layout: "style/specimen", locals: { trick: "sheen" }), and
+# docs/TRICKS.md is generated from it: run bin/tricks-doc after an edit.
+# test/lib/tricks_registry_test.rb fails when the doc drifts, a name repeats, or a token
+# names a class, helper, partial or script the engine does not ship.
+#
+# THE NAMING RULE. A name is one or two Title-case words, the noun a person would say
+# ("Sheen", "Border Glow"). A variant is the name, a middle dot and one lower-case word
+# or two ("Sheen · loop"); its key here is that word, with _ for a space. Every name and
+# every variant name is unique across the guide.
+#
+# Each entry:
+#   name     - the trick's name.
+#   group    - the style guide group it is staged in (the h3 above its card).
+#   token    - what to write: the class, helper, partial or call.
+#   note     - one short sentence on what it does.
+#   resolve  - what the registry test proves exists: css:<class> (engine CSS),
+#              helper:<method>, partial:<path>, js:<text> (app/javascript),
+#              config:<Studio setting>.
+#   variants - optional, keyed by the variant word; each has token, note, resolve.
+
+button:
+  name: Button
+  group: Buttons
+  token: ".btn .btn-primary (or -secondary, -success, -danger, -warning, -neutral, -outline, -google)"
+  note: "A button: .btn plus one role."
+  resolve: [css:btn, css:btn-primary, css:btn-secondary, css:btn-success, css:btn-danger, css:btn-warning, css:btn-neutral, css:btn-outline, css:btn-google]
+  variants:
+    size:
+      token: ".btn-sm / .btn-lg"
+      note: "Smaller or larger; the default size needs no class."
+      resolve: [css:btn-sm, css:btn-lg]
+
+edge_glow:
+  name: Edge Glow
+  group: Button tricks
+  token: ".edge-rotate-glow"
+  note: "Adds a glow that rotates around the button's edge."
+  resolve: [css:edge-rotate-glow]
+  variants:
+    two-color:
+      token: "--edge-rotate-glow-color / --edge-rotate-glow-color-b"
+      note: "Two colors chase each other round the ring."
+      resolve: [css:edge-rotate-glow]
+
+border_glow:
+  name: Border Glow
+  group: Button tricks
+  token: ".studio-border-glow"
+  note: "Adds a moving rainbow border with a soft halo."
+  resolve: [css:studio-border-glow]
+  variants:
+    clear:
+      token: ".studio-border-glow--clear"
+      note: "The same ring and halo on a clear button."
+      resolve: [css:studio-border-glow--clear]
+
+sheen:
+  name: Sheen
+  group: Button tricks
+  token: ".sheen"
+  note: "Adds a band of light that sweeps across the button."
+  resolve: [css:sheen]
+  variants:
+    loop:
+      token: ".sheen--loop"
+      note: "Repeats the sweep."
+      resolve: [css:sheen--loop]
+
+pulse:
+  name: Pulse
+  group: Button tricks
+  token: ".pulse-cta"
+  note: "Adds a slow beat with a ring that spreads from the edge."
+  resolve: [css:pulse-cta]
+  variants:
+    color:
+      token: "--pulse-cta-color (and --pulse-cta-speed, --pulse-cta-scale)"
+      note: "Sets the ring's color, speed and size."
+      resolve: [css:pulse-cta]
+
+fizz:
+  name: Fizz
+  group: Button tricks
+  token: "render layout: \"studio/fizz\" around the button"
+  note: "Adds bubbles that rise from behind the button."
+  resolve: [partial:studio/fizz, css:fizz-stack]
+  variants:
+    colors:
+      token: "colors: [...]"
+      note: "Picks the bubbles' colors."
+      resolve: [partial:studio/fizz]
+
+hold:
+  name: Hold
+  group: Button tricks
+  token: "render \"studio/hold_button\""
+  note: "Makes the button confirm only after a two-second hold."
+  resolve: [partial:studio/hold_button, css:hold-btn]
+  variants:
+    recolor:
+      token: "--hold-* on a parent"
+      note: "Recolors a hold button from any parent element."
+      resolve: [css:hold-btn]
+
+burst:
+  name: Burst
+  group: Button tricks
+  token: "window.studioConfetti.burst(el)"
+  note: "Fires confetti out from behind the button."
+  resolve: [js:burst(]
+  variants:
+    cannons:
+      token: "window.studioConfetti.cannons()"
+      note: "Fires confetti in from both sides of the screen."
+      resolve: [js:cannons(]
+
+page_header:
+  name: Page Header
+  group: Page header
+  token: "render \"studio/page_header\""
+  note: "Crumbs above the title, tabs on the right, links under it."
+  resolve: [partial:studio/page_header, css:page-header]
+  variants:
+    stuck:
+      token: "[data-stuck]"
+      note: "How it looks once pinned under the navbar."
+      resolve: [css:page-header]
+    controls:
+      token: "tabs: or anchors:, menu:, action:, tools_html:"
+      note: "Tabs or anchors, a Links menu, one action, then tools, at one height."
+      resolve: [partial:studio/page_header, css:page-header-menu, css:page-header-menu-list, css:page-header-tools]
+
+section_header:
+  name: Section Header
+  group: Section header
+  token: "render \"studio/section_header\""
+  note: "A section's title that sticks until the next one takes its place."
+  resolve: [partial:studio/section_header, css:section-header]
+  variants:
+    stuck:
+      token: "[data-stuck]"
+      note: "How it looks once pinned under the page row."
+      resolve: [css:section-header]
+
+carousel:
+  name: Carousel
+  group: Carousel
+  token: "render layout: \"studio/carousel\""
+  note: "Shows a set too long to grid, a few slides at a time."
+  resolve: [partial:studio/carousel, css:carousel]
+
+spotlight:
+  name: Spotlight Carousel
+  group: Carousel
+  token: "render layout: \"studio/carousel\", style: :spotlight"
+  note: "Centres one slide with its caption; its neighbours shrink and fade."
+  resolve: [partial:studio/carousel, css:carousel-spotlight]
+
+card:
+  name: Card
+  group: "Surfaces, text & form"
+  token: ".card"
+  note: "The standard surface."
+  resolve: [css:card]
+  variants:
+    hover:
+      token: ".card-hover"
+      note: "A card that lifts under the pointer."
+      resolve: [css:card-hover]
+
+badge:
+  name: Badge
+  group: "Surfaces, text & form"
+  token: ".badge"
+  note: "A small outlined pill; set its color and border-color for a status."
+  resolve: [css:badge]
+
+input:
+  name: Input
+  group: "Surfaces, text & form"
+  token: ".input-field"
+  note: "The text field."
+  resolve: [css:input-field]
+
+label:
+  name: Label
+  group: "Surfaces, text & form"
+  token: ".label-upper"
+  note: "Small upper-case text above a group."
+  resolve: [css:label-upper]
+
+empty_state:
+  name: Empty State
+  group: "Surfaces, text & form"
+  token: ".empty-state"
+  note: "The box a list shows when it has nothing in it."
+  resolve: [css:empty-state]
+
+glass:
+  name: Glass
+  group: Glass
+  token: "config.surface_style = :glass"
+  note: "Frosts the cards and lights the controls from above; opt-in per app."
+  resolve: [config:surface_style, css:surface-glass-blur]
+  variants:
+    lit:
+      token: ".btn, .badge, .input-field under surface_style = :glass"
+      note: "Buttons, badges and inputs lit from above, in every state."
+      resolve: [config:surface_style]
+
+glass_sidebar:
+  name: Glass Sidebar
+  group: Glass
+  token: "config.sidebar_style = :glass"
+  note: "A frosted link sidebar; opt-in per app."
+  resolve: [config:sidebar_style]
+
+icon:
+  name: Icon
+  group: Glass
+  token: "studio_icon(\"rocket\", size: 22)"
+  note: "A line icon by name."
+  resolve: [helper:studio_icon]
+
+scrim:
+  name: Scrim
+  group: "Tints & shades"
+  token: ".scrim"
+  note: "Theme-aware: a tint in light mode, a shade in dark."
+  resolve: [css:scrim, css:scrim-ink]
+  variants:
+    soft:
+      token: ".scrim .scrim-soft"
+      note: "A lighter wash: more of the media shows."
+      resolve: [css:scrim-soft]
+    strong:
+      token: ".scrim .scrim-strong"
+      note: "A heavier wash, for long or small text."
+      resolve: [css:scrim-strong]
+
+tint:
+  name: Tint
+  group: "Tints & shades"
+  token: ".scrim-tint .scrim"
+  note: "Forced tint, in either theme. Dark ink."
+  resolve: [css:scrim-tint]
+
+shade:
+  name: Shade
+  group: "Tints & shades"
+  token: ".scrim-shade .scrim"
+  note: "Forced shade, in either theme. Light ink."
+  resolve: [css:scrim-shade]
+
+time_stamp:
+  name: Time Stamp
+  group: Time stamps
+  token: "at_time_tag(time)"
+  note: "When it happened, on the reader's clock; the date joins only when not today."
+  resolve: [helper:at_time_tag]
+  variants:
+    bare:
+      token: "at_time_tag(time, prefix: nil)"
+      note: "A bare clock, for a cell that already says at."
+      resolve: [helper:at_time_tag]
+    abroad:
+      token: "added in the browser, outside the US"
+      note: "Outside the US a flag trails the clock; inside, nothing."
+      resolve: [helper:at_time_tag]
+
+loader:
+  name: Loader
+  group: Branded loader
+  token: "studio_loader"
+  note: "This app's icon in its theme colors."
+  resolve: [helper:studio_loader, css:studio-loader]
+  variants:
+    breathe:
+      token: "config.loader = :breathe"
+      note: "The icon breathes in and out."
+      resolve: [helper:studio_loader]
+    liquid:
+      token: "config.loader = :liquid"
+      note: "The icon fills like a glass."
+      resolve: [helper:studio_loader]
+    orbit:
+      token: "config.loader = :orbit"
+      note: "A dot circles the icon."
+      resolve: [helper:studio_loader]
+    steel:
+      token: "config.loader = :steel"
+      note: "A light sweeps across the icon."
+      resolve: [helper:studio_loader]
+    weld_bead:
+      token: "config.loader = { style: :weld_bead, art: \"/brand/loader-weld_bead.svg\" }"
+      note: "A signature style: needs this app's own art file."
+      resolve: [helper:studio_loader]
+    sparkle:
+      token: "config.loader = { style: :sparkle, art: \"/brand/loader-sparkle.svg\" }"
+      note: "A signature style: needs this app's own art file."
+      resolve: [helper:studio_loader]
+
+spinner:
+  name: Spinner
+  group: Loaders
+  token: "studio_loader style: :spinner"
+  note: "A small ring for a short wait beside text or in a control."
+  resolve: [helper:studio_loader, css:spinner]
+  variants:
+    css:
+      token: ".spinner (--spinner-size, --spinner-color)"
+      note: "The bare ring, tuned inline."
+      resolve: [css:spinner]
+
+skeleton:
+  name: Skeleton
+  group: Loaders
+  token: "studio_skeleton :lines (or :avatar, :card, :media)"
+  note: "Grey shapes of the content to come, so the page keeps its layout."
+  resolve: [helper:studio_skeleton]
+
+progress_bar:
+  name: Progress Bar
+  group: Loaders
+  token: "studio_loader style: :bar, percent: 62"
+  note: "A bar for a wait you can measure; with no percent it sweeps."
+  resolve: [helper:studio_loader, css:progress-meter]
+  variants:
+    css:
+      token: ".progress-meter (--progress)"
+      note: "The bare bar, with its label inked both sides of the fill."
+      resolve: [css:progress-meter]
+
+typing_dots:
+  name: Typing Dots
+  group: Loaders
+  token: "studio_loader style: :dots"
+  note: "Three dots for a reply on its way, such as a chat answer."
+  resolve: [helper:studio_loader, css:loading-dots]
+  variants:
+    css:
+      token: ".loading-dots with 3 span children"
+      note: "The bare dots, tuned inline."
+      resolve: [css:loading-dots]
+
+busy_button:
+  name: Busy Button
+  group: Loaders
+  token: "studio_loader_pending inside the .btn"
+  note: "The button keeps its place and shows that it is working."
+  resolve: [helper:studio_loader_pending]
+
+overlay:
+  name: Overlay
+  group: Loaders
+  token: "window.StudioLoader.show(\"Caption\") / .hide()"
+  note: "The branded full-screen loader, for a page that takes longer than 350ms."
+  resolve: [helper:studio_loader_overlay, js:StudioLoader]
+
+pull_refresh:
+  name: Pull Refresh
+  group: Loaders
+  token: "studio_pull_to_refresh"
+  note: "On a phone, pull down from the top of the page to reload it."
+  resolve: [helper:studio_pull_to_refresh]
+
+infinite_scroll:
+  name: Infinite Scroll
+  group: Loaders
+  token: "studio_infinite_scroll id:, page:, next_url:"
+  note: "The next page loads as the list's end comes near."
+  resolve: [helper:studio_infinite_scroll]
+
+ping:
+  name: Ping
+  group: Motion primitives
+  token: ".ping .ping--dot"
+  note: "A dot with a ring that pings out from it."
+  resolve: [css:ping, css:ping--dot]
+
+edge_fade:
+  name: Edge Fade
+  group: Motion primitives
+  token: ".fade-edge-y (or -t, -b, -l, -r, -x)"
+  note: "Fades a scroller's content out at its edges."
+  resolve: [css:fade-edge-y]
+
+gradient_text:
+  name: Gradient Text
+  group: Effects
+  token: ".text-gradient"
+  note: "Fills the text with a gradient."
+  resolve: [css:text-gradient]
+
+glow:
+  name: Glow
+  group: Effects
+  token: ".studio-glow"
+  note: "A soft colored halo around the element."
+  resolve: [css:studio-glow]
+  variants:
+    pulse:
+      token: ".studio-glow--pulse"
+      note: "The halo breathes."
+      resolve: [css:studio-glow--pulse]
+
+frost:
+  name: Frost
+  group: Effects
+  token: ".surface-glass"
+  note: "A frosted panel over whatever is behind it."
+  resolve: [css:surface-glass]
+
+conic_wash:
+  name: Conic Wash
+  group: Effects
+  token: ".conic-surface"
+  note: "A slow rotating gradient behind the content."
+  resolve: [css:conic-surface]
+
+level_badge:
+  name: Level Badge
+  group: Leveling
+  token: ".level-badge .level-badge-1 … .level-badge-10"
+  note: "The ten level pills, plainest to holographic."
+  resolve: [css:level-badge, css:level-badge-10]
+
+level_pop:
+  name: Level Pop
+  group: Leveling
+  token: ".level-up-pop"
+  note: "Pops a level badge with a glow when it changes."
+  resolve: [css:level-up-pop]
+
+site_footer:
+  name: Site Footer
+  group: Site footer and booking
+  token: "studio_site_footer"
+  note: "The public footer, in one line at the end of the layout body."
+  resolve: [helper:studio_site_footer]
+
+booking_link:
+  name: Booking Link
+  group: Site footer and booking
+  token: "studio_booking_link \"Schedule a call\""
+  note: "Opens the booking calendar in a popup."
+  resolve: [helper:studio_booking_link]
+
+booking_frame:
+  name: Booking Frame
+  group: Site footer and booking
+  token: "studio_booking_frame"
+  note: "The booking calendar on a page, whole at rest."
+  resolve: [helper:studio_booking_frame]
+  variants:
+    cropped:
+      token: "config.booking_crop = { top:, bottom:, frame_height: }"
+      note: "Cropped to the slot picker at rest; bin/booking-crop-measure prints yours."
+      resolve: [config:booking_crop]
+
+board:
+  name: Board
+  group: Tasks
+  token: "render \"studio/board/board\", columns:, card_partial:"
+  note: "Columns of cards to drag between; a move saves itself."
+  resolve: [partial:studio/board/board]

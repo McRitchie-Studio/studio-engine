@@ -1,0 +1,236 @@
+<%#
+  The inside of the engine's standard sign-in card: Google, then "or", then the
+  email magic link, then the link-sent step with the resend footer. The page
+  card (studio/auth/_sign_in_card) and the modal (studio/auth/_sign_in_modal)
+  both render this, so the two cannot drift apart. Render one of those two, not
+  this one; the locals are theirs, documented in docs/SIGN_IN_CARD.md.
+
+  ONE ALPINE SCOPE, AND ITS SHAPE IS A CONTRACT. studio/modals/auth/_resend_footer
+  reads props.submitting, props.resendCooldown and props.resendError and calls
+  resendMagicLink() from the ENCLOSING x-data. This root is that x-data. Keep
+  those four names.
+
+  THE CONFIG RIDES A DATA ATTRIBUTE, NOT THE EXPRESSION. The endpoint, the
+  return path and the copy are server values. They go in as JSON in
+  data-sign-in-card, which ERB escapes, and the x-data reads them with
+  JSON.parse. No server value is spliced into JavaScript source.
+
+  DEMO MODE (demo: true) POSTS NOTHING. The style guide renders it. Google is a
+  plain type=button with no form around it. The email form has no action, and
+  send() waits on a timer instead of fetch(). The link-sent step and the resend
+  cooldown play as they do for real (cooldown 5s, not 60s). Guarded by
+  test/views/sign_in_card_test.rb and e2e/style_sign_in_card.spec.js.
+
+  REAL MODE posts as the hub's and Turf's cards do. Google is a button_to POST
+  to /auth/google_oauth2 with Turbo off; OmniAuth owns that path, and its
+  request phase is POST-only and CSRF-checked. When the app has no OAuth client
+  yet, studio/google_sign_in/_button draws its setup modal instead. The email
+  form is a real form_tag to the magic-link endpoint, so it still works with no
+  JavaScript; with JavaScript, send() posts the same fields by fetch() as JSON
+  and flips to the link-sent step only after the server says success.
+%>
+<%
+  demo           = local_assigns.fetch(:demo, false) ? true : false
+  dom_id         = local_assigns.fetch(:dom_id, "sign-in-card")
+  # Kept to a plain in-app path, as the server keeps it (Studio::LinkToken.sanitize_path).
+  return_to      = Studio::LocalPath.local?(local_assigns[:return_to]) ? local_assigns[:return_to].to_s : nil
+  modal_store    = local_assigns[:modal_store]
+  show_google    = local_assigns.fetch(:google, demo || Studio.auth_method?(:google))
+  show_email     = local_assigns.fetch(:magic_link, demo || Studio.auth_method?(:magic_link))
+  magic_link_path = local_assigns[:magic_link_path].presence ||
+                    ((respond_to?(:main_app) && main_app.respond_to?(:magic_link_request_path)) ? main_app.magic_link_request_path : "/magic_link")
+  google_path    = return_to ? "#{Studio::GoogleSignIn::REQUEST_PATH}?#{{ return_to: return_to }.to_query}" : Studio::GoogleSignIn::REQUEST_PATH
+  google_label   = local_assigns.fetch(:google_label, "Continue with Google")
+  link_noun      = Studio::AuthLabels.link_noun(Studio.sign_in_label)
+  send_label     = local_assigns.fetch(:send_label, "Email me a #{link_noun}")
+  ttl_minutes    = (Studio.magic_link_ttl.to_i / 60).clamp(1, 24 * 60)
+  # A slot entry is a partial path, or { partial:, locals: }. A named local, not a
+  # block: see Studio::PartialBlock for why a partial cannot trust block_given?.
+  slot = lambda do |entries|
+    Array(entries).filter_map do |entry|
+      entry = { partial: entry } if entry.is_a?(String)
+      render(partial: entry.fetch(:partial), locals: entry.fetch(:locals, {})) if entry.is_a?(Hash)
+    end.join.html_safe
+  end
+  preamble_html = slot.call(local_assigns[:preamble])
+  extras_html   = slot.call(local_assigns[:extras])
+  config = {
+    demo: demo,
+    endpoint: (demo ? nil : magic_link_path),
+    returnTo: return_to,
+    cooldown: (demo ? 5 : 60),
+    email: local_assigns[:email].to_s,
+    sendLabel: send_label,
+    messages: {
+      generic: "We could not send the link. Check your connection and try again.",
+      throttled: "Too many requests. Wait a minute, then try again.",
+      delivery_failed: Studio::MagicLinkIssuing::DELIVERY_FAILED
+    }
+  }
+%>
+<div data-sign-in-card="<%= config.to_json %>"
+     data-sign-in-card-mode="<%= demo ? "demo" : "live" %>"
+     x-data="{
+       cfg: JSON.parse($el.dataset.signInCard),
+       step: 'email',
+       email: '',
+       init() { this.email = this.cfg.email || ''; },
+       error: '',
+       demoNote: '',
+       props: { submitting: null, resendCooldown: 0, resendError: '' },
+       _timer: null,
+       get sending() { return this.props.submitting === 'magic-link'; },
+       async post() {
+         if (this.cfg.demo) { await new Promise((r) => setTimeout(r, 700)); return; }
+         const body = new URLSearchParams();
+         body.set('email', this.email.trim());
+         if (this.cfg.returnTo) body.set('return_to', this.cfg.returnTo);
+         const token = document.querySelector('meta[name=csrf-token]');
+         const resp = await fetch(this.cfg.endpoint, {
+           method: 'POST', credentials: 'same-origin',
+           headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': token ? token.content : '' },
+           body: body.toString()
+         });
+         let payload = {};
+         try { payload = await resp.json(); } catch (e) { payload = {}; }
+         if (resp.ok && payload.success !== false) return;
+         if (resp.status === 429) throw new Error(this.cfg.messages.throttled);
+         if (payload.error === 'delivery_failed') throw new Error(this.cfg.messages.delivery_failed);
+         throw new Error(this.cfg.messages.generic);
+       },
+       startCooldown() {
+         clearInterval(this._timer);
+         this.props.resendCooldown = this.cfg.cooldown;
+         this._timer = setInterval(() => {
+           this.props.resendCooldown -= 1;
+           if (this.props.resendCooldown <= 0) { this.props.resendCooldown = 0; clearInterval(this._timer); }
+         }, 1000);
+       },
+       async send() {
+         if (!this.email.trim() || this.props.submitting) return;
+         this.error = '';
+         this.props.submitting = 'magic-link';
+         try {
+           await this.post();
+           this.step = 'sent';
+           this.startCooldown();
+           this.focusSoon(() => this.$refs.sentHeading);
+         } catch (e) {
+           this.error = e.message || this.cfg.messages.generic;
+         } finally { this.props.submitting = null; }
+       },
+       async resendMagicLink() {
+         if (this.props.submitting || this.props.resendCooldown > 0) return;
+         this.props.resendError = '';
+         this.props.submitting = 'magic-link';
+         try { await this.post(); this.startCooldown(); }
+         catch (e) { this.props.resendError = e.message || this.cfg.messages.generic; }
+         finally { this.props.submitting = null; }
+       },
+       useAnotherEmail() {
+         clearInterval(this._timer);
+         this.props.resendCooldown = 0;
+         this.props.resendError = '';
+         this.step = 'email';
+         this.focusSoon(() => this.$refs.emailForm && this.$refs.emailForm.querySelector('input[type=email]'));
+       },
+       // Focus follows the step, for a keyboard or screen-reader user: the
+       // pressed button is hidden with its step. A hidden node cannot take
+       // focus, and x-show can reveal the new step a frame or more after the
+       // change (measured: still display none in the first frame), so wait
+       // frame by frame until it is rendered, ten frames at most.
+       focusSoon(target, tries = 10) {
+         requestAnimationFrame(() => {
+           const el = target();
+           if (el && el.offsetParent !== null) el.focus();
+           else if (tries > 1) this.focusSoon(target, tries - 1);
+         });
+       },
+       destroy() { clearInterval(this._timer); }
+     }">
+
+  <%# ---- Step 1: the ways in ---- %>
+  <div x-show="step === 'email'" data-sign-in-step="email">
+    <% if preamble_html.present? %>
+      <div class="mb-4" data-sign-in-slot="preamble"><%= preamble_html %></div>
+    <% end %>
+
+    <% if show_google %>
+      <% if demo %>
+        <button type="button" class="btn btn-google btn-lg w-full gap-3" data-sign-in-google="demo"
+                @click="demoNote = 'Demo only: Google sign-in does not run on the style guide.'">
+          <%= render "components/google_logo" %>
+          <%= google_label %>
+        </button>
+      <% elsif Studio::GoogleSignIn.button_posts? %>
+        <%= button_to google_path, method: :post,
+              form: { data: { sign_in_google: "ready" } },
+              data: { turbo: false },
+              class: "btn btn-google btn-lg w-full gap-3" do %>
+          <%= render "components/google_logo" %>
+          <%= google_label %>
+        <% end %>
+      <% else %>
+        <%= render "studio/google_sign_in/button", label: google_label %>
+      <% end %>
+    <% end %>
+
+    <% if extras_html.present? %>
+      <div class="mt-3 space-y-3" data-sign-in-slot="extras"><%= extras_html %></div>
+    <% end %>
+
+    <% if show_email && (show_google || extras_html.present?) %>
+      <div class="flex items-center gap-3 my-5 text-sm" aria-hidden="true">
+        <div class="flex-1 border-t border-strong"></div>
+        <span class="text-secondary">or</span>
+        <div class="flex-1 border-t border-strong"></div>
+      </div>
+    <% end %>
+
+    <% if show_email %>
+      <% form_attrs = { "x-ref" => "emailForm", "@submit.prevent" => "send()", novalidate: true, data: { sign_in_email_form: (demo ? "demo" : "live") } } %>
+      <% email_form_body = capture do %>
+        <label for="<%= dom_id %>-email" class="block text-sm text-secondary mb-2 font-medium">Email</label>
+        <%= render "studio/modals/shared/email_field",
+              name: "email", id: "#{dom_id}-email", required: true,
+              x_model: "email",
+              disabled_expr: "props.submitting === 'magic-link'" %>
+        <% if return_to %><input type="hidden" name="return_to" value="<%= return_to %>"><% end %>
+        <button type="submit" class="btn btn-primary btn-lg w-full mt-4 disabled:cursor-wait disabled:opacity-60"
+                :disabled="sending || !email.trim()">
+          <span x-text="sending ? 'Sending…' : cfg.sendLabel"><%= send_label %></span>
+        </button>
+        <p role="alert" x-show="error" x-cloak class="text-xs text-danger-ink text-center mt-2" x-text="error"></p>
+        <p class="text-xs text-muted text-center mt-2">One tap from your inbox. No password.</p>
+      <% end %>
+      <% if demo %>
+        <%= tag.form(**form_attrs) { email_form_body } %>
+      <% else %>
+        <%= form_tag(magic_link_path, method: :post, **form_attrs) { email_form_body } %>
+      <% end %>
+    <% end %>
+
+    <p x-show="demoNote" x-cloak class="text-xs text-muted text-center mt-3" x-text="demoNote" data-sign-in-demo-note></p>
+  </div>
+
+  <%# ---- Step 2: the link is on its way ---- %>
+  <div x-show="step === 'sent'" x-cloak class="text-center" data-sign-in-step="sent">
+    <div class="text-3xl leading-none mb-3" aria-hidden="true">📬</div>
+    <h3 x-ref="sentHeading" tabindex="-1" class="text-heading font-bold text-lg leading-tight outline-none">Check your email</h3>
+    <p class="text-sm text-body mt-2">
+      We sent a <%= link_noun %> to <strong class="text-heading" x-text="email.trim()"></strong>.
+      It works once and expires in <%= ttl_minutes %> minutes.
+    </p>
+    <div class="border-t border-subtle mt-5 pt-4">
+      <% if modal_store %>
+        <%= render "studio/modals/auth/resend_footer", modal_store: modal_store %>
+      <% else %>
+        <%= render "studio/modals/auth/resend_footer", close: false %>
+      <% end %>
+    </div>
+    <button type="button" @click="useAnotherEmail()"
+            class="block mx-auto mt-3 text-xs text-muted hover:text-secondary underline underline-offset-2">
+      Use a different email
+    </button>
+  </div>
+</div>

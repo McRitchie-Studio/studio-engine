@@ -701,6 +701,11 @@ class E2eLabController < ActionController::Base
   # identical whether either one runs.
   def style_modals = render(:style_modals)
 
+  # The engine's standard sign-in card, LIVE (demo: false), on a page. Its one
+  # input is return_to, set in the view. The spec answers POST /magic_link itself
+  # (page.route), so it reads exactly what the card sends without minting a link.
+  def sign_in_card = render(:sign_in_card)
+
   # The style guide's Theme section, whose Save and Regenerate submit by fetch
   # to the real /admin/theme. The saved theme is the partial's one input, as
   # StyleController sets it; without the table the partial uses the defaults.

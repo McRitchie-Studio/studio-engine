@@ -4,6 +4,30 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Deprecated
+
+- **`studio/_page_header`'s `actions_html:`.** It still renders, before the menu, for one
+  more release. In development the first render from each call site writes one warning to
+  the log. Move each control to `tabs:`, `menu:`, `action:`, `tools_html:` or `meta:`.
+### Changed
+
+- **The style guide's cards carry trick names, not markup snippets.** Alex McRitchie,
+  2026-11-06: "I really just need to have a good naming convention so I can convey an
+  idea to my agents." Every card under Tricks, Loaders and Tasks on `/admin/style` now
+  shows a short name as its heading ("Sheen", "Border Glow", "Hold"), a one-line note,
+  and its class or helper small and muted. A variant is the name, a middle dot and a
+  lower-case word ("Sheen · loop", "Border Glow · clear", "Hold · recolor"), and
+  variants of one primitive share a card, side by side on its stage: Tricks and
+  Loaders went from 79 cards to 58. The usage `<pre>` and its Copy are gone; the one Copy copies the
+  agent line, for example `Sheen — .sheen; Sheen · loop — .sheen--loop`. One registry,
+  `config/studio_tricks.yml` (`Studio::Tricks`), feeds the cards and the generated
+  glossary `docs/TRICKS.md` (`bin/tricks-doc`; `test/lib/tricks_registry_test.rb`
+  fails when they drift, a name repeats, or a token names a class, helper, partial or
+  script the engine does not ship). `style/_specimen` takes `trick:` (and `variant:`)
+  in place of `klass:`, `usage:` and `note:`. The Tricks branded-loader group no longer
+  repeats the busy button and the overlay trigger: they are the Loaders section's Busy
+  Button and Overlay (task `tricks-named-not-snippets`).
+
 ### Added
 
 - **The page header's four kinds of control.** Alex McRitchie, 2026-11-06: the
@@ -18,11 +42,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   and the style guide's Page header specimen shows all four (task
   `page-header-control-kinds`).
 
-### Deprecated
-
-- **`studio/_page_header`'s `actions_html:`.** It still renders, before the menu, for one
-  more release. In development the first render from each call site writes one warning to
-  the log. Move each control to `tabs:`, `menu:`, `action:`, `tools_html:` or `meta:`.
+- **The engine ships a standard sign-in card.** Alex McRitchie, on the style guide's
+  Email field specimen: "this should use the standard auth component with Google and
+  Email." `studio/auth/_sign_in_card` (a page) and `studio/auth/_sign_in_modal` (a
+  modal host's template) render Google, then "or", then the email magic link; Send
+  flips the card to a link-sent step with the shared resend footer. Locals: `heading`,
+  `subheading` (default "Sign in to" the app name), `return_to` (a plain in-app path
+  only; it rides the magic-link POST and the Google request URL), `preamble` and
+  `extras` slots for an age attestation or extra providers, and `demo`. Real use
+  posts Google to `/auth/google_oauth2` (`button_to` POST, Turbo off) and the email to
+  `POST /magic_link`, and reads the `503 delivery_failed` answer. `demo: true` posts
+  nothing. `/admin/style` > Modals > Auth is now one "Sign in" specimen that opens
+  the card in demo mode; the separate Email field and Resend footer specimens are
+  gone, and both partials stay. `studio/modals/auth/_resend_footer` takes
+  `close: false` for a host that is not a modal. The hub and turf-monster still
+  render their own cards; adoption is follow-up work. This reverses the 2026-09-09
+  call (PR #319) that the engine ships only the fragments, not a card. Docs: `docs/SIGN_IN_CARD.md`
+  (task `engine-ships-sign-in-card`).
 
 ## 0.132.0 — 2026-11-06
 

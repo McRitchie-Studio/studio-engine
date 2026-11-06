@@ -1,0 +1,36 @@
+<%#
+  The engine's standard sign-in card, as a modal: the same body as
+  studio/auth/_sign_in_card (studio/auth/_sign_in_body), under a modal header
+  and a ×. Single root, for a modal host's <template x-if>:
+
+    <template x-if="$store.modals.current()?.id === 'sign-in'">
+      <div>render "studio/auth/sign_in_modal", return_to: request.path</div>
+    </template>
+
+    $store.modals.open('sign-in')
+
+  Locals: every local of studio/auth/_sign_in_card except logo, plus
+    modal_store — the Alpine store the × and the resend footer's Close close.
+                  Default "modals". VALIDATED as a JS identifier
+                  (Studio::JsIdentifier): it is spliced as a bare name.
+  dom_id defaults to "sign-in-modal", so a page can carry the page card and the
+  modal at once with no duplicate ids.
+%>
+<%
+  # IDENTIFIER position ($store.<name>) — VALIDATED, never escaped: Studio::JsIdentifier.
+  modal_store = Studio::JsIdentifier.validate!(
+                local_assigns.fetch(:modal_store, "modals"), local: :modal_store)
+  heading    = local_assigns[:heading].presence || Studio::AuthLabels.to_app(Studio.sign_in_label, Studio.app_name)
+  subheading = local_assigns.key?(:subheading) ? local_assigns[:subheading] : "New here? The same step creates your account."
+  body_locals = local_assigns.slice(:return_to, :preamble, :extras, :google, :magic_link, :magic_link_path,
+                                    :email, :demo, :google_label, :send_label)
+                             .merge(dom_id: local_assigns.fetch(:dom_id, "sign-in-modal"), modal_store: modal_store)
+%>
+<div class="relative text-left" data-sign-in-modal>
+  <%= render "studio/modals/blocks/close_x", modal_store: modal_store %>
+  <div class="mb-5 pr-6">
+    <h3 class="text-heading font-bold text-xl leading-tight"><%= heading %></h3>
+    <% if subheading.present? %><p class="text-secondary text-sm mt-1"><%= subheading %></p><% end %>
+  </div>
+  <%= render "studio/auth/sign_in_body", **body_locals %>
+</div>
