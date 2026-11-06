@@ -71,6 +71,24 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   longer names the unsaved user as its target: ErrorLog's `belongs_to` autosaved it, which ran the
   failing save again inside the logger. That second raise skipped the logged mark, so the
   catch-all wrote the same failure twice.
+### Fixed
+
+- **`rescue_and_log` writes one ErrorLog row per failure, also for an unsaved target.** It
+  linked `target:` with ErrorLog's `belongs_to`, which saves a new record. With an unsaved
+  record, the logger ran the failing save a second time. That raise skipped the logged mark,
+  so the catch-all wrote the same failure again, and a save that could pass created the
+  record. Now an unsaved target or parent is named on the row (`unsaved User`) and not
+  linked. This covers the SSO, wallet and link sign-ups and the theme save. When the
+  ErrorLog write itself fails, in `rescue_and_log` or in the catch-all, `Rails.logger.error`
+  records both errors. `rescue_and_log` still raises the original error, and the catch-all
+  still gives its friendly reply. Before, the logger's error replaced both.
+- **`POST /magic_link` answers a failed mint or mail the same way for every address.** The
+  raise went to the catch-all: "Something went wrong" on the home page, or a JSON 500. Now
+  the failure is logged once and the visitor goes back to `/login` with one alert. JSON gets
+  `503` with `{ success: false, error: "delivery_failed", message: … }`: the input was
+  fine and a retry can work, so it is not a 4xx. The body does not carry the internal
+  message, and the action never looks an account up, so it reveals nothing about which
+  emails have accounts. `Studio::MagicLinkIssuing::DELIVERY_FAILED` holds the words.
 
 ## 0.130.0 — 2026-11-05
 

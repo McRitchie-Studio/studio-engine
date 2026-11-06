@@ -219,18 +219,22 @@ module Studio
         attach_error_context(error_log, :parent, parent)
         error_log.save!
       rescue StandardError => log_error
-        # The row could not be written. The original error still reaches the
-        # caller, and the process log keeps both, so a passwordless rescue that
-        # redirects never leaves the failure with no trace at all.
-        Rails.logger.error(
-          "[Studio::ErrorHandling] ErrorLog write failed (#{log_error.class}: #{log_error.message}) " \
-          "while logging #{e.class}: #{e.message}"
-        )
+        log_error_write_failed(log_error, e)
       end
       # Set on a failed write too: the catch-all would only try the same write
       # again, and its raise would replace the friendly reply with a raw 500.
       @_error_logged = true
       raise e
+    end
+
+    # The row could not be written. The original error still reaches the caller,
+    # and the process log keeps both, so a rescue that redirects never leaves the
+    # failure with no trace at all.
+    def log_error_write_failed(log_error, original)
+      Rails.logger.error(
+        "[Studio::ErrorHandling] ErrorLog write failed (#{log_error.class}: #{log_error.message}) " \
+        "while logging #{original.class}: #{original.message}"
+      )
     end
 
     # Names `record` on the row as its target or parent.
@@ -317,7 +321,14 @@ module Studio
     # Layer 1: Catch-all for unexpected errors — log + friendly response.
     # Skips logging if rescue_and_log already captured it.
     def handle_unexpected_error(exception)
-      create_error_log(exception) unless @_error_logged
+      unless @_error_logged
+        begin
+          create_error_log(exception)
+        rescue StandardError => log_error
+          # Unguarded, this raise replaced the friendly reply with a raw 500.
+          log_error_write_failed(log_error, exception)
+        end
+      end
       raise exception if Rails.env.development? || Rails.env.test?
 
       respond_to do |format|

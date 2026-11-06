@@ -132,11 +132,8 @@ class RescueAndLogTargetTest < ActiveSupport::TestCase
   end
 
   test "when the ErrorLog write itself fails, the original error surfaces and Rails.logger records it" do
-    lines = StringIO.new
     prior_logger = Rails.logger
-    Rails.logger = ActiveSupport::Logger.new(lines)
-    ErrorLog.singleton_class.alias_method(:__lab_capture!, :capture!)
-    ErrorLog.define_singleton_method(:capture!) { |_e| raise ActiveRecord::StatementInvalid, "lab: error_logs is gone" }
+    lines = arm_failing_capture
 
     error = assert_raises(IOError) do
       @controller.rescue_and_log { raise IOError, "lab: the mail transport refused" }
@@ -146,7 +143,37 @@ class RescueAndLogTargetTest < ActiveSupport::TestCase
     assert_match(/IOError: lab: the mail transport refused/, lines.string)
     assert_match(/lab: error_logs is gone/, lines.string)
   ensure
+    restore_capture(prior_logger)
+  end
+
+  test "when the catch-all cannot write its row, the original error surfaces and Rails.logger records it" do
+    prior_logger = Rails.logger
+    lines = arm_failing_capture
+
+    # Test env re-raises after logging; the raise must be the ORIGINAL error.
+    error = assert_raises(ArgumentError) { @controller.rescue_with_handler(ArgumentError.new("lab: boom")) }
+
+    assert_equal "lab: boom", error.message
+    assert_match(/ArgumentError: lab: boom/, lines.string)
+    assert_match(/lab: error_logs is gone/, lines.string)
+  ensure
+    restore_capture(prior_logger)
+  end
+
+  private
+
+  def arm_failing_capture
+    lines = StringIO.new
+    Rails.logger = ActiveSupport::Logger.new(lines)
+    ErrorLog.singleton_class.alias_method(:__lab_capture!, :capture!)
+    ErrorLog.define_singleton_method(:capture!) { |_e| raise ActiveRecord::StatementInvalid, "lab: error_logs is gone" }
+    lines
+  end
+
+  def restore_capture(prior_logger)
     Rails.logger = prior_logger
+    return unless ErrorLog.singleton_class.method_defined?(:__lab_capture!)
+
     ErrorLog.singleton_class.alias_method(:capture!, :__lab_capture!)
     ErrorLog.singleton_class.remove_method(:__lab_capture!)
   end

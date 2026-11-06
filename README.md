@@ -31,7 +31,7 @@ resolved.
 ## What It Provides
 
 - **Authentication**: Passwordless magic-link auth, optional password auth, Google OAuth via OmniAuth (ships ready: strategy, default `User.from_omniauth` and a setup modal until the OAuth client is set; docs/GOOGLE_AUTH_SETUP.md), Solana wallet sign-in, and optional one-way SSO patterns
-- **Error handling**: `Studio::ErrorHandling` concern with `rescue_and_log`, `ErrorLog` model with `capture!`, error log viewer at `/error_logs`
+- **Error handling**: `Studio::ErrorHandling` concern with `rescue_and_log`, `ErrorLog` model with `capture!`, error log viewer at `/error_logs`. `rescue_and_log` writes one row per failure: an unsaved `target:` or `parent:` is named on the row (`unsaved User`), never linked, so the logger never saves it. If the row itself cannot be written, the original error still raises and `Rails.logger.error` records both.
 - **Session drift**: every page carries a session stamp and loads `window.StudioSession`, which notices when another tab signs in or out, the session expires, or the server revokes it; `session:changed` / `session:mismatch` events, cross-tab sync, an identity-source plug-in interface, and `expectChange` holds for deliberate switches. The rehydrate endpoint (`GET /session/state`) is opt-in. See [`docs/SESSION_DRIFT.md`](docs/SESSION_DRIFT.md).
 - **Theme system**: Dynamic CSS custom properties generated from 7 role colors (primary, dark, light, success, accent, warning, danger). Dark/light mode toggle. Admin theme editor at `/admin/theme`.
 - **UI primitives**: Shared component partials and CSS primitives such as `components/emoji_swap` for nav/sidebar emoji hover transitions.
@@ -244,7 +244,7 @@ Rails.application.routes.draw do
 end
 ```
 
-This draws the enabled auth routes (`/login`, `/signup`, `/logout`, `POST /magic_link` to request a link, `GET`/`POST /l/:token` for the link itself, Solana routes), OAuth callbacks, optional SSO routes, `/error_logs`, and `/admin/theme`. Set `Studio.draw_geo_routes = true` to add the geo manager (`/admin/geo`) and its public probe (`/geo/check`) — off by default because turf-monster owns those helper names until its adoption lands. Magic-link emails point at the inert `GET /l/:token` confirmation page; the single-use token is burned only by the CSRF-protected `POST` to `link_consume_path`.
+This draws the enabled auth routes (`/login`, `/signup`, `/logout`, `POST /magic_link` to request a link, `GET`/`POST /l/:token` for the link itself, Solana routes), OAuth callbacks, optional SSO routes, `/error_logs`, and `/admin/theme`. Set `Studio.draw_geo_routes = true` to add the geo manager (`/admin/geo`) and its public probe (`/geo/check`) — off by default because turf-monster owns those helper names until its adoption lands. If `POST /magic_link` cannot mint or mail the link, it logs the failure and answers the same for every address: the login page with one alert, or a `503` with `{ success: false, error: "delivery_failed", message: … }` for JSON. Magic-link emails point at the inert `GET /l/:token` confirmation page; the single-use token is burned only by the CSRF-protected `POST` to `link_consume_path`.
 
 Set `Studio.draw_session_routes = true` to add the session-drift rehydrate endpoint (`GET /session/state`) — off by default because it inherits the host's filters, which an app should check first ([`docs/SESSION_DRIFT.md`](docs/SESSION_DRIFT.md)).
 
