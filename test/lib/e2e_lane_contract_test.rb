@@ -377,6 +377,7 @@ class E2eLaneContractTest < Minitest::Test
       # The region, track, controls and controller are the engine's; the slides are
       # the host's blocks, which is the partial's whole contract.
       "carousel.html.erb" => ["studio/carousel"],
+      "carousel_spotlight.html.erb" => ["studio/carousel"],
       # The voice row's recorder, meter and save are the engine's program
       # (studio/voice_profile), mounted by the row's own markup.
       "voice_profile.html.erb" => ["studio/profiles/voice_section"],

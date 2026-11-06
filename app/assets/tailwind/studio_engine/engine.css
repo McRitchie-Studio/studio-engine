@@ -770,6 +770,146 @@ body.modal-open .studio-app-banner {
   }
 }
 
+/* -- The spotlight carousel (studio/_carousel, style: :spotlight) --------------
+   The same region, track, arrows, dots and keys, but each slide snaps to the centre.
+   The centred slide is full size and full colour, with its caption under it; its
+   neighbours are smaller, faded and grey, and the next ones peek at the edges.
+
+   WIDTHS. A slide is --carousel-spot-w wide, in units of the region (cqi, since the
+   region is the inline-size container). n slides and a 0.6 peek fill the row:
+   n * w + (n - 1) * gap + 0.6 * w = 100cqi. The track pads each end by half the
+   rest, so the first and the last slide can centre too.
+
+   THE EFFECT FOLLOWS THE SCROLL where the browser has scroll-driven animations:
+   each slide is its own inline view timeline, and its body and caption run one
+   animation across the stretch from one neighbour's place to the other's (a step,
+   a slide and a gap, either side of the centre), full at the middle. Outside that
+   stretch the fill holds the neighbour look.
+
+   ELSEWHERE, the controller marks the centred slide (data-current) and the body
+   transitions to it. Until the controller connects every slide stays plain.
+
+   UNDER REDUCED MOTION nothing scales, greys or animates: the neighbours of the
+   marked slide are only dimmed. */
+@keyframes carousel-spotlight {
+  0%, 100% {
+    scale: var(--carousel-spot-scale);
+    opacity: var(--carousel-spot-opacity);
+    filter: grayscale(1);
+  }
+  50% {
+    scale: 1;
+    opacity: 1;
+    filter: grayscale(0);
+  }
+}
+
+@keyframes carousel-spotlight-caption {
+  0%, 30%, 70%, 100% {
+    opacity: 0;
+    translate: 0 0.25rem;
+  }
+  50% {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@utility carousel-spotlight {
+  --carousel-spot-scale: 0.75;
+  --carousel-spot-opacity: 0.45;
+
+  /* On the track, not the region: the track's container queries set --carousel-n,
+     and a container query cannot read the element it sits on. */
+  & > .carousel-track {
+    /* A smaller gap: the neighbours' scale already opens space around the centre. */
+    --carousel-gap: 0.5rem;
+    --carousel-spot-w: calc((100cqi - (var(--carousel-n) - 1) * var(--carousel-gap)) / (var(--carousel-n) + 0.6));
+    --carousel-spot-step: calc(var(--carousel-spot-w) + var(--carousel-gap));
+    padding-inline: calc((100cqi - var(--carousel-spot-w)) / 2);
+    /* The neighbours are already dimmed; an edge fade over them reads as a smear. */
+    -webkit-mask-image: none;
+            mask-image: none;
+  }
+
+  & > .carousel-track > .carousel-slide {
+    flex: 0 0 var(--carousel-spot-w);
+    scroll-snap-align: center;
+    display: flex;
+    flex-direction: column;
+    view-timeline: --carousel-slide inline;
+  }
+
+  & .carousel-spotlight-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    transform-origin: 50% 50%;
+  }
+
+  & .carousel-caption {
+    margin-top: 0.75rem;
+    text-align: center;
+    @apply text-sm text-body;
+  }
+
+  /* The fallback: the controller's mark, with a transition. */
+  &[data-carousel-ready] .carousel-slide .carousel-spotlight-body {
+    transition: scale 300ms ease, opacity 300ms ease, filter 300ms ease;
+  }
+
+  &[data-carousel-ready] .carousel-slide:not([data-current]) .carousel-spotlight-body {
+    scale: var(--carousel-spot-scale);
+    opacity: var(--carousel-spot-opacity);
+    filter: grayscale(1);
+  }
+
+  &[data-carousel-ready] .carousel-caption {
+    transition: opacity 300ms ease;
+  }
+
+  &[data-carousel-ready] .carousel-slide:not([data-current]) .carousel-caption {
+    opacity: 0;
+  }
+
+  /* A neighbour holding focus drops the neighbour look on every path, so its focus
+     ring shows at full strength (WCAG 2.4.7). It outranks the animation and the mark. */
+  & .carousel-slide:focus-within .carousel-spotlight-body,
+  &[data-carousel-ready] .carousel-slide:focus-within .carousel-spotlight-body {
+    animation: none;
+    scale: 1;
+    opacity: 1;
+    filter: none;
+  }
+
+  /* The scroll-driven path. It needs no controller, so it runs from the first paint. */
+  @supports (animation-timeline: view()) and (animation-range: cover 0% cover 100%) {
+    & .carousel-spotlight-body,
+    & .carousel-caption {
+      transition: none;
+      animation: carousel-spotlight linear both;
+      animation-timeline: --carousel-slide;
+      animation-range: cover calc(50% - var(--carousel-spot-step)) cover calc(50% + var(--carousel-spot-step));
+    }
+
+    & .carousel-caption {
+      animation-name: carousel-spotlight-caption;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    & .carousel-spotlight-body,
+    & .carousel-caption {
+      animation: none !important;
+      transition: none !important;
+    }
+
+    &[data-carousel-ready] .carousel-slide:not([data-current]) .carousel-spotlight-body {
+      scale: none;
+      filter: none;
+    }
+  }
+}
+
 /* -- The section header (studio/_section_header, docs/PAGE_HEADER.md) --------
    A section's title that sticks under the rest of the stack, inside its own <section>,
    so the next section's header takes its place with no scroll script. At rest it reads as

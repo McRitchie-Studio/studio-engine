@@ -123,4 +123,63 @@ class CarouselRenderTest < Minitest::Test
     assert_empty doc.css(".carousel-slide")
     assert_empty doc.css(".carousel-dot")
   end
+
+  # --- style: :spotlight -------------------------------------------------------
+  # The same region, controls and keys; the spotlight adds a class, a body around
+  # each slide's block (what scales), and a caption under it.
+
+  def test_the_standard_style_adds_no_spotlight_markup
+    doc = render_carousel
+
+    assert_equal %w[carousel], region(doc)["class"].split
+    assert_empty doc.css(".carousel-spotlight-body, .carousel-caption")
+    assert_equal render_carousel.to_html, render_carousel(style: :standard).to_html
+  end
+
+  def test_spotlight_marks_the_region_and_wraps_each_slide_in_a_body
+    doc = render_carousel(style: :spotlight)
+    section = region(doc)
+
+    assert_equal %w[carousel carousel-spotlight], section["class"].split
+    bodies = doc.css(".carousel-slide > .carousel-spotlight-body")
+    assert_equal 3, bodies.size
+    assert_equal %w[Turf Cyvasse Rolio], bodies.map { |body| body.at_css("a.card").text }
+    assert_equal "carousel", section["data-studio-controller"], "the same controller"
+    assert_equal "region", section["role"]
+    assert_equal ["Previous slides", "Next slides"], doc.css(".carousel-button").map { |b| b["aria-label"] }
+    assert_equal 3, doc.css(".carousel-dot").size
+    assert_includes region(render_carousel(style: "spotlight"))["class"].split, "carousel-spotlight",
+                    "a string style works as the symbol does"
+  end
+
+  def test_a_caption_writes_a_line_under_each_slide_from_its_item
+    doc = render_carousel(style: :spotlight, caption: ->(item) { "#{item.name}, live" })
+    captions = doc.css(".carousel-slide > .carousel-caption")
+
+    assert_equal ["Turf, live", "Cyvasse, live", "Rolio, live"], captions.map(&:text)
+    assert_equal %w[carousel-spotlight-body carousel-caption],
+                 doc.at_css(".carousel-slide").element_children.map { |el| el["class"] },
+                 "the caption sits under the body, outside what scales"
+    assert_empty render_carousel(style: :spotlight).css(".carousel-caption"), "no caption without the callable"
+  end
+
+  def test_a_caption_is_escaped
+    doc = render_carousel(style: :spotlight, caption: ->(_) { "<b>bold</b>" })
+
+    assert_empty doc.css(".carousel-caption b")
+    assert_equal "<b>bold</b>", doc.at_css(".carousel-caption").text
+  end
+
+  def test_an_unknown_style_is_refused
+    error = assert_raises(StandardError) { render_carousel(style: :fancy) }
+    # This bare test view wraps the error twice; the ArgumentError is in the chain.
+    chain = []
+    while error
+      chain << error
+      error = error.cause
+    end
+    refused = chain.find { |e| e.is_a?(ArgumentError) }
+    assert refused, "an ArgumentError in #{chain.map(&:class).inspect}"
+    assert_match(/not :standard or :spotlight/, refused.message)
+  end
 end

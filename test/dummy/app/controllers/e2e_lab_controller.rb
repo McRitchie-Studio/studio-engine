@@ -772,6 +772,10 @@ class E2eLabController < ActionController::Base
   # a row of two that fits. A view, no inputs.
   def carousel; end
 
+  # studio/_carousel, style: :spotlight: seven captioned slides, the centred one
+  # full size. e2e/carousel_spotlight.spec.js. A view, no inputs.
+  def carousel_spotlight; end
+
   # studio/_section_header under the real chrome, with a table inside a section.
   # ?timeline=1 puts the header on the scroll-driven collapse.
   def section_header

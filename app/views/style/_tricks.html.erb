@@ -253,6 +253,22 @@
         <% end %>
       </div>
     <% end %>
+
+    <%= render layout: "style/specimen",
+          locals: { klass: "studio/_carousel (style: :spotlight)",
+                    note: "Centres one slide at full size and colour, with its caption, and shrinks, fades and greys its neighbours as they scroll by.",
+                    usage: %(<%= render layout: "studio/carousel",\n      locals: { label: "Team", items: @people, style: :spotlight,\n                caption: ->(person) { person.title } } do |person| %\>\n  <%= render "people/card", person: person %\>\n<% end %\>) } do %>
+      <div class="w-full min-w-0" data-carousel-spotlight-specimen>
+        <%= render layout: "studio/carousel",
+              locals: { label: "Spotlight specimen", items: (1..7).to_a, per_view: 3, style: :spotlight,
+                        id: "style-carousel-spotlight-specimen", caption: ->(n) { "Slide #{n}" } } do |n| %>
+          <div class="card h-full p-5 space-y-1 aspect-[4/3]" style="background-image: linear-gradient(150deg, rgb(var(--color-primary-rgb) / 0.35), transparent)">
+            <p class="label-upper">Slide <%= n %></p>
+            <p class="text-sm text-body">Any block content.</p>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
   </section>
 
   <!-- Surfaces, text and form -->
