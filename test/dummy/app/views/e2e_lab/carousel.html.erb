@@ -1,0 +1,22 @@
+<%# studio/_carousel, rendered by name (E2eLabController#carousel). The slides are the
+    host's blocks; the region, track, controls and controller are the engine's. %>
+<main class="max-w-5xl mx-auto px-4 py-10 space-y-12">
+  <%= render layout: "studio/carousel",
+        locals: { label: "Apps", items: (1..9).to_a, per_view: 3, data: { lab: "apps" } } do |n| %>
+    <a href="#app-<%= n %>" class="card-hover block h-full p-5" data-lab-card="<%= n %>">
+      <span class="block font-semibold text-heading">App <%= n %></span>
+      <span class="block text-sm text-muted">One line of what it is.</span>
+    </a>
+  <% end %>
+
+  <%= render layout: "studio/carousel",
+        locals: { label: "Quotes", items: %w[One Two Three Four Five], per_view: 2,
+                  slide_label: ->(word) { "Quote #{word}" }, data: { lab: "quotes" } } do |word| %>
+    <div class="card h-full p-5 text-body"><%= word %></div>
+  <% end %>
+
+  <%= render layout: "studio/carousel",
+        locals: { label: "Pair", items: %w[Left Right], per_view: 3, data: { lab: "pair" } } do |word| %>
+    <div class="card h-full p-5 text-body"><%= word %></div>
+  <% end %>
+</main>
