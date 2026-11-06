@@ -136,6 +136,13 @@ test("the arrow keys move a row of plain slides from its focused track", async (
   expect(await settled(row)).toBeLessThan(2);
 });
 
+test("a focused track shows a ring on its region, where the edge mask cannot clip it", async ({ page }) => {
+  await open(page);
+  await track(page, "apps").focus();
+  const ring = await region(page, "apps").evaluate((el) => getComputedStyle(el).outlineStyle);
+  expect(ring).toBe("solid");
+});
+
 test("a row that fits shows no controls", async ({ page }) => {
   await open(page);
   await expect(region(page, "pair")).toHaveAttribute("data-carousel-static", "");

@@ -390,6 +390,14 @@ body.modal-open .studio-app-banner {
   position: relative;
   min-width: 0;
   container-type: inline-size;
+
+  /* The track's focus ring is drawn here: the track's edge mask clips anything
+     outside its own box, an outline included. */
+  &:has(> .carousel-track:focus-visible) {
+    outline: 2px solid color-mix(in srgb, var(--color-cta) 70%, transparent);
+    outline-offset: 2px;
+    border-radius: 0.75rem;
+  }
 }
 
 @utility carousel-track {
@@ -422,9 +430,7 @@ body.modal-open .studio-app-banner {
   }
 
   &:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--color-cta) 70%, transparent);
-    outline-offset: 2px;
-    border-radius: 0.75rem;
+    outline: none;
   }
 
   .carousel:not([data-carousel-ready]) & {
