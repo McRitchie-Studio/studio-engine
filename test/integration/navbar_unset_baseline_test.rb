@@ -18,7 +18,9 @@
 # (/tasks/sidebar-rows-center-icon-and-label); the link sidebar's title became the
 # viewer's name or a greeting, its section labels gave way to dividers and its rows
 # to one line each at rest (/tasks/sidebar-greeting-and-no-labels); the link sidebar's
-# panels gained data-sidebar-edge for their blurred edge (/tasks/sidebar-edge-blur).
+# panels gained data-sidebar-edge for their blurred edge (/tasks/sidebar-edge-blur); the
+# sidebar's focus ring became ring-primary-ink, 3:1 beside every surface
+# (/tasks/engine-ui-polish-follow-ups).
 
 require "bundler/setup"
 

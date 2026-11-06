@@ -48,10 +48,12 @@
     does.
 
     ACCESSIBLE BY THE APG CAROUSEL PATTERN: a labelled region with
-    aria-roledescription carousel, each slide a group with aria-roledescription
-    slide and its own label, named arrows that set aria-disabled at an end (not
-    disabled, so focus stays on the arrow), and a polite status line that speaks
-    only after a press. %>
+    aria-roledescription carousel, a focusable track named "<label> slides", each
+    slide a group with aria-roledescription slide and its own label, named arrows
+    that set aria-disabled at an end (not disabled, so focus stays on the arrow),
+    and a polite, atomic status line that speaks only after a press that moves the
+    row. A key pressed in a form field, an arrow-key widget (a slider, a tab list,
+    a listbox...) or a nested carousel stays that element's. %>
 <%
   per_view = per_view.to_f.clamp(1, 6)
   per_view = per_view.to_i if per_view == per_view.floor
@@ -76,7 +78,10 @@
       aria: { roledescription: "carousel", label: label },
       style: "--carousel-per-view: #{per_view}",
       data: { studio_controller: "carousel", studio_action: "keydown->carousel#key", carousel_start: (start_index.to_s if start_index.positive?) }.compact.merge(data)) do %>
-  <div id="<%= track_id %>" class="carousel-track" tabindex="0" data-carousel-target="track">
+  <%# The track takes focus for the keys, so it carries a name: a group, since a
+      bare div may not be named. %>
+  <div id="<%= track_id %>" class="carousel-track" tabindex="0" role="group"
+       aria-label="<%= label %> slides" data-carousel-target="track">
     <% items.each_with_index do |item, index| %>
       <div class="carousel-slide" role="group" aria-roledescription="slide"
            aria-label="<%= slide_label ? slide_label.call(item) : "#{index + 1} of #{total}" %>"
@@ -103,5 +108,5 @@
       </button>
     </div>
   </div>
-  <p class="sr-only" role="status" aria-live="polite" data-carousel-target="status"></p>
+  <p class="sr-only" role="status" aria-live="polite" aria-atomic="true" data-carousel-target="status"></p>
 <% end %>

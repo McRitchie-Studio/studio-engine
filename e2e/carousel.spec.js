@@ -10,13 +10,17 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 //   - "carousel" removed from LAZY: 10 red. Every spec waits for the controller,
 //     and the failed-load spec's mark is never set without its import.
 //   - --carousel-peek set to 0: 2 red, the wide and phone widths.
+//   - move()'s `to === this.current` return removed: the end-press spec, its
+//     cleared status line rewritten to "Slides 7 to 9 of 9".
+//   - the key guard back on form fields alone: the widget spec, the slider's
+//     ArrowRight moving the row.
 
 const DESKTOP = { width: 1280, height: 900 };
 const PHONE = { width: 390, height: 844 };
 const LAB = "/lab/carousel";
 
 const region = (page, name) => page.locator(`section[data-lab='${name}']`);
-const track = (page, name) => region(page, name).locator(".carousel-track");
+const track = (page, name) => region(page, name).locator("> .carousel-track");
 
 async function open(page, viewport = DESKTOP) {
   await page.setViewportSize(viewport);
@@ -222,4 +226,93 @@ test("a carousel whose controller never loads still scrolls, with its controls h
   expect(await track(page, "apps").evaluate((el) => getComputedStyle(el).scrollbarWidth)).toBe("thin");
   await track(page, "apps").evaluate((el) => { el.scrollLeft = 200; });
   expect(await settled(track(page, "apps"))).toBeGreaterThan(100);
+});
+
+test("the controls row keeps its room before the controller connects, so nothing below moves", async ({ page }) => {
+  await page.setViewportSize(DESKTOP);
+  await blockOffsiteRequests(page);
+  await page.route(/carousel_controller.*\.js/, async (route) => { await new Promise((r) => setTimeout(r, 800)); await route.continue(); });
+  await page.goto(LAB, { waitUntil: "domcontentloaded" });
+  const apps = region(page, "apps");
+  await expect(apps).not.toHaveAttribute("data-carousel-ready", "");
+  const before = await apps.evaluate((el) => el.getBoundingClientRect().height);
+  await expect(apps).toHaveAttribute("data-carousel-ready", "");
+  expect(await apps.evaluate((el) => el.getBoundingClientRect().height)).toBe(before);
+});
+
+const status = (page, name) => region(page, name).locator("> [role='status']");
+
+test("the status line stays empty after the first paint and after a swipe", async ({ page }) => {
+  await open(page);
+  const row = track(page, "apps");
+
+  await expect(status(page, "apps")).toHaveText("");
+  // A swipe is a scroll the controller did not ask for: the row moves, the line stays quiet.
+  await row.evaluate((el) => el.scrollTo({ left: 400, behavior: "auto" }));
+  expect(await settled(row)).toBeGreaterThan(100);
+  await expect(region(page, "apps").getByRole("button", { name: "Previous slides" })).toHaveAttribute("aria-disabled", "false");
+  await expect(status(page, "apps")).toHaveText("");
+});
+
+test("an arrow pressed at its end scrolls nothing and announces nothing", async ({ page }) => {
+  await open(page);
+  const apps = region(page, "apps");
+  const row = track(page, "apps");
+
+  // aria-disabled keeps the arrow focusable and clickable, which Playwright reads as disabled.
+  await apps.getByRole("button", { name: "Previous slides" }).click({ force: true });
+  await row.focus();
+  await page.keyboard.press("Home");
+  await page.waitForTimeout(300);
+  await expect(status(page, "apps")).toHaveText("");
+
+  await page.keyboard.press("End");
+  await settled(row);
+  await expect(status(page, "apps")).toHaveText("Slides 7 to 9 of 9");
+  // Clear the line, then press at the end: a press that goes nowhere writes nothing.
+  await status(page, "apps").evaluate((el) => { el.textContent = ""; });
+  await apps.getByRole("button", { name: "Next slides" }).click({ force: true });
+  await row.focus();
+  await page.keyboard.press("End");
+  await page.waitForTimeout(300);
+  await expect(status(page, "apps")).toHaveText("");
+});
+
+test("a widget that owns the arrow keys, or a nested carousel, keeps them", async ({ page }) => {
+  await open(page);
+  const widgets = region(page, "widgets");
+  const row = track(page, "widgets");
+  await expect(widgets).toHaveAttribute("data-carousel-ready", "");
+  await expect(region(page, "inner")).toHaveAttribute("data-carousel-ready", "");
+  // A real slider or tab list handles its own keys and cancels the browser's scroll;
+  // this stands in for that script, so only the carousel could move the row.
+  await page.evaluate(() => {
+    for (const el of document.querySelectorAll("[data-lab-widget]")) {
+      el.addEventListener("keydown", (event) => {
+        if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) event.preventDefault();
+      });
+    }
+  });
+
+  for (const hook of ["slider", "tab"]) {
+    await widgets.locator(`[data-lab-widget='${hook}']`).focus();
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("End");
+    await page.waitForTimeout(300);
+    expect(await scrollLeft(row), `a key in the ${hook} moved the row`).toBeLessThan(2);
+    await row.evaluate((el) => el.scrollTo({ left: 0, behavior: "auto" }));
+  }
+
+  // The nested carousel's keys move the inner row, not the outer one.
+  const inner = track(page, "inner");
+  await inner.focus();
+  await page.keyboard.press("ArrowRight");
+  expect(await settled(inner)).toBeGreaterThan(10);
+  expect(await settled(row)).toBeLessThan(2);
+  await expect(status(page, "widgets")).toHaveText("");
+
+  // The outer row still takes its own keys.
+  await row.focus();
+  await page.keyboard.press("ArrowRight");
+  expect(await settled(row)).toBeGreaterThan(10);
 });

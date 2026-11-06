@@ -22,7 +22,7 @@ require "nokogiri"
 #   3. StyleController wires that gate as a before_action.
 #   4. The view is a bare content wrapper that REFERENCES every primitive family
 #      (buttons, surfaces/text/form, motion, effect), wires the four-section nav
-#      in order (Theme landing / Modals / Tricks / Tasks) with matching anchor
+#      in order (Theme landing / Tricks / Modals / Tasks) with matching anchor
 #      targets, and keeps the color role tokens in the Theme section (Theme owns
 #      "the colors"). The dummy app does not compile the engine CSS, so specimens
 #      are unstyled here by design — this asserts the classes/contract.
@@ -60,7 +60,7 @@ class StylePageTest < ActiveSupport::TestCase
 
   test "the title and the section tabs share one sticky row" do
     doc = Nokogiri::HTML.fragment(render_index)
-    row = doc.at_css("nav[aria-label='Style guide sections']")
+    row = doc.at_css(".page-header:has(> nav[aria-label='Style guide sections'])")
 
     assert_includes row["class"].split, "sticky"
     assert_equal "style-section-nav", row["data-studio-controller"]
@@ -69,7 +69,7 @@ class StylePageTest < ActiveSupport::TestCase
     assert_nil doc.at_css("header"), "no separate header above the row"
 
     links = row.css("[data-style-section-nav-target='link']")
-    assert_equal %w[#theme #modals #tricks #loaders #tasks #components], links.map { |a| a["href"] }
+    assert_equal %w[#theme #tricks #loaders #modals #tasks #components], links.map { |a| a["href"] }
     assert_equal ["#theme"], row.css("a[aria-current='true']").map { |a| a["href"] }, "Theme starts active"
     assert_includes links.first["class"].split, "btn-primary"
     assert_includes links.last["class"].split, "btn-neutral"
@@ -77,7 +77,7 @@ class StylePageTest < ActiveSupport::TestCase
 
   test "the row is the engine's page header, in the stack, and the guide shows the primitive" do
     doc = Nokogiri::HTML.fragment(render_index)
-    row = doc.at_css("nav[aria-label='Style guide sections']")
+    row = doc.at_css(".page-header:has(> nav[aria-label='Style guide sections'])")
 
     assert_includes row["class"].split, "page-header"
     assert_equal "page", row["data-pin"]
@@ -90,6 +90,10 @@ class StylePageTest < ActiveSupport::TestCase
     assert specimen, "the Tricks section documents the primitive"
     assert_equal 1, specimen.css(".page-header[data-stuck]").size
     assert_equal 2, specimen.css(".page-header").size
+    # A specimen draws the classes, not the landmarks: the page's one breadcrumb nav is
+    # the real row's, so the specimens add no nav, region or header of their own.
+    assert_empty specimen.css(".page-header nav, .page-header [role='navigation'], .page-header [role='region'], .page-header header"),
+                 "a page header specimen adds a landmark to the page"
   end
 
   test "the Tricks section shows the live carousel" do
@@ -117,7 +121,7 @@ class StylePageTest < ActiveSupport::TestCase
 
   test "every section's title is a section header, first in its section, and joins no data-pin" do
     doc = Nokogiri::HTML.fragment(render_index)
-    { "theme" => "Theme", "modals" => "Modals", "tricks" => "Tricks", "loaders" => "Loaders", "tasks" => "Tasks", "components" => "Components" }.each do |id, title|
+    { "theme" => "Theme", "tricks" => "Tricks", "loaders" => "Loaders", "modals" => "Modals", "tasks" => "Tasks", "components" => "Components" }.each do |id, title|
       section = doc.at_css("section##{id}")
       first = section.element_children.first
 
@@ -259,6 +263,8 @@ class StylePageTest < ActiveSupport::TestCase
     studio-border-glow spinner loading-dots sheen ping fade-edge progress-meter
     carousel-spotlight carousel-spotlight-body carousel-caption
     carousel carousel-track carousel-slide carousel-dot carousel-button
+    carousel-controls carousel-dots carousel-arrows
+    studio-border-glow--clear
   ].freeze
 
   REQUIRED_THEME_TOKENS = %w[
@@ -273,7 +279,7 @@ class StylePageTest < ActiveSupport::TestCase
   ].freeze
 
   # Theme is the landing section; the section order the nav pills follow.
-  SECTION_ANCHORS = %w[theme modals tricks loaders tasks].freeze
+  SECTION_ANCHORS = %w[theme tricks loaders modals tasks].freeze
 
   # solana-studio's app/views. The guide's THREE web3 specimens (Connect wallet
   # and the two Sign Wallet cards) render from that gem since the two-template
@@ -426,7 +432,7 @@ class StylePageTest < ActiveSupport::TestCase
 
     # The section nav must sit above the portal's --z-raised floor, or the
     # bubbles paint over it as the button scrolls under it.
-    nav = doc.at_css("nav[aria-label='Style guide sections']")
+    nav = doc.at_css(".page-header:has(> nav[aria-label='Style guide sections'])")
     assert_includes nav["style"], "z-index: var(--z-sticky", "the nav sits on the sticky rung"
     refute_includes nav["class"].split, "z-20", "not tied with the portal floor"
 
@@ -460,6 +466,7 @@ class StylePageTest < ActiveSupport::TestCase
     expected = [
       [".edge-rotate-glow", "button.btn.edge-rotate-glow"],
       [".studio-border-glow", "button.btn.studio-border-glow"],
+      [".studio-border-glow--clear", "button.btn.studio-border-glow.studio-border-glow--clear:not(.btn-primary)"],
       [".sheen", "button.btn.sheen"],
       [".pulse-cta", "button.btn.pulse-cta"],
       [".fizz-stack", ".fizz-stack > button.btn"],
@@ -476,6 +483,7 @@ class StylePageTest < ActiveSupport::TestCase
       note = card.at_css("p.text-body").text
       assert_operator note.split.size, :<=, 12, "one short sentence: #{note.inspect}"
       assert card.at_css("code[x-ref=snippet]"), "#{name} shows copyable code"
+      assert_equal 1, card.css("button[aria-label^='Copy']").size, "#{name}: one Copy per card, the snippet's"
     end
 
     # Colored, not a plain .btn: the lit style reads a role class, and it skips any
@@ -620,12 +628,12 @@ class StylePageTest < ActiveSupport::TestCase
     end
   end
 
-  test "the sections render in order: Theme (landing), Modals, Tricks, Tasks" do
+  test "the sections render in order: Theme (landing), Tricks, Modals, Tasks" do
     html = render_index
     positions = SECTION_ANCHORS.map { |id| html.index(%(id="#{id}")) }
     refute_includes positions, nil, "every section anchor must be present"
     assert_equal positions, positions.sort,
-      "sections must appear in order Theme, Modals, Tricks, Tasks"
+      "sections must appear in order Theme, Tricks, Modals, Tasks"
   end
 
   # [integration] The Loaders section (style/_loaders, docs/LOADER.md "The family"):
@@ -741,11 +749,12 @@ class StylePageTest < ActiveSupport::TestCase
   # and the longer name was describing a subset of its own cards. What has held
   # across both renames is the ORDER, which is what this asserts.
   def modals_subheadings(html)
+    # Tricks now comes before Modals; the next section is a host's own modals, or Tasks.
     modals_start = html.index('id="modals"')
-    tricks_start = html.index('id="tricks"')
+    next_start = html.index('id="host-modals"') || html.index('id="tasks"')
     refute_nil modals_start, "the Modals section anchor must exist"
-    refute_nil tricks_start, "the Tricks section anchor must exist"
-    slice = html[modals_start...tricks_start]
+    refute_nil next_start, "the section after Modals must exist"
+    slice = html[modals_start...next_start]
     slice.scan(%r{type-h4 text-heading">([^<]+)</h3>}).flatten
   end
 

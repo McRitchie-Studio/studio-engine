@@ -125,6 +125,10 @@
   --text-color-success-ink: var(--color-success-ink);
   /* The primary role as chip text; text-primary stays the brand colour. */
   --text-color-primary-ink: var(--color-primary-ink);
+  /* The keyboard focus ring: the primary ink, so a ring clears 3:1 beside every
+     surface it lands on (WCAG 1.4.11). A translucent ring-primary/40 measured 1.3
+     to 2.0:1 (e2e/sidebar_focus_ring.spec.js). */
+  --ring-color-primary-ink: var(--color-primary-ink);
 
   /* The status-role FILLS, for backgrounds and borders ONLY. */
   --background-color-success: var(--color-success);

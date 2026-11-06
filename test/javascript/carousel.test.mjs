@@ -4,7 +4,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/carousel.js", import.meta.url), "utf8")
-const { hiddenEnds, stops, currentStop, perPage, targetStop, keyAction, positionText } =
+const { hiddenEnds, stops, currentStop, perPage, targetStop, keyAction, positionText, ownsKey, KEY_OWNERS } =
   await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 // Six 100px slides, no gap, a 300px row: it rests at 0, 100, 200 and 300.
@@ -76,4 +76,34 @@ test("the status line says which slides are in view", () => {
   assert.equal(positionText(0, 3, 9), "Slides 1 to 3 of 9")
   assert.equal(positionText(7, 3, 9), "Slides 8 to 9 of 9")
   assert.equal(positionText(2, 1, 6), "Slide 3 of 6")
+})
+
+// A stand-in element: `closest` answers from the ancestors it was built with, each
+// a set of selectors it matches, nearest first.
+function node(ancestors) {
+  return {
+    closest(selector) {
+      const wanted = selector.split(",").map((part) => part.trim())
+      return ancestors.find((el) => wanted.some((one) => el.matches.includes(one))) || null
+    }
+  }
+}
+
+test("a key in a field or an arrow-key widget is that element's, not the row's", () => {
+  const region = { matches: [".carousel"] }
+  assert.equal(ownsKey(node([{ matches: [] }, region]), region), true, "a link in a slide")
+  for (const owner of ["input", "textarea", "select", "[role='slider']", "[role='listbox']",
+                       "[role='combobox']", "[role='tablist']", "[role='radiogroup']", "[role='grid']",
+                       "video", "audio"]) {
+    assert.ok(KEY_OWNERS.includes(owner), `${owner} is a key owner`)
+    assert.equal(ownsKey(node([{ matches: [owner] }, region]), region), false, owner)
+  }
+})
+
+test("a key in a carousel nested in a slide is the inner carousel's", () => {
+  const outer = { matches: [".carousel"] }
+  const inner = { matches: [".carousel"] }
+  assert.equal(ownsKey(node([{ matches: [] }, inner, outer]), outer), false)
+  assert.equal(ownsKey(node([{ matches: [] }, inner, outer]), inner), true)
+  assert.equal(ownsKey({}, outer), false, "a target with no closest")
 })

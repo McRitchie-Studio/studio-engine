@@ -26,10 +26,7 @@
 // and nothing in the status line. A row already moved (the browser's own start, a
 // restored scroll, a #fragment inside it) is left where it is.
 import { Controller } from "@hotwired/stimulus"
-import { TOLERANCE, centerStops, currentStop, hiddenEnds, keyAction, perPage, positionText, startStop, stops, targetStop } from "studio/carousel"
-
-// Keys inside these belong to the field, not the row.
-const TYPING = "input, textarea, select, [contenteditable]"
+import { TOLERANCE, centerStops, currentStop, hiddenEnds, keyAction, ownsKey, perPage, positionText, startStop, stops, targetStop } from "studio/carousel"
 
 export default class extends Controller {
   static targets = ["track", "slide", "prev", "next", "dot", "status"]
@@ -129,7 +126,8 @@ export default class extends Controller {
   }
 
   key(event) {
-    if (event.target.closest?.(TYPING)) return
+    // A form field, a widget that owns the arrow keys, or a nested carousel keeps them.
+    if (!ownsKey(event.target, this.element)) return
     // Alt+Left is Back, Cmd+Left a line start: a held modifier leaves the key alone.
     if (event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) return
     const action = keyAction(event.key)
@@ -138,9 +136,13 @@ export default class extends Controller {
     this.move(action)
   }
 
+  // A press that goes nowhere (an arrow at its end, Home at the start) scrolls
+  // nothing and says nothing: the status line speaks only when the row moves.
   move(action) {
     this.sync()
-    this.scrollToStop(targetStop(action, this.current, this.page, this.positions.length))
+    const to = targetStop(action, this.current, this.page, this.positions.length)
+    if (to === this.current) return
+    this.scrollToStop(to)
   }
 
   scrollToStop(index) {

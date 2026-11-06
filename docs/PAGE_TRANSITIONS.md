@@ -65,7 +65,7 @@ and `:unfold` with `:right` goes back as `unfold-right`.
 | A click on a link with `data-page-transition-back`, to that link's address | Back |
 | Browser Back by a full load: the `pageswap` activation traverses to an earlier entry | Back |
 | A full load from a link with `data-page-transition-back`, to its address | Back |
-| The second half of a redirect | The first half's way |
+| A redirect | The first half's way; Turbo's replace to the final address draws nothing |
 | Anything else | The app's own |
 
 `studio/_page_header` puts `data-page-transition-back` on every ancestor crumb and on the

@@ -24,4 +24,29 @@
                   caption: ->(word) { "Caption #{word}" }, data: { lab: "captioned" } } do |word| %>
     <div class="card h-full p-5 text-body"><%= word %></div>
   <% end %>
+  <%# Widgets that own the arrow keys, and a carousel nested in a slide: a key
+      pressed in any of them is theirs, so this row never moves for it. %>
+  <%= render layout: "studio/carousel",
+        locals: { label: "Widgets", items: %w[slider tabs nested four five], per_view: 2,
+                  data: { lab: "widgets" } } do |kind| %>
+    <div class="card h-full p-5 text-body">
+      <% case kind
+         when "slider" %>
+        <div role="slider" tabindex="0" aria-label="Volume" aria-valuemin="0" aria-valuemax="10"
+             aria-valuenow="5" data-lab-widget="slider">Volume 5</div>
+      <% when "tabs" %>
+        <div role="tablist" aria-label="Views">
+          <button type="button" role="tab" aria-selected="true" data-lab-widget="tab">One</button>
+          <button type="button" role="tab" aria-selected="false" tabindex="-1">Two</button>
+        </div>
+      <% when "nested" %>
+        <%= render layout: "studio/carousel",
+              locals: { label: "Inner", items: %w[A B C D], per_view: 1, data: { lab: "inner" } } do |letter| %>
+          <div class="card h-full p-3 text-body"><%= letter %></div>
+        <% end %>
+      <% else %>
+        <%= kind %>
+      <% end %>
+    </div>
+  <% end %>
 </main>

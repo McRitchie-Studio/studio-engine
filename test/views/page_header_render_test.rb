@@ -24,8 +24,9 @@ class PageHeaderRenderTest < Minitest::Test
 
   def test_renders_title_meta_and_tabs
     doc = render_row(title: "Models", meta: "v1.2.3", meta_title: "studio-engine", label: "Models", tabs: TABS)
-    row = doc.at_css("nav[aria-label='Models']")
+    row = doc.at_css("div.page-header")
 
+    assert_equal "Models", row.at_css("nav.page-header-tabs")["aria-label"], "the label names the tabs' nav"
     assert_equal "Models", row.at_css("h1").text
     assert_equal "v1.2.3", row.at_css(".page-header-meta").text
     assert_equal "studio-engine", row.at_css(".page-header-meta")["title"]
@@ -47,7 +48,7 @@ class PageHeaderRenderTest < Minitest::Test
   # --pin-stack-bottom includes the row's own edge, so positioning off it chases
   # itself down the page.
   def test_the_row_joins_the_stack_and_positions_off_what_is_above_it
-    row = render_row(title: "Models", label: "Models", tabs: TABS).at_css("nav")
+    row = render_row(title: "Models", label: "Models", tabs: TABS).at_css(".page-header")
 
     assert_equal "page", row["data-pin"]
     assert_includes row["class"].split, "sticky"
@@ -60,6 +61,22 @@ class PageHeaderRenderTest < Minitest::Test
   def test_the_row_is_never_a_header_element
     assert_nil render_row(title: "Models", label: "Models", tabs: TABS).at_css("header")
     assert_nil render_row(title: "Plain").at_css("header")
+  end
+
+  # With tabs, crumbs and links, the row holds three navs side by side. The row itself
+  # is no landmark (a div with no role and no name), so none nests in another.
+  def test_no_landmark_nests_in_another_and_the_row_is_none
+    doc = render_row(title: "Models", label: "Models", tabs: TABS, crumbs: CRUMBS,
+                     links: [{ label: "Sessions", href: "/sessions" }])
+    row = doc.at_css(".page-header")
+
+    assert_equal "div", row.name
+    assert_nil row["role"]
+    assert_nil row["aria-label"]
+    navs = doc.css("nav")
+    assert_equal %w[page-header-crumbs page-header-tabs page-header-links], navs.map { |nav| nav["class"] }
+    navs.each { |nav| assert_empty nav.ancestors("nav, [role='navigation'], [role='region'], header, main, aside"), nav["class"] }
+    assert_equal ["Breadcrumb", "Models", "More links"], navs.map { |nav| nav["aria-label"] }
   end
 
   def test_with_no_tabs_it_is_a_div_with_no_tab_strip
@@ -87,8 +104,8 @@ class PageHeaderRenderTest < Minitest::Test
 
     assert_equal "page-header", sentinel["data-studio-controller"]
     assert_equal "true", sentinel["aria-hidden"]
-    assert_equal doc.at_css("nav"), sentinel.next_element
-    assert_equal "style-section-nav", doc.at_css("nav")["data-studio-controller"]
+    assert_equal doc.at_css(".page-header"), sentinel.next_element
+    assert_equal "style-section-nav", doc.at_css(".page-header")["data-studio-controller"]
     assert_equal "scroller", doc.at_css(".page-header-tabs")["data-style-section-nav-target"]
   end
 
