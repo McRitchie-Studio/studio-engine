@@ -169,6 +169,7 @@ test.describe("pull to refresh on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
   test("a short pull settles back; a long pull from the top reloads the page", async ({ page }) => {
+    await blockOffsiteRequests(page);
     const errors = watchPageErrors(page);
     await page.goto("/lab/pull_to_refresh");
     const stamp = page.locator('[data-test="pull-stamp"]');
