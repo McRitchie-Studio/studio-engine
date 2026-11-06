@@ -97,3 +97,11 @@ export function centerStops(slides, clientWidth, max) {
   if (slides.length === 0) return [0]
   return slides.map(({ left, width }) => Math.min(max, Math.max(0, left + width / 2 - clientWidth / 2)))
 }
+
+// The stop a row opens on, from the partial's start index: a standard row with
+// more slides than stops opens at its last stop.
+export function startStop(start, count) {
+  if (!(count > 0)) return 0
+  const index = Math.floor(Number(start)) || 0
+  return Math.min(count - 1, Math.max(0, index))
+}

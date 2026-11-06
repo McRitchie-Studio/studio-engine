@@ -1,13 +1,24 @@
 <%# studio/_carousel, style: :spotlight, rendered by name (E2eLabController#carousel_spotlight).
-    Seven slides with a caption each: the centred one is full size and colour. %>
+    Seven slides with a caption each: the centred one is full size and colour.
+    "spot" opens on its first slide (start: 0), so its specs walk the row from an end;
+    "spot-default" takes the spotlight's default start, the middle slide. %>
 <main class="max-w-5xl mx-auto px-4 py-10 space-y-12">
   <%= render layout: "studio/carousel",
-        locals: { label: "Team", items: (1..7).to_a, per_view: 3, style: :spotlight,
+        locals: { label: "Team", items: (1..7).to_a, per_view: 3, style: :spotlight, start: 0,
                   slide_label: ->(n) { "Person #{n}" }, caption: ->(n) { "Person #{n}, role #{n}" },
                   data: { lab: "spot" } } do |n| %>
     <div class="card h-full p-5 aspect-[4/5] flex items-end" data-lab-card="<%= n %>"
          style="background: linear-gradient(160deg, hsl(<%= n * 47 %> 70% 55%), hsl(<%= n * 47 + 60 %> 70% 35%))">
       <span class="font-semibold text-white">Card <%= n %></span>
+    </div>
+  <% end %>
+  <%= render layout: "studio/carousel",
+        locals: { label: "Crew", items: (1..7).to_a, per_view: 3, style: :spotlight,
+                  slide_label: ->(n) { "Crew #{n}" }, caption: ->(n) { "Crew #{n}" },
+                  data: { lab: "spot-default" } } do |n| %>
+    <div class="card h-full p-5 aspect-[4/5] flex items-end" data-lab-card="<%= n %>"
+         style="background: linear-gradient(160deg, hsl(<%= n * 47 %> 70% 55%), hsl(<%= n * 47 + 60 %> 70% 35%))">
+      <span class="font-semibold text-white">Crew <%= n %></span>
     </div>
   <% end %>
 </main>

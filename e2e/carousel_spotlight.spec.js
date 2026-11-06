@@ -16,6 +16,13 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 //     scroll-driven spec (the slides lose the neighbour look, scale 1).
 //   - the controller's data-current toggle removed: 8 red (no slide is marked).
 //   - `scroll-snap-align: center` back to start: 8 red (the slide no longer centres).
+//
+// CONTROLS FOR THE START (the three "middle slide" specs, 2026-11-05):
+//   - `scroll-initial-target: nearest` removed: the controller-blocked spec red.
+//   - the controller's openAtStart() call removed: the no-scroll-initial-target spec red.
+//   - openAtStart's scrollTo given behavior "smooth": the same spec red (837px off
+//     on the first frame).
+//   - the spotlight's default start set to 0: all three red.
 
 const DESKTOP = { width: 1280, height: 900 };
 const PHONE = { width: 390, height: 844 };
@@ -106,7 +113,7 @@ test("the first slide rests at the centre, full size, its neighbours small, fade
   expectSpotlightOn(await restingLooks(page), 0);
   // Every slide is a stop: seven dots, all showing.
   await expect(region(page).locator(".carousel-dot:visible")).toHaveCount(7);
-  await expect(region(page).getByRole("button", { name: "Previous slides" })).toHaveAttribute("aria-disabled", "true");
+  await expect(region(page).getByRole("button", { name: "Previous slide", exact: true })).toHaveAttribute("aria-disabled", "true");
   expect(errors).toEqual([]);
 });
 
@@ -135,7 +142,7 @@ async function arrowsAndKeys(page, path) {
   if (path === "fallback") await page.addStyleTag({ content: FALLBACK });
   const spot = region(page);
 
-  await spot.getByRole("button", { name: "Next slides" }).click();
+  await spot.getByRole("button", { name: "Next slide", exact: true }).click();
   expectSpotlightOn(await restingLooks(page), 1);
   await expect(spot.locator("[role='status']")).toHaveText("Slide 2 of 7");
   await expect(spot.locator(".carousel-dot[aria-current='true']")).toHaveAttribute("data-carousel-index", "1");
@@ -147,11 +154,11 @@ async function arrowsAndKeys(page, path) {
   expectSpotlightOn(await restingLooks(page), 1);
   await page.keyboard.press("End");
   expectSpotlightOn(await restingLooks(page), 6);
-  await expect(spot.getByRole("button", { name: "Next slides" })).toHaveAttribute("aria-disabled", "true");
+  await expect(spot.getByRole("button", { name: "Next slide", exact: true })).toHaveAttribute("aria-disabled", "true");
 
   await spot.getByRole("button", { name: "Go to slide 4" }).click();
   expectSpotlightOn(await restingLooks(page), 3);
-  await spot.getByRole("button", { name: "Previous slides" }).click();
+  await spot.getByRole("button", { name: "Previous slide", exact: true }).click();
   expectSpotlightOn(await restingLooks(page), 2);
 }
 
@@ -188,7 +195,7 @@ test("a phone row centres one slide with its neighbours peeking either side", as
   await open(page, PHONE);
   const all = await restingLooks(page);
   expectSpotlightOn(all, 0);
-  await region(page).getByRole("button", { name: "Next slides" }).click();
+  await region(page).getByRole("button", { name: "Next slide", exact: true }).click();
   const moved = await restingLooks(page);
   expectSpotlightOn(moved, 1);
   const visible = await track(page).evaluate((row) => {
@@ -214,7 +221,7 @@ test("under reduced motion nothing scales or greys: the neighbours are only dimm
   const name = await slides(page).nth(1).locator(".carousel-spotlight-body").evaluate((el) => getComputedStyle(el).animationName);
   expect(name).toBe("none");
 
-  await region(page).getByRole("button", { name: "Next slides" }).click();
+  await region(page).getByRole("button", { name: "Next slide", exact: true }).click();
   // No glide: the next frame already rests on slide two, and its mark has moved.
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   const moved = await looks(page);
@@ -245,6 +252,83 @@ test("dark and glass keep the spotlight and the arrows' glass fill", async ({ pa
     document.documentElement.dataset.surfaceStyle = "glass";
   });
   expectSpotlightOn(await restingLooks(page), 0);
-  const fill = await region(page).getByRole("button", { name: "Next slides" }).evaluate((el) => getComputedStyle(el).backgroundColor);
+  const fill = await region(page).getByRole("button", { name: "Next slide", exact: true }).evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(fill).toMatch(/\/\s*0?\.\d+\)|rgba\(.*,\s*0?\.\d+\)/);
+});
+
+// THE START. "spot-default" takes the spotlight's default start, the middle slide
+// (seven slides: the fourth). Each spec reads where the row is against where the
+// fourth slide centres.
+const defaultRegion = (page) => page.locator("section[data-lab='spot-default']");
+const defaultTrack = (page) => defaultRegion(page).locator(".carousel-track").first();
+const middleCentre = (page) => defaultTrack(page).evaluate((row) => {
+  const s = row.children[3];
+  return s.offsetLeft + s.offsetWidth / 2 - row.clientWidth / 2;
+});
+const centredIndex = (page) => defaultTrack(page).evaluate((row) => {
+  const mid = row.getBoundingClientRect().left + row.clientWidth / 2;
+  const offsets = [...row.children].map((s) => { const b = s.getBoundingClientRect(); return Math.abs(b.left + b.width / 2 - mid); });
+  return offsets.indexOf(Math.min(...offsets));
+});
+
+test("the default spotlight opens on its middle slide, with both arrows on and nothing said", async ({ page }) => {
+  const errors = await open(page);
+  await expect(defaultRegion(page)).toHaveAttribute("data-carousel-ready", "");
+  const left = await settled(defaultTrack(page));
+  expect(Math.abs(left - await middleCentre(page))).toBeLessThan(3);
+  expect(await centredIndex(page)).toBe(3);
+  expect(left, "the row is not at its first slide").toBeGreaterThan(100);
+  const spot = defaultRegion(page);
+  await expect(spot.locator(".carousel-slide[data-current]")).toHaveAttribute("aria-label", "Crew 4");
+  await expect(spot.locator(".carousel-dot[aria-current='true']")).toHaveAttribute("data-carousel-index", "3");
+  await expect(spot.getByRole("button", { name: "Previous slide", exact: true })).toHaveAttribute("aria-disabled", "false");
+  await expect(spot.getByRole("button", { name: "Next slide", exact: true })).toHaveAttribute("aria-disabled", "false");
+  await expect(spot.locator("[role='status']")).toHaveText("");
+  // The start moves the row, not the page.
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  // The first-slide row beside it is untouched by its neighbour's start.
+  expect(await track(page).evaluate((el) => el.scrollLeft)).toBe(0);
+  expect(errors).toEqual([]);
+});
+
+test("the browser opens the row on the middle slide before any script: the controller blocked", async ({ page }) => {
+  await page.setViewportSize(DESKTOP);
+  await blockOffsiteRequests(page);
+  await page.route(/carousel_controller.*\.js/, (route) => route.abort());
+  await page.goto(LAB);
+  await expect(defaultRegion(page)).toHaveAttribute("data-studio-controller-failed", /carousel/);
+  await expect(defaultRegion(page)).not.toHaveAttribute("data-carousel-ready", "");
+  const left = await settled(defaultTrack(page));
+  expect(Math.abs(left - await middleCentre(page))).toBeLessThan(3);
+  expect(await centredIndex(page)).toBe(3);
+});
+
+test("without scroll-initial-target the controller opens the row on the middle slide, with no glide", async ({ page }) => {
+  await page.setViewportSize(DESKTOP);
+  await blockOffsiteRequests(page);
+  // Take the browser's own start away before the first layout, and record the row
+  // one frame after the controller marks it ready: a glide would still be near 0.
+  await page.route(/\/tailwind\.css/, async (route) => {
+    const response = await route.fetch();
+    const body = `${await response.text()}\n[data-carousel-start-slide] { scroll-initial-target: none !important; }`;
+    await route.fulfill({ response, body });
+  });
+  await page.addInitScript(() => {
+    window.__firstLeft = null;
+    new MutationObserver((_, observer) => {
+      const region = document.querySelector("section[data-lab='spot-default'][data-carousel-ready]");
+      if (!region) return;
+      observer.disconnect();
+      requestAnimationFrame(() => { window.__firstLeft = region.querySelector(".carousel-track").scrollLeft; });
+    }).observe(document, { subtree: true, attributes: true, attributeFilter: ["data-carousel-ready"] });
+  });
+  await page.goto(LAB);
+  await expect(defaultRegion(page)).toHaveAttribute("data-carousel-ready", "");
+  await expect.poll(() => page.evaluate(() => typeof window.__firstLeft)).toBe("number");
+  // The override reached the page: the browser's own start is off.
+  expect(await defaultTrack(page).locator("[data-carousel-start-slide]").evaluate((el) => getComputedStyle(el).scrollInitialTarget)).toBe("none");
+  const centre = await middleCentre(page);
+  expect(Math.abs(await page.evaluate(() => window.__firstLeft) - centre), "the first frame already rests there").toBeLessThan(3);
+  expect(await centredIndex(page)).toBe(3);
+  await expect(defaultRegion(page).locator("[role='status']")).toHaveText("");
 });

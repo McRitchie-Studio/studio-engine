@@ -19,6 +19,11 @@
         locals: { label: "Pair", items: %w[Left Right], per_view: 3, data: { lab: "pair" } } do |word| %>
     <div class="card h-full p-5 text-body"><%= word %></div>
   <% end %>
+  <%= render layout: "studio/carousel",
+        locals: { label: "Captioned", items: %w[One Two Three Four Five], per_view: 3,
+                  caption: ->(word) { "Caption #{word}" }, data: { lab: "captioned" } } do |word| %>
+    <div class="card h-full p-5 text-body"><%= word %></div>
+  <% end %>
   <%# Widgets that own the arrow keys, and a carousel nested in a slide: a key
       pressed in any of them is theirs, so this row never moves for it. %>
   <%= render layout: "studio/carousel",
