@@ -20,7 +20,7 @@ require "nokogiri"
 class StyleGuideAnchorsRenderTest < ActiveSupport::TestCase
   ANCHORS = %w[
     modals-auth modals-profile modals-profile-leveling modals-web3
-    modals-contest-entry modals-system-status modals-templates modals-rewards
+    modals-contest-entry modals-system-status modals-templates modals-agent-chat modals-rewards
   ].freeze
 
   def doc
