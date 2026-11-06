@@ -1,0 +1,37 @@
+<%# locals: (kind:, count:, lines:, label:, html: {}) %>
+<%#
+  A skeleton (Studio::LoaderHelper#studio_skeleton, docs/LOADER.md): grey shapes
+  of the content to come. The wrapper is aria-busy, so assistive tech knows the
+  region is not ready; each item is aria-hidden, since a shape means nothing
+  read aloud. One line of screen-reader text names the wait. The shimmer is
+  engine-motion.css ("Loader family"), and stops under reduced motion.
+%>
+<%
+  extra = html.dup
+  data = (extra.delete(:data) || {}).merge(skeleton: kind.to_s)
+  classes = [ "studio-skeleton", extra.delete(:class) ].compact.join(" ")
+  draw_lines = lambda do |total|
+    safe_join(Array.new(total) { |i| tag.span(class: "studio-skeleton-bone", data: { bone: "line" }, style: "--studio-skeleton-width: #{studio_skeleton_width(i, total)}") })
+  end
+%>
+<%= tag.div(class: classes, aria: { busy: "true" }, data: data, **extra) do %>
+  <% if label.present? %><span class="sr-only"><%= label %></span><% end %>
+  <% count.times do %>
+    <div class="studio-skeleton-item" data-skeleton-kind="<%= kind %>" aria-hidden="true">
+      <% case kind %>
+      <% when :avatar %>
+        <span class="studio-skeleton-bone" data-bone="avatar"></span>
+        <span class="studio-skeleton-lines"><%= draw_lines.call([ lines, 1 ].max) %></span>
+      <% when :card %>
+        <span class="studio-skeleton-bone" data-bone="media"></span>
+        <span class="studio-skeleton-bone" data-bone="title"></span>
+        <%= draw_lines.call(lines) %>
+      <% when :media %>
+        <span class="studio-skeleton-bone" data-bone="media"></span>
+        <%= draw_lines.call(lines) %>
+      <% else %>
+        <%= draw_lines.call([ lines, 1 ].max) %>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

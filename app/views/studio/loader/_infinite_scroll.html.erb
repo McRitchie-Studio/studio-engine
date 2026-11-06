@@ -1,0 +1,42 @@
+<%# locals: (id:, page:, next_url:, more_label:, end_label:, announce:, items:, html: {}) %>
+<%#
+  Infinite scroll (Studio::LoaderHelper#studio_infinite_scroll, docs/LOADER.md).
+  Every page renders this whole wrapper, so a page opened with no script is a
+  complete page. Page 2 and later put their items in the frame the page before
+  left for them; Turbo lifts just that frame out of the response, and the frame
+  takes no box (display: contents), so the items join the list in place.
+
+  The next page's frame holds an ordinary link. A click loads the frame; with no
+  script it opens the page. studio/infinite_scroll clicks it early, as the frame
+  nears the viewport, and says on the status line how many items came.
+%>
+<%
+  extra = html.dup
+  data = (extra.delete(:data) || {}).merge(studio_controller: "infinite-scroll",
+                                           infinite_scroll_announce: announce,
+                                           infinite_scroll_end: end_label)
+  classes = [ "studio-infinite-scroll", extra.delete(:class) ].compact.join(" ")
+  body = capture do
+    concat items
+    if next_url
+      concat(content_tag("turbo-frame", id: studio_infinite_scroll_frame_id(id, page + 1),
+                         class: "studio-infinite-scroll-next", data: { infinite_scroll_next: "" }) do
+        tag.div(class: "studio-infinite-scroll-more") do
+          link_to(next_url, class: "btn btn-secondary", data: { infinite_scroll_more: "" }) do
+            safe_join([ tag.span(more_label), studio_loader_pending(style: :spinner, size: 16, class: "ml-2") ])
+          end
+        end
+      end)
+    elsif end_label.present?
+      concat tag.p(end_label, class: "studio-infinite-scroll-end", data: { infinite_scroll_done: "" })
+    end
+  end
+%>
+<%= tag.div(id: id, class: classes, data: data, **extra) do %>
+  <% if page > 1 %>
+    <%= content_tag("turbo-frame", body, id: studio_infinite_scroll_frame_id(id, page)) %>
+  <% else %>
+    <%= body %>
+  <% end %>
+  <p class="sr-only" role="status" aria-live="polite" data-infinite-scroll-status></p>
+<% end %>
