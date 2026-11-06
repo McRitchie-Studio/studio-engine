@@ -16,7 +16,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   writes no ErrorLog row. A POST with no `user` params gets the form too, not a
   `ParameterMissing`. Any other raise is logged once and goes to the catch-all. The rescue no
   longer names the unsaved user as its target: ErrorLog's `belongs_to` autosaved it, which ran the
-  failing save again inside the logger and lost the row.
+  failing save again inside the logger. That second raise skipped the logged mark, so the
+  catch-all wrote the same failure twice.
 
 ## 0.130.0 — 2026-11-05
 

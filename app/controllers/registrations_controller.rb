@@ -54,7 +54,8 @@ class RegistrationsController < ApplicationController
   #
   # No `target:` here. The user is unsaved when the raise lands, and ErrorLog's
   # belongs_to would autosave it while writing the row: the same failing write a
-  # second time, inside the logger, masking the error it exists to record.
+  # second time, inside the logger. That raise escapes before @_error_logged is
+  # set, so the catch-all logs the same failure again: two rows for one error.
   def create_with_password
     @user = User.new(user_params)
     rescue_and_log do
