@@ -323,8 +323,10 @@ class StylePageTest < ActiveSupport::TestCase
 
     group = doc.at_css("section#tricks section#site-footer")
     refute_nil group, "the group must sit inside the Tricks section, under its own anchor"
-    assert_equal %w[studio_site_footer studio_booking_link studio_booking_frame config.booking_crop],
-                 group.css("article code[x-ref='klass']").map { |code| code.text.strip }
+    assert_equal ["Site Footer", "Booking Link", "Booking Frame"],
+                 group.css("article [data-trick-name]").map { |name| name.text.strip }
+    assert_equal %w[studio_site_footer studio_booking_link studio_booking_frame],
+                 group.css("article [data-trick-token]").map { |code| code.text.strip.split.first }
     assert_match(/footer\s+default \(not declared\).*booking\s+off.*booking page\s+not drawn/m,
                  group.at_css("[data-site-footer-status]").text)
 
@@ -335,7 +337,7 @@ class StylePageTest < ActiveSupport::TestCase
     refute_nil preview, "the preview must be the real footer partial"
     assert preview.at_css("[data-footer-map][data-lat]"), "the sample carries an address, so it shows the map"
     assert preview.at_css("span[aria-disabled='true']"), "and a disabled label"
-    assert_equal 3, group.css("article[aria-disabled='true']").size, "all three booking specimens are flagged off"
+    assert_equal 2, group.css("article[aria-disabled='true']").size, "both booking specimens are flagged off"
     assert_nil doc.at_css("dialog[data-booking-dialog]"), "no booking_url, so no popup"
 
     Studio.site_footer = false
@@ -397,8 +399,17 @@ class StylePageTest < ActiveSupport::TestCase
 
     assert_operator group.css(".studio-loader[data-loader-style='#{Studio.loader[:style].to_s.tr('_', '-')}']").size, :>=, 3,
       "this app's loader at three sizes"
-    assert group.at_css("button[aria-busy='true'] .studio-loader[data-loader-pending]"), "a busy pending button"
-    assert group.at_css("[data-test='style-show-loader-overlay']"), "the overlay trigger"
+    # Its busy button and overlay are the Loaders section's Busy Button and Overlay,
+    # so they are named once, there.
+    assert_nil group.at_css("[data-loader-pending], [data-test='style-show-loader-overlay']"),
+      "no second busy button or overlay trigger under another name"
+    loaders = doc.at_css("section#loaders")
+    assert loaders.at_css("[data-trick='busy_button'] button[aria-busy='true'] .studio-loader[data-loader-pending]"),
+      "a busy pending button"
+    assert loaders.at_css("[data-trick='overlay'] [data-test='style-loaders-overlay']"), "the overlay trigger"
+    assert_equal Studio::Loader::STYLES.map(&:to_s),
+                 group.css("article[data-trick='loader'][data-trick-variant]").map { |a| a["data-trick-variant"] },
+      "one card per style, each named Loader · <style>"
     %w[breathe liquid orbit steel].each do |style|
       assert group.at_css(".studio-loader[data-loader-style='#{style}']"), "the #{style} specimen"
     end
@@ -462,28 +473,32 @@ class StylePageTest < ActiveSupport::TestCase
     group = doc.at_css("section#button-tricks")
     refute_nil group
 
-    # In the owner's order. Each entry: what the stage must hold.
+    # In the owner's order, one card per trick, its variants on the same stage. Each
+    # entry: the name, the token, and what the stage must hold.
     expected = [
-      [".edge-rotate-glow", "button.btn.edge-rotate-glow"],
-      [".studio-border-glow", "button.btn.studio-border-glow"],
-      [".studio-border-glow--clear", "button.btn.studio-border-glow.studio-border-glow--clear:not(.btn-primary)"],
-      [".sheen", "button.btn.sheen"],
-      [".pulse-cta", "button.btn.pulse-cta"],
-      [".fizz-stack", ".fizz-stack > button.btn"],
-      [".hold-btn", "button.hold-btn"],
-      [".hold-btn", "button.hold-btn"],
-      ["window.studioConfetti.burst", "button.btn[x-data]"],
-      ["window.studioConfetti.cannons", "button.btn[x-data]"]
+      ["Edge Glow", ".edge-rotate-glow", ["button.btn.edge-rotate-glow[style*='--edge-rotate-glow-color-b']"]],
+      ["Border Glow", ".studio-border-glow",
+       ["button.btn.btn-primary.studio-border-glow",
+        "button.btn.studio-border-glow.studio-border-glow--clear:not(.btn-primary)"]],
+      ["Sheen", ".sheen", ["button.btn.sheen:not(.sheen--loop)", "button.btn.sheen.sheen--loop"]],
+      ["Pulse", ".pulse-cta", ["button.btn.pulse-cta"]],
+      ["Fizz", "studio/fizz", [".fizz-stack > button.btn"]],
+      ["Hold", "studio/hold_button",
+       ["button.hold-btn[data-hold-id='style-hold']", "[style*='--hold-success-to'] button.hold-btn"]],
+      ["Burst", "window.studioConfetti.burst",
+       ["button.btn.btn-primary[x-data]", "button.btn.btn-success[x-data]"]]
     ]
     cards = group.css("article")
-    assert_equal expected.size, cards.size
-    expected.zip(cards).each do |(name, stage), card|
-      assert_includes card.at_css("code[x-ref=klass]").text, name
-      assert card.at_css(stage), "#{name}: expected #{stage} on the stage"
-      note = card.at_css("p.text-body").text
+    assert_equal expected.map(&:first), cards.map { |card| card.at_css("[data-trick-name]").text.strip }
+    expected.zip(cards).each do |(name, token, stages), card|
+      assert_includes card.at_css("[data-trick-token]").text, token
+      stages.each { |stage| assert card.at_css(stage), "#{name}: expected #{stage} on the stage" }
+      note = card.at_css("[data-trick-note]").text
       assert_operator note.split.size, :<=, 12, "one short sentence: #{note.inspect}"
-      assert card.at_css("code[x-ref=snippet]"), "#{name} shows copyable code"
-      assert_equal 1, card.css("button[aria-label^='Copy']").size, "#{name}: one Copy per card, the snippet's"
+      assert_nil card.at_css("pre"), "#{name}: no markup snippet"
+      copies = card.css("button[aria-label^='Copy']")
+      assert_equal 1, copies.size, "#{name}: one Copy per card"
+      assert copies.first["data-trick-copy"].start_with?("#{name} — "), "#{name}: Copy carries the agent line"
     end
 
     # Colored, not a plain .btn: the lit style reads a role class, and it skips any
@@ -496,7 +511,7 @@ class StylePageTest < ActiveSupport::TestCase
     ["Fire / Flying", "You joined a contest", "Change Username", "Level 5"].each do |game|
       refute_includes text, game, "no game wording in the button tricks"
     end
-    assert_includes group.at_css("code[x-ref=klass]").text, "edge-rotate-glow"
+    assert_includes group.at_css("[data-trick-token]").text, "edge-rotate-glow"
     assert_nil doc.at_css("section#tricks button.studio-team-glow"), "the board teaches the new name"
   end
 
@@ -508,8 +523,9 @@ class StylePageTest < ActiveSupport::TestCase
     assert stack.at_css("> .fizz-layer-extra"), "lively by default, with its hover layer"
     assert_nil stack.at_css(".hold-fizz, .hold-btn, .hold-stack"), "and nothing hold-named"
     assert doc.at_css(".fizz-stack[style*='--fizz-c-1:']"), "a specimen shows the palette"
-    snippet = doc.css("code[x-ref=snippet]").map(&:text).find { |t| t.include?("studio/fizz") }
-    assert_includes snippet, "<button class=\"btn btn-primary\">", "the code wraps a button"
+    card = doc.at_css("article[data-trick='fizz']")
+    assert_includes card.at_css("[data-trick-copy]")["data-trick-copy"], "studio/fizz\" around the button",
+      "the agent line says the partial wraps a button"
   end
 
   # The groups this board writes itself; Glass, Scrims and Site footer are partials
@@ -1066,22 +1082,22 @@ class StylePageTest < ActiveSupport::TestCase
     end
   end
 
-  # ...and the specimen must TEACH what it stages: the snippet beside it is
-  # copy-paste fuel for an agent, so it has to show the shape that rings AND the
-  # second color knob, which is the whole reason a two-type caller reaches for it.
-  test "the selection-glow snippet teaches the card shape and the second color" do
+  # ...and the card must TEACH what it stages. The markup snippet is gone (an agent
+  # reads markup from the engine), so the NAME carries it: the agent line names the
+  # second color knob, which is the whole reason a two-type caller reaches for it,
+  # and the stage shows the card shape (glow class and filled button on one element).
+  test "the Edge Glow card names the second color and stages the card shape" do
     doc = Nokogiri::HTML.fragment(render_index)
+    card = doc.at_css("article[data-trick='edge_glow']")
+    refute_nil card, "the Edge Glow card"
 
-    snippet = doc.css("code[x-ref=snippet]").map(&:text).find { |t| t.include?("edge-rotate-glow") }
-    refute_nil snippet, "the selection-glow specimen must ship a copyable usage snippet"
-
-    host_lines = snippet.lines.select { |l| l.include?("edge-rotate-glow") }
-    assert host_lines.any? { |l| l.match?(/\bbtn-/) },
-      "the recipe must show the glow class and a filled button on the SAME element — the " \
-      "card shape. Saw: #{host_lines.join.strip.inspect}"
-    assert_includes snippet, "--edge-rotate-glow-color-b",
-      "the recipe must show the second wedge's color knob, or a two-color caller has " \
+    line = card.at_css("[data-trick-copy]")["data-trick-copy"]
+    assert_includes line, "Edge Glow — .edge-rotate-glow"
+    assert_includes line, "Edge Glow · two-color — --edge-rotate-glow-color / --edge-rotate-glow-color-b",
+      "the agent line must name the second wedge's color knob, or a two-color caller has " \
       "no way to discover it"
+    assert card.css(".edge-rotate-glow").all? { |host| host["class"].match?(/\bbtn-/) },
+      "the glow class and a filled button on the SAME element: the card shape"
   end
 
   # PROFILE — crop / upload ACTUALLY open: cropper_assets is rendered on the
