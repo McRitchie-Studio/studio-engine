@@ -19,8 +19,8 @@
 // slide is a stop, an arrow moves one slide, and the slide nearest the centre
 // carries data-current, which the CSS styles where scroll-driven animations are
 // missing and under reduced motion.
-import { Controller } from "@hotwired/stimulus"
 import { centerStops } from "studio/carousel"
+import { Controller } from "@hotwired/stimulus"
 import { currentStop, hiddenEnds, keyAction, perPage, positionText, stops, targetStop } from "studio/carousel"
 
 // Keys inside these belong to the field, not the row.
