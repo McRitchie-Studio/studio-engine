@@ -6,7 +6,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/infinite_scroll.js", import.meta.url), "utf8")
-const { announcement, newItems, waitingFrame, loadNext, sentinelOf, NEXT, MORE, NEAR_PX } =
+const { announcement, newItems, waitingFrame, loadNext, sentinelOf, watchInfiniteScroll, NEXT, MORE, NEAR_PX } =
   await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 function el(matches = [], attrs = {}, children = [], query = {}) {
@@ -58,4 +58,39 @@ test("the observer watches the button's row, since the frame takes no box", () =
   assert.equal(sentinelOf(el([], {}, [], { ".studio-infinite-scroll-more": row, [MORE]: link })), row)
   assert.equal(sentinelOf(el([], {}, [], { [MORE]: link })), link)
   assert.ok(NEAR_PX >= 300, "the next page starts well before the end shows")
+})
+
+test("a Tab onto Load more that the observer loads still moves focus to the first new item", () => {
+  const link = el([], { href: "/posts?page=2" })
+  const row = el()
+  const frame = el([NEXT], {}, [], { [MORE]: link, ".studio-infinite-scroll-more": row })
+  frame.contains = (node) => node === link
+  row.closest = (s) => (s === NEXT ? frame : null)
+  let seen = null
+  class FakeObserver {
+    constructor(cb) { seen = cb }
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  const listeners = {}
+  const root = {
+    addEventListener: (type, fn) => { listeners[type] = fn },
+    removeEventListener: () => {},
+    querySelectorAll: () => [frame],
+    querySelector: () => null,
+    getAttribute: () => null,
+    contains: () => true
+  }
+  const win = { IntersectionObserver: FakeObserver, document: { activeElement: link } }
+  watchInfiniteScroll(root, win)
+  seen([{ isIntersecting: true, target: row }])
+  assert.equal(frame.attrs.src, "/posts?page=2")
+  let focused = false
+  const first = el()
+  first.focus = () => { focused = true }
+  frame.children = [first]
+  frame.querySelector = () => null
+  listeners["turbo:frame-load"]({ target: frame })
+  assert.ok(focused, "the keyboard user's focus lands on the first new item, not BODY")
 })

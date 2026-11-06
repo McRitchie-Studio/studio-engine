@@ -99,8 +99,12 @@ export function watchInfiniteScroll(root, win) {
       entries.forEach((entry) => {
         if (!entry.isIntersecting) return
         watcher.unobserve(entry.target)
-        byKeyboard = false
-        loadNext(entry.target.closest(NEXT))
+        const frame = entry.target.closest(NEXT)
+        // A Tab onto "Load more" scrolls it into view, so the observer loads the
+        // page before any click: focus inside the frame is that keyboard user.
+        const active = win.document && win.document.activeElement
+        byKeyboard = !!(frame && active && frame.contains(active))
+        loadNext(frame)
       })
     }, { rootMargin: `0px 0px ${NEAR_PX}px 0px` })
   }
