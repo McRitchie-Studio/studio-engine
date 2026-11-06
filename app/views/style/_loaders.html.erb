@@ -12,7 +12,10 @@
      another. Pull to refresh is drawn still: it arms only on a phone with touch,
      at the top of a page. %>
 <%
-  feed_path = local_assigns[:feed_path] || admin_style_loaders_feed_path
+  # A view rendered without the app's routes (a test's bare ActionView) gets the
+  # path Studio.routes draws.
+  feed_path = local_assigns[:feed_path] ||
+              (respond_to?(:admin_style_loaders_feed_path) ? admin_style_loaders_feed_path : "/admin/style/loaders_feed")
   erb = ->(code) { "<" + "%= " + code + " %" + ">" }
   erb_end = "<" + "% end %" + ">"
 %>

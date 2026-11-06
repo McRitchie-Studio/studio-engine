@@ -20,7 +20,7 @@ class LoaderLabController < ActionController::Base
 
   def loaders_feed
     sleep(params[:ms].to_i.clamp(0, 2000) / 1000.0)
-    @page = params[:page].to_i.clamp(1, StyleController::LOADERS_FEED_PAGES)
+    @page = params[:page].to_i.clamp(1, Studio::Loader::DEMO_FEED_PAGES)
     render(:loaders_feed, layout: lab_layout)
   end
 

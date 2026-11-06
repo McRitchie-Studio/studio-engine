@@ -4,8 +4,8 @@
     the rest (StyleController#loaders_feed), and Turbo lifts each one into the
     frame the page before left for it. %>
 <%
-  pages = StyleController::LOADERS_FEED_PAGES
-  per_page = StyleController::LOADERS_FEED_PER_PAGE
+  pages = Studio::Loader::DEMO_FEED_PAGES
+  per_page = Studio::Loader::DEMO_FEED_PER_PAGE
   next_url = page < pages ? "#{feed_path}?page=#{page + 1}" : nil
 %>
 <%= studio_infinite_scroll id: "style-loaders-feed", page: page, next_url: next_url,

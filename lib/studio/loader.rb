@@ -50,6 +50,12 @@ module Studio
     # 96px, a spinner beside text, dots in a line, and a bar across its parent.
     DEFAULT_SIZES = { spinner: 20, dots: 32, bar: "100%" }.freeze
     DEFAULT_SIZE = 96
+    # The style guide's live infinite-scroll specimen: a demo feed of this many
+    # pages of this many items (style/_loaders_feed_page). Here, not on
+    # StyleController, so a view can read them without loading a controller that
+    # needs the host's ApplicationController.
+    DEMO_FEED_PAGES = 3
+    DEMO_FEED_PER_PAGE = 4
     DEFAULT_STYLE = :breathe
     KEYS = %i[style icon art].freeze
 
