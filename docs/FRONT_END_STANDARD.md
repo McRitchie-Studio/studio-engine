@@ -15,7 +15,8 @@ own, holds no script, and picks no colour.
 
 An admin page's title is `studio/_page_header`, so its pinned chrome is one
 stack: navbar, page row, table header, each below the last
-([`PAGE_HEADER.md`](PAGE_HEADER.md)).
+([`PAGE_HEADER.md`](PAGE_HEADER.md)). Its crumb trail comes from the app's one
+parent map (`Studio.crumbs`), never from links typed per page.
 
 ## Components
 

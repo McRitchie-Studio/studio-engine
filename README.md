@@ -290,9 +290,18 @@ actions; the engine supplies only the banner.
 
 ### The page header — `studio/_page_header`
 
-An admin page's title: a plain header at rest, a bar once stuck under the navbar,
-in the pinned stack so a table's sticky header sits under it
+An admin page's title: a crumb trail from the app's one parent map (`Studio.crumbs`,
+`studio_crumbs`) above an h2-size title, tabs with a gliding pill and one action on the right,
+and the page's other links on a line under it. A plain header at rest, a bar once stuck under
+the navbar, in the pinned stack so a table's sticky header sits under it
 ([`docs/PAGE_HEADER.md`](docs/PAGE_HEADER.md)).
+
+```erb
+<%= render "studio/page_header", title: "Deployments", crumbs: studio_crumbs(:deployments),
+      label: "Views", tabs: [{ label: "Board", href: deployments_path, current: "page" }],
+      actions_html: link_to("New Task", new_task_path, class: "btn btn-sm btn-primary"),
+      links: [{ label: "Epics", href: epics_path }] %>
+```
 
 ### The section header — `studio/_section_header`
 
