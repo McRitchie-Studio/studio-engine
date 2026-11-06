@@ -93,7 +93,10 @@ test("a modified click follows the link", async ({ page, context }) => {
     context.waitForEvent("page"),
     page.locator('[data-test="talk-pro"]').click({ modifiers: [process.platform === "darwin" ? "Meta" : "Control"] })
   ]);
-  await opened.waitForLoadState();
+  // A new tab is born at about:blank, and its "load" can be that blank page's,
+  // before the link's navigation commits (CI under load read "blank" here). Wait
+  // for the URL itself.
+  await opened.waitForURL((url) => url.pathname === "/agent_chat_lab");
   expect(new URL(opened.url()).pathname).toBe("/agent_chat_lab");
   await expect(page.locator('[data-test="talk-to-agent-panel"]')).toHaveCount(0);
 });
