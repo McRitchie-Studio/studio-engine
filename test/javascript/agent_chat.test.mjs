@@ -9,7 +9,8 @@ const source = readFileSync(new URL("../../app/javascript/studio/agent_chat.js",
 const {
   settled, mergeTurns, turnKey, afterCursor, pollDelay, typingPhase, isFollowing, csrfToken, turnsUrl, mountAgentChat, coveredPx,
   REVEAL_GAP_PX, RECORDER_STATE_EVENT, EXPIRED_MESSAGE, POLL_MS, SLOW_MS, SLOW_AFTER_MS, IDLE_MS, OFFLINE_MS, LIMIT, REFRESH_EVENT, SENT_EVENT,
-  revealPlan, openerStorageKey, OPENER_STORAGE_PREFIX, REVEAL_MIN_MS, REVEAL_MAX_MS, REVEAL_CPS
+  revealPlan, openerStorageKey, OPENER_STORAGE_PREFIX, REVEAL_MIN_MS, REVEAL_MAX_MS, REVEAL_CPS,
+  markdownInline, markdownBlocks, renderMarkdown, safeHref
 } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 const turn = (id, status = "answered", role = "user") => ({ id, role, status, text: `t${id}` })
@@ -629,4 +630,202 @@ test("a closed chat stops: destroy clears its poll and any answer still typing",
   assert.equal(t.chat.state.typing.size, 0)
   assert.equal(t.chat.state.alive, false)
   assert.equal(t.log["aria-busy"], undefined)
+})
+
+// ---- the opener races (Carl's review of talk-to-agent-modal) ---------------------
+
+// An opener page whose GET (the thread load) and POSTs wait for the test.
+function racePage() {
+  const setup = openerPage(null)
+  const loads = []
+  const posts = []
+  setup.fetcher = (url, init) => new Promise((resolve) => {
+    if (init && init.method === "POST") {
+      const body = JSON.parse(init.body)
+      posts.push({ body, answer: (id) => resolve({ status: 201, json: async () => ({ turn: { ...turn(id, "pending"), text: body.text } }) }) })
+    } else {
+      loads.push({ answer: (turns = []) => resolve({ ok: true, json: async () => ({ turns, pending: false }) }) })
+    }
+  })
+  return { ...setup, loads, posts }
+}
+
+// CONTROL: restore the old order (mark the store, then post(), which returns at
+// once while the visitor's send is in flight) and this fails: the posts are only
+// the visitor's words, and the store says the opener went.
+test("race 1: the visitor sends before the thread loads; the opener still goes, first, once", async () => {
+  const storage = memoryStorage()
+  const r = racePage()
+  const chat = mountOpener(r, storage)
+  r.input.value = "how much is it?"
+  const sending = chat.submit()
+  await flush()
+  assert.deepEqual(r.posts.map((p) => p.body.text), ["Tell me about Pro."], "the opener goes ahead of the visitor's words")
+  r.loads[0].answer([])
+  await flush()
+  assert.equal(r.posts.length, 1, "the load does not send the opener again")
+  r.posts[0].answer(5)
+  await flush()
+  assert.deepEqual(r.posts.map((p) => p.body.text), ["Tell me about Pro.", "how much is it?"])
+  r.posts[1].answer(6)
+  await sending
+  await flush()
+  assert.equal(r.posts.length, 2, "never twice")
+  assert.equal(r.input.value, "", "the visitor's words went")
+  assert.equal(storage.items.size, 1, "remembered: it was posted")
+})
+
+// CONTROL: restore `if (!text || state.sending) return` with no wait for the
+// opener and this fails: the visitor's words are never posted.
+test("race 2: the visitor sends while the load's opener is in flight; both go, in order, once each", async () => {
+  const storage = memoryStorage()
+  const r = racePage()
+  const chat = mountOpener(r, storage)
+  r.loads[0].answer([])
+  await flush()
+  assert.deepEqual(r.posts.map((p) => p.body.text), ["Tell me about Pro."])
+  r.input.value = "and Team?"
+  const sending = chat.submit()
+  await flush()
+  assert.equal(r.posts.length, 1, "the visitor's words wait for the opener")
+  r.posts[0].answer(5)
+  await flush()
+  assert.deepEqual(r.posts.map((p) => p.body.text), ["Tell me about Pro.", "and Team?"])
+  r.posts[1].answer(6)
+  await sending
+  chat.sendOpener()
+  await flush()
+  assert.equal(r.posts.length, 2, "a later sendOpener sends nothing")
+})
+
+test("a chat mounted again while the opener is in flight does not send it twice", async () => {
+  const storage = memoryStorage()
+  const r = racePage()
+  mountOpener(r, storage)
+  r.loads[0].answer([])
+  await flush()
+  assert.equal(r.posts.length, 1)
+  const again = racePage()
+  mountOpener(again, storage)
+  again.loads[0].answer([])
+  await flush()
+  assert.equal(again.posts.length, 0)
+})
+
+// ---- Markdown in agent turns -------------------------------------------------------
+
+test("markdownInline: bold, italics, code and http(s) links; anything else is text", () => {
+  assert.deepEqual(markdownInline("a **b** c"), [{ text: "a " }, { strong: [{ text: "b" }] }, { text: " c" }])
+  assert.deepEqual(markdownInline("__b__ *i*"), [{ strong: [{ text: "b" }] }, { text: " " }, { em: [{ text: "i" }] }])
+  assert.deepEqual(markdownInline("**a *b* c**"), [{ strong: [{ text: "a " }, { em: [{ text: "b" }] }, { text: " c" }] }])
+  assert.deepEqual(markdownInline("`x<y>`"), [{ code: "x<y>" }])
+  assert.deepEqual(markdownInline("see [Pro](https://alex.build/packages)."), [{ text: "see " }, { link: "Pro", href: "https://alex.build/packages" }, { text: "." }])
+  assert.deepEqual(markdownInline("[x](javascript:alert(1))"), [{ text: "[x](javascript:alert(1))" }])
+  assert.deepEqual(markdownInline("2 * 3 * 4 and snake_case_name"), [{ text: "2 * 3 * 4 and snake_case_name" }])
+})
+
+test("safeHref: http and https only", () => {
+  assert.equal(safeHref("https://a.example/x?y=1"), "https://a.example/x?y=1")
+  assert.equal(safeHref("http://a.example"), "http://a.example")
+  for (const bad of ["javascript:alert(1)", "JaVaScRiPt:alert(1)", "data:text/html,<b>", "vbscript:x", "//evil.example", "/relative", "https://a.example/\"onmouseover=alert(1)", "https://a .example", ""]) {
+    assert.equal(safeHref(bad), null, bad)
+  }
+})
+
+test("markdownBlocks: lists, a dropped quote marker, and kept line breaks", () => {
+  const blocks = markdownBlocks("> Proposal sent.\nLine two\n- one\n- **two**\n1. first\n2. second\nafter")
+  assert.deepEqual(blocks, [
+    { lines: [[{ text: "Proposal sent." }], [{ text: "Line two" }]] },
+    { list: "ul", items: [[{ text: "one" }], [{ strong: [{ text: "two" }] }]] },
+    { list: "ol", items: [[{ text: "first" }], [{ text: "second" }]] },
+    { lines: [[{ text: "after" }]] }
+  ])
+})
+
+// A tiny DOM: elements and text nodes, enough to see what renderMarkdown builds.
+function fakeDocument() {
+  const d = {
+    createTextNode: (text) => ({ nodeType: 3, text, get textContent() { return this.text } }),
+    createElement: (tag) => {
+      const el = {
+        nodeType: 1, tagName: tag.toUpperCase(), children: [], attributes: {}, style: {}, ownerDocument: d,
+        setAttribute(k, v) { this.attributes[k] = String(v) },
+        append(...nodes) { this.children.push(...nodes) },
+        replaceChildren(...nodes) { this.children = nodes },
+        get textContent() { return this.children.map((c) => c.textContent).join("") },
+        set textContent(v) { this.children = [d.createTextNode(String(v))] }
+      }
+      return el
+    }
+  }
+  return d
+}
+const allElements = (el) => el.children.filter((c) => c.nodeType === 1).flatMap((c) => [c, ...allElements(c)])
+
+test("renderMarkdown builds nodes: bold, a list, a safe link", () => {
+  const d = fakeDocument()
+  const el = d.createElement("div")
+  renderMarkdown(el, "**Pro** is $49.\n- one\n- see [docs](https://alex.build/packages)", d)
+  const tags = allElements(el).map((e) => e.tagName)
+  assert.deepEqual(tags, ["STRONG", "UL", "LI", "LI", "A"])
+  const link = allElements(el).find((e) => e.tagName === "A")
+  assert.deepEqual(link.attributes, { href: "https://alex.build/packages", target: "_blank", rel: "noopener noreferrer nofollow" })
+  assert.equal(el.textContent, "Pro is $49.onesee docs", "no break added beside a list")
+})
+
+// CONTROL: drop the safeHref check from markdownInline and this fails: an A with
+// a javascript: href appears. The module test above keeps innerHTML out entirely.
+test("renderMarkdown: an XSS attempt shows as its own characters", () => {
+  const d = fakeDocument()
+  const el = d.createElement("div")
+  const attack = `<img src=x onerror=alert(1)> **<script>alert(2)</script>** [click](javascript:alert(3)) [a](javascript:void0) [b](data:text/html;base64,PHNjcmlwdD4=) [c](https://a.example/"onmouseover=x) \`<b>\``
+  renderMarkdown(el, attack, d)
+  const elements = allElements(el)
+  assert.deepEqual(elements.map((e) => e.tagName), ["STRONG", "CODE"], "no IMG, SCRIPT, A or B element")
+  assert.equal(el.textContent, attack.replace("**<script>alert(2)</script>**", "<script>alert(2)</script>").replace("`<b>`", "<b>"))
+  for (const e of elements) assert.deepEqual(e.attributes, {}, "no attribute but a safe link's")
+})
+
+test("a rendered agent turn shows Markdown; a visitor's turn keeps its asterisks", async () => {
+  const d = fakeDocument()
+  const page = standIn()
+  const nodes = []
+  const log = page.root.querySelector("[data-agent-chat-log]")
+  log.querySelectorAll = () => nodes
+  log.appendChild = (n) => nodes.push(n)
+  const make = () => {
+    const lines = { "[data-agent-chat-text]": d.createElement("div"), "[data-agent-chat-failed]": { hidden: true }, "[data-agent-chat-held]": { hidden: true } }
+    const node = { dataset: {}, lines, querySelector: (s) => lines[s] || null, after(n) { nodes.push(n) } }
+    return node
+  }
+  const template = { content: { firstElementChild: { cloneNode: make } } }
+  const query = page.root.querySelector
+  page.root.querySelector = (s) => (s.startsWith("template") ? template : query(s))
+  const { asks, fetcher } = deferredFetch()
+  mountStandIn(page, fetcher)
+  asks[0].answer([{ id: 1, role: "user", status: "answered", text: "is **Pro** good?" }, { id: 1, role: "agent", status: "answered", text: "> **Yes.**" }])
+  await flush()
+  const [user, agent] = nodes.map((n) => n.lines["[data-agent-chat-text]"])
+  assert.equal(user.textContent, "is **Pro** good?")
+  assert.deepEqual(allElements(user), [])
+  assert.equal(agent.textContent, "Yes.")
+  assert.deepEqual(allElements(agent).map((e) => e.tagName), ["STRONG"])
+})
+
+// CONTROL: let shownWords read an agent element's textContent and this fails:
+// a reply the page printed itself keeps its raw asterisks.
+test("an agent turn the page rendered itself is upgraded to Markdown once", async () => {
+  const d = fakeDocument()
+  const page = standIn()
+  const text = d.createElement("div")
+  text.textContent = "**Yes.**"
+  const lines = { "[data-agent-chat-text]": text, "[data-agent-chat-failed]": { hidden: true }, "[data-agent-chat-held]": { hidden: true } }
+  const node = { dataset: { turnKey: "1:agent" }, querySelector: (s) => lines[s] || null, after() {} }
+  page.root.querySelector("[data-agent-chat-log]").querySelectorAll = () => [node]
+  const { asks, fetcher } = deferredFetch()
+  mountStandIn(page, fetcher)
+  asks[0].answer([{ id: 1, role: "agent", status: "answered", text: "**Yes.**" }])
+  await flush()
+  assert.deepEqual(allElements(text).map((e) => e.tagName), ["STRONG"])
+  assert.equal(text.textContent, "Yes.")
 })
