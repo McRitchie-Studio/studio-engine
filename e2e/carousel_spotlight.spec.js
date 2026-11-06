@@ -11,12 +11,11 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 // the controller's data-current with a transition, is read in the same browser with
 // the animation switched off by a test stylesheet, so both paths are asserted.
 //
-// CONTROLS, each run against this file with the lab server restarted:
-//   - the spotlight's `animation-timeline` line removed from engine.css: the
-//     scroll-driven spec red (every slide reads full size, scale 1).
-//   - the controller's data-current toggle removed: the arrow, key, scroll and
-//     reduced-motion specs red (no slide is marked, or the mark stays on slide 1).
-//   - `scroll-snap-align: center` back to start: the centring spec red.
+// CONTROLS, each run against this file with the lab server restarted (2026-11-05):
+//   - the spotlight's `animation-timeline` line removed from engine.css: 6 red, every
+//     scroll-driven spec (the slides lose the neighbour look, scale 1).
+//   - the controller's data-current toggle removed: 8 red (no slide is marked).
+//   - `scroll-snap-align: center` back to start: 8 red (the slide no longer centres).
 
 const DESKTOP = { width: 1280, height: 900 };
 const PHONE = { width: 390, height: 844 };

@@ -26,6 +26,16 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `createElement` and text nodes, never HTML; any other markup, and any link that is not
   http or https, shows as its own characters. A visitor's words stay plain text. Detail:
   `docs/AGENT_CHAT.md`, "The page's script".
+- **A spotlight style for the carousel: `studio/_carousel`, `style: :spotlight`.** The
+  same carousel, arrows, dots and keys, but each slide snaps to the centre. The centred
+  slide is full size and colour, with an optional `caption:` line under it (a callable on
+  the item); its neighbours are smaller (0.75), faded and grey, and the next ones peek at
+  the edges. An arrow or key moves one slide, and every slide gets a dot. Where the browser
+  has scroll-driven animations (`animation-timeline: view()`), each slide's own view
+  timeline drives the look, so it follows the finger; elsewhere the controller marks the
+  centred slide `data-current` and CSS transitions it. Reduced motion scales and greys
+  nothing: the neighbours are only dimmed. An unknown `style:` raises. Specimen on
+  `/admin/style`, Tricks.
 - **Talk to an agent in a modal: `studio/agent_chat/_talk_modal`.** Render it once on a page,
   then mark any link with `studio_talk_to_agent_link(label, href:, soul:, topic:, opener:)`. A
   click opens the shared agent chat in a card on the page-scoped modal host and sends the
