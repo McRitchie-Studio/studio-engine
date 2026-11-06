@@ -25,14 +25,33 @@
 // scroll-initial-target (engine.css); elsewhere connect() jumps there, with no glide
 // and nothing in the status line. A row already moved (the browser's own start, a
 // restored scroll, a #fragment inside it) is left where it is.
+//
+// A LOOPING row (loop:, data-carousel-loop) wraps: Next at the last stop goes back
+// to the first, Previous at the first to the last, and neither arrow is ever
+// aria-disabled. There are no cloned slides, so a screen reader reads each once:
+// the row glides back across itself.
+//
+// AUTOPLAY (autoplay: seconds, data-carousel-autoplay) moves the row one stop each
+// interval. It holds still while the pointer is over the slides, while keyboard focus
+// is in it, while the tab is hidden or the row is off screen, and after a swipe,
+// wheel, arrow, dot or key until the reader has left it alone a while (idleDelay).
+// The pause button (WCAG 2.2.2) stops it until pressed again; under reduced motion
+// the row starts stopped. A move by autoplay writes nothing to the status line
+// (APG: a rotating carousel does not announce). Without loop it stops at the end.
 import { Controller } from "@hotwired/stimulus"
-import { TOLERANCE, centerStops, currentStop, hiddenEnds, keyAction, ownsKey, perPage, positionText, startStop, stops, targetStop } from "studio/carousel"
+import {
+  TOLERANCE, autoplayRunning, autoplaySeconds, autoplayStop, centerStops, currentStop, hiddenEnds, idleDelay,
+  initialReasons, keyAction, ownsKey, perPage, positionText, startStop, stops, targetStop, toggleLabel, withReason
+} from "studio/carousel"
+
+const REDUCE = "(prefers-reduced-motion: reduce)"
 
 export default class extends Controller {
-  static targets = ["track", "slide", "prev", "next", "dot", "status"]
+  static targets = ["track", "slide", "prev", "next", "dot", "status", "toggle"]
 
   connect() {
     this.schedule = this.schedule.bind(this)
+    this.loop = this.element.hasAttribute("data-carousel-loop")
     this.trackTarget.addEventListener("scroll", this.schedule, { passive: true })
     if (typeof ResizeObserver === "function") {
       this.observer = new ResizeObserver(this.schedule)
@@ -41,6 +60,7 @@ export default class extends Controller {
     this.element.setAttribute("data-carousel-ready", "")
     this.openAtStart()
     this.sync()
+    this.startAutoplay()
   }
 
   openAtStart() {
@@ -65,6 +85,112 @@ export default class extends Controller {
     this.observer?.disconnect()
     if (this.frame) cancelAnimationFrame(this.frame)
     this.frame = null
+    this.stopAutoplay()
+  }
+
+  // -- autoplay ---------------------------------------------------------------
+
+  startAutoplay() {
+    this.seconds = autoplaySeconds(this.element.dataset.carouselAutoplay)
+    if (this.seconds === null) return
+
+    this.motion = window.matchMedia?.(REDUCE)
+    this.reasons = initialReasons({ reducedMotion: !!this.motion?.matches, hidden: document.hidden })
+    this.listeners = [
+      [this.trackTarget, "pointerenter", (event) => { if (event.pointerType !== "touch") this.pause("hover", true) }],
+      [this.trackTarget, "pointerleave", (event) => { if (event.pointerType !== "touch") this.pause("hover", false) }],
+      [this.element, "focusin", (event) => this.pause("focus", this.keyboardFocus(event.target))],
+      [this.element, "focusout", (event) => { if (!this.element.contains(event.relatedTarget)) this.pause("focus", false) }],
+      [this.trackTarget, "pointerdown", () => this.interacted()],
+      [this.trackTarget, "wheel", () => this.interacted()],
+      [this.trackTarget, "touchstart", () => this.interacted()],
+      [document, "visibilitychange", () => this.pause("hidden", document.hidden)],
+      [this.motion, "change", (event) => { if (event.matches) this.pause("stopped", true) }]
+    ].filter(([target]) => target?.addEventListener)
+    this.listeners.forEach(([target, type, handler]) => target.addEventListener(type, handler, { passive: true }))
+
+    if (typeof IntersectionObserver === "function") {
+      this.viewport = new IntersectionObserver(([entry]) => this.pause("offscreen", !entry.isIntersecting))
+      this.viewport.observe(this.element)
+    }
+    this.refresh()
+  }
+
+  stopAutoplay() {
+    this.listeners?.forEach(([target, type, handler]) => target.removeEventListener(type, handler))
+    this.listeners = null
+    this.viewport?.disconnect()
+    this.viewport = null
+    clearTimeout(this.timer)
+    clearTimeout(this.idle)
+    this.timer = this.idle = null
+  }
+
+  // Focus by keyboard holds the row; a mouse click that focuses an arrow does not.
+  // The pause button is the exception: a reader who tabs to it and presses Play
+  // means it to play.
+  keyboardFocus(target) {
+    if (this.hasToggleTarget && this.toggleTarget.contains(target)) return false
+    try { return target.matches(":focus-visible") } catch { return true }
+  }
+
+  pause(reason, on) {
+    if (this.seconds === null || !this.reasons) return
+    this.reasons = withReason(this.reasons, reason, on)
+    this.refresh()
+  }
+
+  // A swipe, a wheel, an arrow, a dot or a key: hold still until the reader has
+  // left the row alone for idleDelay.
+  interacted() {
+    if (this.seconds === null || !this.reasons) return
+    clearTimeout(this.idle)
+    this.idle = setTimeout(() => { this.idle = null; this.pause("interaction", false) }, idleDelay(this.seconds))
+    this.pause("interaction", true)
+  }
+
+  // The pause button.
+  toggle() {
+    if (this.seconds === null || !this.reasons) return
+    const stopped = !this.reasons.has("stopped")
+    if (!stopped) {
+      // Play at the end of a row that does not loop starts it again from the first.
+      this.sync()
+      if (!this.loop && autoplayStop(this.current, this.positions.length, false) === null && this.current > 0) {
+        this.scrollToStop(0, { announce: false })
+      }
+    }
+    this.pause("stopped", stopped)
+  }
+
+  refresh() {
+    const running = autoplayRunning(this.seconds, this.reasons)
+    const stopped = this.reasons.has("stopped")
+    this.element.toggleAttribute("data-carousel-playing", running)
+    if (this.hasToggleTarget) {
+      this.toggleTarget.setAttribute("aria-label", toggleLabel(stopped))
+      this.toggleTarget.toggleAttribute("data-carousel-stopped", stopped)
+    }
+    if (!running) {
+      clearTimeout(this.timer)
+      this.timer = null
+    } else if (!this.timer) {
+      this.timer = setTimeout(() => this.tick(), this.seconds * 1000)
+    }
+  }
+
+  tick() {
+    this.timer = null
+    this.sync()
+    const count = this.positions.length
+    const to = autoplayStop(this.current, count, this.loop)
+    if (to === null && count > 1) {
+      // The end of a row that does not loop: autoplay is done until Play.
+      this.pause("stopped", true)
+      return
+    }
+    if (to !== null) this.scrollToStop(to, { announce: false })
+    this.refresh()
   }
 
   schedule() {
@@ -104,8 +230,10 @@ export default class extends Controller {
     this.element.toggleAttribute("data-carousel-static", positions.length < 2)
     track.toggleAttribute("data-fade-start", ends.start)
     track.toggleAttribute("data-fade-end", ends.end)
-    if (this.hasPrevTarget) this.prevTarget.setAttribute("aria-disabled", String(!ends.start))
-    if (this.hasNextTarget) this.nextTarget.setAttribute("aria-disabled", String(!ends.end))
+    // A looping row never disables an arrow: each end leads round to the other.
+    const wraps = this.loop && positions.length > 1
+    if (this.hasPrevTarget) this.prevTarget.setAttribute("aria-disabled", String(!wraps && !ends.start))
+    if (this.hasNextTarget) this.nextTarget.setAttribute("aria-disabled", String(!wraps && !ends.end))
     if (this.element.classList.contains("carousel-spotlight")) {
       this.slideTargets.forEach((slide, index) => slide.toggleAttribute("data-current", index === this.current))
     }
@@ -121,6 +249,7 @@ export default class extends Controller {
   next() { this.move("next") }
 
   goTo(event) {
+    this.interacted()
     this.sync()
     this.scrollToStop(Number(event.currentTarget.dataset.carouselIndex))
   }
@@ -139,20 +268,22 @@ export default class extends Controller {
   // A press that goes nowhere (an arrow at its end, Home at the start) scrolls
   // nothing and says nothing: the status line speaks only when the row moves.
   move(action) {
+    this.interacted()
     this.sync()
-    const to = targetStop(action, this.current, this.page, this.positions.length)
+    const to = targetStop(action, this.current, this.page, this.positions.length, this.loop)
     if (to === this.current) return
     this.scrollToStop(to)
   }
 
-  scrollToStop(index) {
+  // announce: false for autoplay, which moves the row without a word.
+  scrollToStop(index, { announce = true } = {}) {
     const left = this.positions[index]
     if (left === undefined) return
 
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    const reduce = window.matchMedia?.(REDUCE).matches
     this.trackTarget.scrollTo({ left, behavior: reduce ? "auto" : "smooth" })
 
-    if (!this.hasStatusTarget) return
+    if (!announce || !this.hasStatusTarget) return
     const total = this.slideTargets.length
     const last = index === this.positions.length - 1
     const first = last ? Math.max(0, total - this.page) : index
