@@ -13,6 +13,15 @@
     <h4 class="type-h4 text-heading" data-trick-name><%= t.name %></h4>
     <p class="text-sm text-body" data-trick-note><%= t.note %></p>
     <code class="block font-mono text-2xs text-muted break-words" data-trick-token><%= t.token %></code>
+    <% if t.variants.any? %>
+      <%# The variants by name, so "Sheen · loop" is on the card and not only on the
+          clipboard. %>
+      <ul class="space-y-0.5" data-trick-variants>
+        <% t.variants.each do |v| %>
+          <li class="text-2xs leading-snug"><span class="text-body font-semibold" data-trick-variant-name><%= v.name %></span> <code class="font-mono text-muted break-words"><%= v.token %></code></li>
+        <% end %>
+      </ul>
+    <% end %>
   </div>
   <button type="button"
           class="btn btn-neutral btn-sm shrink-0"

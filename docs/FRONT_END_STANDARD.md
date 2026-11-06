@@ -40,7 +40,9 @@ unit test in `test/components/studio` and its preview in
 button, modals, banners); each documents its locals in a header comment. View
 tests in `test/views` render partials, and `/admin/style` frames hand-written
 specimens with `style/_specimen` beside a Components section that lists every
-preview.
+preview. Each specimen card is named from `config/studio_tricks.yml` (its name, a
+one-line note and its class or helper, no markup snippet); `docs/TRICKS.md` is the
+glossary that file generates.
 
 **The gallery.** Lookbook serves the previews at `/admin/style/components`,
 drawn by `Studio.routes` (`Studio::ComponentGallery`):

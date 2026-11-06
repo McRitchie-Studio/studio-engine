@@ -43,6 +43,8 @@ class StyleSpecimenTest < ActiveSupport::TestCase
     assert_includes token["class"].split, "text-muted", "the token is small and muted"
     assert_includes token["class"].split, "text-2xs"
     assert article.at_css("button.btn.sheen"), "the caller's block is the stage"
+    assert_equal ["Sheen · loop"], article.css("[data-trick-variants] [data-trick-variant-name]").map(&:text),
+      "the variant is named on the card, not only on the clipboard"
 
     copies = article.css("button[aria-label^='Copy']")
     assert_equal 1, copies.size, "one Copy"
@@ -65,6 +67,7 @@ class StyleSpecimenTest < ActiveSupport::TestCase
     assert_equal "Loader · orbit", article.at_css("[data-trick-name]").text
     assert_equal "config.loader = :orbit", article.at_css("[data-trick-token]").text
     assert_equal "Loader · orbit — config.loader = :orbit", article.at_css("[data-trick-copy]")["data-trick-copy"]
+    assert_nil article.at_css("[data-trick-variants]"), "a variant's card lists no variants"
   end
 
   test "disabled stays present and flagged; openable keeps its click" do
