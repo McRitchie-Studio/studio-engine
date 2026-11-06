@@ -13,9 +13,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   the opener is in flight waits for it; and the tab remembers the opener only as its
   POST starts, forgetting it if the POST fails. It is never sent twice.
 - **`e2e/talk_to_agent.spec.js`'s modified-click spec no longer flakes.** It waited for
-  the new tab's first `load`, which can be its `about:blank` before the link's
-  navigation commits, and read "blank" on a loaded CI runner (80 local runs at 8 workers
-  failed repeatedly before the fix and all passed after). It now waits for the URL.
+  the new tab a Ctrl+click opens, which on CI's headless Linux Chromium stayed at
+  `about:blank` (it read "blank", and a wait for its URL timed out), so it measured the
+  browser rather than the modal. It now asserts what the modal owes a modified click:
+  the click is not prevented (the browser follows the `href`) and no card opens.
 
 ### Added
 

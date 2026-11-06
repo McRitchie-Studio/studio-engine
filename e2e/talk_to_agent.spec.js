@@ -85,18 +85,29 @@ test("closing and reopening the same topic shows the thread and sends nothing ne
   expect(errors).toEqual([]);
 });
 
-test("a modified click follows the link", async ({ page, context }) => {
+// What the modal owes a modified click is to leave it alone: not take it, so the
+// browser follows the link's href as it would anywhere. That is asserted on the
+// click itself (defaultPrevented after the page's own listeners ran), not on the
+// new tab: on CI's headless Linux Chromium a Ctrl+click's background tab stayed at
+// about:blank (it read "blank", then waitForURL timed out), so a spec that waits for
+// that tab measures the browser, not this code. CONTROL: drop the plainClick check
+// in studio/talk_to_agent and this fails: the click is prevented and the card opens.
+test("a modified click follows the link", async ({ page }) => {
   await blockOffsiteRequests(page);
   await page.goto(PAGE);
   await expect(page.locator('[data-test="talk-to-agent"]')).toHaveAttribute("data-talk-to-agent-ready", "true");
-  const [opened] = await Promise.all([
-    context.waitForEvent("page"),
-    page.locator('[data-test="talk-pro"]').click({ modifiers: [process.platform === "darwin" ? "Meta" : "Control"] })
-  ]);
-  // A new tab is born at about:blank, and its "load" can be that blank page's,
-  // before the link's navigation commits (CI under load read "blank" here). Wait
-  // for the URL itself.
-  await opened.waitForURL((url) => url.pathname === "/agent_chat_lab");
-  expect(new URL(opened.url()).pathname).toBe("/agent_chat_lab");
+  const link = page.locator('[data-test="talk-pro"]');
+  expect(new URL(await link.evaluate((el) => el.href)).pathname).toBe("/agent_chat_lab");
+  // A window listener runs after the document's (the modal's): it records whether
+  // anything took the click, then stops the new tab this spec does not need.
+  await page.evaluate(() => {
+    window.__clicks = [];
+    window.addEventListener("click", (event) => {
+      window.__clicks.push({ prevented: event.defaultPrevented, modified: event.metaKey || event.ctrlKey });
+      event.preventDefault();
+    });
+  });
+  await link.click({ modifiers: [process.platform === "darwin" ? "Meta" : "Control"] });
+  await expect.poll(() => page.evaluate(() => window.__clicks)).toEqual([{ prevented: false, modified: true }]);
   await expect(page.locator('[data-test="talk-to-agent-panel"]')).toHaveCount(0);
 });
