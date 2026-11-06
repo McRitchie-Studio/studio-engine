@@ -1,4 +1,4 @@
-<%# locals: (label:, items:, per_view: 3, id: nil, slide_label: nil, data: {}, class_name: nil) %>
+<%# locals: (label:, items:, per_view: 3, id: nil, slide_label: nil, data: {}, class_name: nil, style: :standard, caption: nil) %>
 <%# THE CAROUSEL: one sideways row of slides, the apps' standard for a set too
     long to grid. Render it as a layout, so each slide is your own block:
 
@@ -18,6 +18,18 @@
                    slide is "2 of 6".
       data         data attributes for the region, such as a test hook.
       class_name   classes for the region, such as its width.
+      style        :standard (slides snap to the start) or :spotlight (the
+                   centred slide is full size and colour, its neighbours smaller,
+                   faded and grey, and the arrows and keys move one slide).
+      caption      a callable that writes a line under a slide from its item.
+                   The spotlight shows it under the centred slide only.
+
+    THE SPOTLIGHT (engine.css, carousel-spotlight) snaps each slide to the centre.
+    Where the browser has scroll-driven animations, each slide's own view timeline
+    scales and fades it as it nears the centre, so the effect follows the finger.
+    Elsewhere the controller marks the centred slide (data-current) and CSS
+    transitions it. Under reduced motion nothing scales: the neighbours are only
+    dimmed.
 
     THE TRACK IS A NATIVE SCROLL-SNAP ROW (engine.css, carousel). A swipe, a
     trackpad, a wheel and a focused link move it with no script. The carousel
@@ -37,9 +49,14 @@
   per_view = per_view.to_i if per_view == per_view.floor
   items = items.to_a
   total = items.size
+  spotlight = case style.to_s
+              when "standard" then false
+              when "spotlight" then true
+              else raise ArgumentError, "studio/carousel style: #{style.inspect} is not :standard or :spotlight"
+              end
   track_id = id.presence || "carousel-#{label.to_s.parameterize.presence || 'slides'}"
 %>
-<%= tag.section(class: ["carousel", class_name].compact.join(" "),
+<%= tag.section(class: ["carousel", ("carousel-spotlight" if spotlight), class_name].compact.join(" "),
       role: "region",
       aria: { roledescription: "carousel", label: label },
       style: "--carousel-per-view: #{per_view}",
@@ -48,7 +65,7 @@
     <% items.each_with_index do |item, index| %>
       <div class="carousel-slide" role="group" aria-roledescription="slide"
            aria-label="<%= slide_label ? slide_label.call(item) : "#{index + 1} of #{total}" %>"
-           data-carousel-target="slide"><%= yield(item) %></div>
+           data-carousel-target="slide"><% if spotlight %><div class="carousel-spotlight-body"><%= yield(item) %></div><% else %><%= yield(item) %><% end %><% if caption %><div class="carousel-caption"><%= caption.call(item) %></div><% end %></div>
     <% end %>
   </div>
   <div class="carousel-controls">

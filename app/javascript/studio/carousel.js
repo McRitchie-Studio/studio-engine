@@ -71,3 +71,11 @@ export function positionText(first, shown, total) {
   const to = Math.min(total, first + shown)
   return from === to ? `Slide ${from} of ${total}` : `Slides ${from} to ${to} of ${total}`
 }
+
+// The spotlight's stops: the scroll position that centres each slide, from each
+// slide's offset and width in the track (its padding included), held to the row.
+// Every slide is a stop, so every dot shows and an arrow moves one slide.
+export function centerStops(slides, clientWidth, max) {
+  if (slides.length === 0) return [0]
+  return slides.map(({ left, width }) => Math.min(max, Math.max(0, left + width / 2 - clientWidth / 2)))
+}
