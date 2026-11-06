@@ -71,8 +71,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   longer names the unsaved user as its target: ErrorLog's `belongs_to` autosaved it, which ran the
   failing save again inside the logger. That second raise skipped the logged mark, so the
   catch-all wrote the same failure twice.
-### Fixed
-
 - **`rescue_and_log` writes one ErrorLog row per failure, also for an unsaved target.** It
   linked `target:` with ErrorLog's `belongs_to`, which saves a new record. With an unsaved
   record, the logger ran the failing save a second time. That raise skipped the logged mark,
