@@ -14,8 +14,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   POST starts, forgetting it if the POST fails. It is never sent twice.
 - **`e2e/talk_to_agent.spec.js`'s modified-click spec no longer flakes.** It waited for
   the new tab's first `load`, which can be its `about:blank` before the link's
-  navigation commits, and read "blank" on a loaded CI runner (80 of 80 local runs
-  reproduced it at 8 workers before the fix, 0 after). It now waits for the URL.
+  navigation commits, and read "blank" on a loaded CI runner (80 local runs at 8 workers
+  failed repeatedly before the fix and all passed after). It now waits for the URL.
 
 ### Added
 
