@@ -86,6 +86,13 @@
       <% end %>
 
       <%= render layout: "style/specimen",
+            locals: { klass: ".studio-border-glow--clear",
+                      note: "The same rainbow ring and halo on a clear button.",
+                      usage: %(<button class="btn studio-border-glow studio-border-glow--clear">Save</button>) } do %>
+        <button type="button" class="btn studio-border-glow studio-border-glow--clear" data-border-glow-clear>Save</button>
+      <% end %>
+
+      <%= render layout: "style/specimen",
             locals: { klass: ".sheen .sheen--loop",
                       note: "Adds a band of light that sweeps across the button.",
                       usage: %(<button class="btn btn-primary sheen">Once</button>\n<button class="btn btn-primary sheen sheen--loop">Loop</button>) } do %>

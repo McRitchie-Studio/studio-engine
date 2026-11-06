@@ -6,6 +6,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **`.studio-border-glow--clear`.** The border glow on a clear button: no fill, only the
+  moving rainbow ring and its halo, with the heading ink as the label (16:1 light, 18:1 dark,
+  measured). `<button class="btn studio-border-glow studio-border-glow--clear">`. Under
+  reduced motion the ring and halo of every `.studio-border-glow` stand still.
 - **Talk to an agent in a modal: `studio/agent_chat/_talk_modal`.** Render it once on a page,
   then mark any link with `studio_talk_to_agent_link(label, href:, soul:, topic:, opener:)`. A
   click opens the shared agent chat in a card on the page-scoped modal host and sends the
@@ -73,6 +77,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `anchor-scope`. `studio_crumbs` with a key the map lacks still raises in development and
   test; elsewhere it logs to ErrorLog and draws no trail, not a 500. The dead redirect guard
   in `studio/page_transitions` is gone.
+- **`/admin/style`: Tricks is second, and nothing in the header is cut off.** The sections and
+  their pills run Theme, Tricks, Modals, Tasks, Components (a host's own modals still follow
+  Modals). The tab scroller gives its pills 4px of room on every side, so their shadow, lit
+  edge and focus ring show, and the last pill's right edge too; phones still scroll sideways.
+  Each specimen card has one Copy (the snippet's, or the class name's when there is no
+  snippet), and the code wraps clear of it.
 
 ## 0.130.0 — 2026-11-05
 

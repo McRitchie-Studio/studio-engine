@@ -6,16 +6,17 @@
      Five ENGINE sections, reached by the page header below and rendered
      as sibling partials: Theme is the landing section (the color foundation - it
      owns the role tokens/swatches, the theme editor, the live preview, and the
-     logos and type), then Modals (the shared host + engine card blocks), Tricks
-     (the button/surface/motion/effect/leveling primitives, framed as a board of
-     copy-paste-for-an-agent snippets), Tasks (the shared board primitive), and
+     logos and type), then Tricks (the button/surface/motion/effect/leveling
+     primitives, framed as a board of copy-paste-for-an-agent snippets; second by
+     Alex McRitchie's ruling of 2026-11-05), Modals (the shared host + engine card
+     blocks), Tasks (the shared board primitive), and
      Components (the ViewComponent previews, linking into the gallery at
      /admin/style/components).
 
      A SIXTH section is the host app's own, and appears only on an app that asks
      for it: define app/views/style/host/_modals.html.erb in the consuming app
      and the guide grows a section (and a nav pill) for that app's own modals,
-     between Modals and Tricks. The gem still renders the section chrome; the app
+     between Modals and Tasks. The gem still renders the section chrome; the app
      supplies the specimens. Full contract, including which modal store a host
      specimen drives and why it is not the one the Modals section uses:
      app/views/style/_host.html.erb.

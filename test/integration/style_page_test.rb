@@ -253,6 +253,7 @@ class StylePageTest < ActiveSupport::TestCase
     studio-border-glow spinner loading-dots sheen ping fade-edge progress-meter
     carousel carousel-track carousel-slide carousel-dot carousel-button
     carousel-controls carousel-dots carousel-arrows
+    studio-border-glow--clear
   ].freeze
 
   REQUIRED_THEME_TOKENS = %w[
@@ -454,6 +455,7 @@ class StylePageTest < ActiveSupport::TestCase
     expected = [
       [".edge-rotate-glow", "button.btn.edge-rotate-glow"],
       [".studio-border-glow", "button.btn.studio-border-glow"],
+      [".studio-border-glow--clear", "button.btn.studio-border-glow.studio-border-glow--clear:not(.btn-primary)"],
       [".sheen", "button.btn.sheen"],
       [".pulse-cta", "button.btn.pulse-cta"],
       [".fizz-stack", ".fizz-stack > button.btn"],
@@ -470,6 +472,7 @@ class StylePageTest < ActiveSupport::TestCase
       note = card.at_css("p.text-body").text
       assert_operator note.split.size, :<=, 12, "one short sentence: #{note.inspect}"
       assert card.at_css("code[x-ref=snippet]"), "#{name} shows copyable code"
+      assert_equal 1, card.css("button[aria-label^='Copy']").size, "#{name}: one Copy per card, the snippet's"
     end
 
     # Colored, not a plain .btn: the lit style reads a role class, and it skips any

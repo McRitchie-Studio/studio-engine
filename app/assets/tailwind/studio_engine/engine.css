@@ -569,6 +569,32 @@ body.modal-open .studio-app-banner {
   }
 }
 
+/* -- The clear border glow (.studio-border-glow--clear) ------------------------
+   Alex McRitchie, 2026-11-05: "a clear background and the glowing circumference". A
+   modifier on .studio-border-glow (engine-motion.css), named as .sheen--loop is: the
+   button has no fill, so the page shows through, and only the moving rainbow ring and
+   its soft halo draw. The label is the heading ink, which clears 4.5:1 on every surface
+   (e2e/border_glow_clear.spec.js). Pair it with .btn alone, not a filled variant.
+
+     <button class="btn studio-border-glow studio-border-glow--clear">Save</button> */
+.btn.studio-border-glow--clear {
+  @apply text-heading;
+  background-color: transparent;
+  background-image: none;
+}
+
+.btn.studio-border-glow--clear:not(:disabled, [aria-disabled="true"]):hover {
+  --studio-border-glow-halo-opacity: 0.4;
+}
+
+/* Reduced motion: the ring and the halo stay, still. */
+@media (prefers-reduced-motion: reduce) {
+  .studio-border-glow::before,
+  .studio-border-glow::after {
+    animation: none;
+  }
+}
+
 /* -- The carousel (studio/_carousel) -----------------------------------------
    One sideways row of slides on a native scroll-snap track: a swipe, a trackpad and
    a focused link move it with no script. The carousel controller adds the edge fade,
