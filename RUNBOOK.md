@@ -79,7 +79,8 @@ Troubleshooting guide for autonomous agents. Format: problem, diagnosis, fix.
 2. Run `bin/release-check`
 3. Open the PR into `accepted`. **Do not bump `lib/studio/version.rb`** — the
    release owns the version and `bin/dor-check` refuses a PR that edits it.
-   `CHANGELOG.md` is not gated. See `docs/RELEASE.md` for who sets the number.
+   Do not edit `CHANGELOG.md` either: add `changelog.d/<slug>.<kind>.md`
+   (`changelog.d/README.md`). See `docs/RELEASE.md` for who sets the number.
 
 Steps 4-7 below are the **manual** consumer-adoption path. On the normal
 release, `bin/release prepare` does all of it — it publishes the gem, tags it,

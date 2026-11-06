@@ -1,5 +1,6 @@
-# Parallel PRs all add entries at the top of `## Unreleased`, so an ordinary merge
-# conflicts on nearly every pair. Union keeps both sides. It has one cost: a branch
+# PRs no longer edit `## Unreleased`: they add changelog.d/ fragments (changelog.d/README.md),
+# because GitHub's merge check ignores this driver. Union stays for local merges of older
+# branches that still carry an Unreleased entry. Union keeps both sides. It has one cost: a branch
 # forked before a roll no longer conflicts when it merges after one. See docs/RELEASE.md,
 # 'Rolling Unreleased into a version'.
 CHANGELOG.md merge=union
