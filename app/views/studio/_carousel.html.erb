@@ -1,4 +1,4 @@
-<%# locals: (label:, items:, per_view: 3, id: nil, slide_label: nil, data: {}, class_name: nil, style: :standard, caption: nil, start: nil) %>
+<%# locals: (label:, items:, per_view: 3, id: nil, slide_label: nil, data: {}, class_name: nil, style: :standard, caption: nil, start: nil, autoplay: nil, loop: false) %>
 <%# THE CAROUSEL: one sideways row of slides, the apps' standard for a set too
     long to grid. Render it as a layout, so each slide is your own block:
 
@@ -31,6 +31,17 @@
                    it has scroll-initial-target; elsewhere the controller sets it
                    when it connects, with no glide and nothing announced. A link
                    to an id inside the row (#fragment) wins over the start.
+      loop         true wraps the row: Next at the last slide goes to the first,
+                   Previous at the first to the last, and neither arrow is ever
+                   disabled. No slide is cloned, so a screen reader reads each once.
+      autoplay     seconds between moves (a number above 0); nil, the default, is
+                   off. The row moves one slide each interval and holds still while
+                   the pointer is over the slides, while keyboard focus is in it,
+                   while the tab is hidden or the row is off screen, and after a
+                   swipe or press until the reader leaves it alone a while. A pause
+                   button sits beside the arrows (WCAG 2.2.2). Under reduced motion
+                   the row starts stopped, and Play starts it. Without loop it
+                   stops at the last slide; Play then starts again from the first.
 
     THE SPOTLIGHT (engine.css, carousel-spotlight) snaps each slide to the centre.
     Where the browser has scroll-driven animations, each slide's own view timeline
@@ -52,7 +63,7 @@
     slide a group with aria-roledescription slide and its own label, named arrows
     that set aria-disabled at an end (not disabled, so focus stays on the arrow),
     and a polite, atomic status line that speaks only after a press that moves the
-    row. A key pressed in a form field, an arrow-key widget (a slider, a tab list,
+    row (a looping row's arrows are never disabled; autoplay never speaks). A key pressed in a form field, an arrow-key widget (a slider, a tab list,
     a listbox...) or a nested carousel stays that element's. %>
 <%
   per_view = per_view.to_f.clamp(1, 6)
@@ -70,6 +81,13 @@
                 when Integer then start.clamp(0, [total - 1, 0].max)
                 else raise ArgumentError, "studio/carousel start: #{start.inspect} is not an index or :middle"
                 end
+  autoplay = nil if autoplay == false
+  unless autoplay.nil? || (autoplay.is_a?(Numeric) && autoplay.positive? && autoplay.finite?)
+    raise ArgumentError, "studio/carousel autoplay: #{autoplay.inspect} is not a number of seconds above 0 or nil"
+  end
+  autoplay = autoplay.to_i if autoplay && autoplay == autoplay.floor
+  loop = loop ? true : false
+  wraps = loop && total > 1
   arrow_noun = spotlight ? "slide" : "slides"
   track_id = id.presence || "carousel-#{label.to_s.parameterize.presence || 'slides'}"
 %>
@@ -77,7 +95,8 @@
       role: "region",
       aria: { roledescription: "carousel", label: label },
       style: "--carousel-per-view: #{per_view}",
-      data: { studio_controller: "carousel", studio_action: "keydown->carousel#key", carousel_start: (start_index.to_s if start_index.positive?) }.compact.merge(data)) do %>
+      data: { studio_controller: "carousel", studio_action: "keydown->carousel#key", carousel_start: (start_index.to_s if start_index.positive?),
+              carousel_autoplay: (autoplay.to_s if autoplay), carousel_loop: ("" if loop) }.compact.merge(data)) do %>
   <%# The track takes focus for the keys, so it carries a name: a group, since a
       bare div may not be named. %>
   <div id="<%= track_id %>" class="carousel-track" tabindex="0" role="group"
@@ -98,12 +117,21 @@
       <% end %>
     </div>
     <div class="carousel-arrows">
+      <% if autoplay %>
+        <%# The pause button (WCAG 2.2.2). The controller renames it "Play slideshow"
+            and swaps the icon when the reader stops the row. %>
+        <button type="button" class="carousel-button carousel-autoplay" aria-label="Pause slideshow" aria-controls="<%= track_id %>"
+                data-carousel-target="toggle" data-studio-action="click->carousel#toggle">
+          <svg class="carousel-autoplay-pause" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5.5" y="4.5" width="3" height="11" rx="1"/><rect x="11.5" y="4.5" width="3" height="11" rx="1"/></svg>
+          <svg class="carousel-autoplay-play" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M7 4.8v10.4a.8.8 0 0 0 1.2.7l8.2-5.2a.8.8 0 0 0 0-1.4L8.2 4.1A.8.8 0 0 0 7 4.8Z"/></svg>
+        </button>
+      <% end %>
       <button type="button" class="carousel-button" aria-label="Previous <%= arrow_noun %>" aria-controls="<%= track_id %>"
-              aria-disabled="<%= start_index.zero? %>" data-carousel-target="prev" data-studio-action="click->carousel#prev">
+              aria-disabled="<%= !wraps && start_index.zero? %>" data-carousel-target="prev" data-studio-action="click->carousel#prev">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12.5 15 7.5 10l5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <button type="button" class="carousel-button" aria-label="Next <%= arrow_noun %>" aria-controls="<%= track_id %>"
-              <%= 'aria-disabled="true" '.html_safe if total.positive? && start_index == total - 1 %>data-carousel-target="next" data-studio-action="click->carousel#next">
+              <%= 'aria-disabled="true" '.html_safe if !wraps && total.positive? && start_index == total - 1 %>data-carousel-target="next" data-studio-action="click->carousel#next">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m7.5 5 5 5-5 5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
     </div>

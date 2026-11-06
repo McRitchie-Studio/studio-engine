@@ -11,6 +11,16 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   the log. Move each control to `tabs:`, `menu:`, `action:`, `tools_html:` or `meta:`.
 ### Changed
 
+- **A link to a place on the same page scrolls there. It no longer loads the page again.**
+  Alex McRitchie, on the style guide's tabs: "The system needs to understand when a scroll
+  down is the solution rather than a page change." Turbo 8 made a click on `#tricks` a full
+  visit: a fetch, a render and the page transition. `studio/in_page_links` now takes a plain
+  click on a link to this page's path and query with a `#fragment` whose element exists. It
+  smooth-scrolls to the element under the pinned stack (a jump under reduced motion), pushes
+  the fragment so Back and a shared link work, and moves focus to the target. Cross-page
+  links, modifier clicks, `target`, `download` and `data-turbo="false"` are untouched. The
+  style guide's tab highlight holds the clicked tab until the scroll settles
+  (docs/PAGE_HEADER.md, "In-page links"; task `in-page-links-scroll`).
 - **The style guide's cards carry trick names, not markup snippets.** Alex McRitchie,
   2026-11-06: "I really just need to have a good naming convention so I can convey an
   idea to my agents." Every card under Tricks, Loaders and Tasks on `/admin/style` now
@@ -42,6 +52,15 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   and the style guide's Page header specimen shows all four (task
   `page-header-control-kinds`).
 
+- **A carousel can loop and play itself: `loop:` and `autoplay:`.** Alex McRitchie wants
+  the hub's Portfolio spotlight "auto scrolling and in a loop". `loop: true` wraps the
+  arrows and keys (last to first, first to last) and keeps both arrows enabled, with no
+  cloned slides. `autoplay: <seconds>` moves one slide each interval in `:standard` and
+  `:spotlight`; it holds on hover over the slides, on keyboard focus, in a hidden tab, off
+  screen, and after any swipe or press until the reader is idle; it starts stopped under
+  reduced motion and never writes the status line. A pause button (`.carousel-autoplay`,
+  "Pause slideshow" / "Play slideshow") meets WCAG 2.2.2. Both default off, so every
+  existing carousel is unchanged (task `carousel-autoplay-and-loop`).
 - **The engine ships a standard sign-in card.** Alex McRitchie, on the style guide's
   Email field specimen: "this should use the standard auth component with Google and
   Email." `studio/auth/_sign_in_card` (a page) and `studio/auth/_sign_in_modal` (a

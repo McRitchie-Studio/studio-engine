@@ -349,6 +349,26 @@ row opens on its first. The browser sets it before the first paint where it has
 `scroll-initial-target`; elsewhere the controller jumps there when it connects, with no
 glide and nothing announced. A `#fragment` link to an element inside the row wins.
 
+`loop: true` wraps the row: Next at the last slide goes to the first, Previous at the first
+to the last, and neither arrow is ever disabled. No slide is cloned, so a screen reader reads
+each one once; the row glides back across itself.
+
+`autoplay:` is the seconds between moves (default `nil`, off). The row moves one slide each
+interval, in both styles. It holds still while the pointer is over the slides, while keyboard
+focus is in the row, while the tab is hidden or the row is off screen, and after a swipe,
+wheel, arrow, dot or key until the reader leaves it alone for one interval (never under five
+seconds). A pause button ("Pause slideshow", then "Play slideshow") sits before the arrows,
+for WCAG 2.2.2. Under reduced motion the row starts stopped, and Play starts it. Autoplay
+never writes the status line. Without `loop:` it stops at the last slide, and Play starts
+again from the first.
+
+```erb
+<%= render layout: "studio/carousel",
+      locals: { label: "Portfolio", items: @apps, style: :spotlight, autoplay: 5, loop: true } do |app| %>
+  <%= render "apps/card", app: app %>
+<% end %>
+```
+
 ```erb
 <%= render layout: "studio/carousel",
       locals: { label: "Team", items: @people, style: :spotlight, caption: ->(person) { person.title } } do |person| %>

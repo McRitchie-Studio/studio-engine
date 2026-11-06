@@ -19,6 +19,7 @@ import IdentityMiniController from "studio/controllers/identity_mini_controller"
 import { startPinnedStack } from "studio/pinned_stack"
 import { installAlpineShims } from "studio/alpine_shims"
 import { installStudioLoader } from "studio/loader"
+import "studio/in_page_links"
 
 installAlpineShims()
 startPinnedStack()

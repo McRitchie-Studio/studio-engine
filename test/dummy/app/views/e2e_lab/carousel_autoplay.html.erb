@@ -1,0 +1,31 @@
+<%# studio/_carousel with autoplay: and loop:, rendered by name (E2eLabController#carousel_autoplay).
+    e2e/carousel_autoplay.spec.js. One-second intervals, so a spec sees a move quickly:
+    "auto" is a standard looping row of six, three to a view (four stops);
+    "auto-spot" a looping spotlight of five opening on its last slide;
+    "auto-end" a standard row that does not loop, so autoplay stops at its end;
+    "loop" a looping row with no autoplay. %>
+<main class="max-w-5xl mx-auto px-4 py-10 space-y-12">
+  <%= render layout: "studio/carousel",
+        locals: { label: "Apps", items: (1..6).to_a, per_view: 3, autoplay: 1, loop: true,
+                  slide_label: ->(n) { "App #{n}" }, data: { lab: "auto" } } do |n| %>
+    <div class="card h-32 p-5" data-lab-card="<%= n %>">App <%= n %></div>
+  <% end %>
+  <%= render layout: "studio/carousel",
+        locals: { label: "Team", items: (1..5).to_a, per_view: 3, style: :spotlight, start: 4, autoplay: 1, loop: true,
+                  slide_label: ->(n) { "Person #{n}" }, caption: ->(n) { "Person #{n}" },
+                  data: { lab: "auto-spot" } } do |n| %>
+    <div class="card h-full p-5 aspect-[4/5] flex items-end"
+         style="background: linear-gradient(160deg, hsl(<%= n * 47 %> 70% 55%), hsl(<%= n * 47 + 60 %> 70% 35%))">
+      <span class="font-semibold text-white">Person <%= n %></span>
+    </div>
+  <% end %>
+  <%= render layout: "studio/carousel",
+        locals: { label: "Steps", items: (1..4).to_a, per_view: 2, autoplay: 1,
+                  data: { lab: "auto-end" } } do |n| %>
+    <div class="card h-24 p-5">Step <%= n %></div>
+  <% end %>
+  <%= render layout: "studio/carousel",
+        locals: { label: "Loop", items: (1..6).to_a, per_view: 3, loop: true, data: { lab: "loop" } } do |n| %>
+    <div class="card h-24 p-5">Loop <%= n %></div>
+  <% end %>
+</main>

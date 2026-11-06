@@ -747,9 +747,11 @@ class E2eLabController < ActionController::Base
   end
 
   # The same guide under the real navbar, as a host draws it: the whole stack. ?turbo=1
-  # loads Turbo, as every host does: it moves a tab's hash by pushState and scrolls itself.
+  # loads Turbo, as every host does. ?direction=left turns the page transition on, as a host
+  # with one sets it, so e2e/in_page_links.spec.js can show a tab's scroll plays none.
   def style_chrome
     @theme_setting = ThemeSetting.current if ThemeSetting.table_exists?
+    @studio_page_transition_direction = params[:direction].presence_in(Studio::PAGE_TRANSITION_DIRECTIONS.map(&:to_s))
     bar_stack_locals
     render(:style_chrome, layout: params[:turbo].present? ? "survey_turbo_lab" : "e2e_lab")
   end
@@ -798,6 +800,10 @@ class E2eLabController < ActionController::Base
   # studio/_carousel, style: :spotlight: seven captioned slides, the centred one
   # full size. e2e/carousel_spotlight.spec.js. A view, no inputs.
   def carousel_spotlight; end
+
+  # studio/_carousel with autoplay: and loop: on one-second intervals, both styles,
+  # plus a row that does not loop. e2e/carousel_autoplay.spec.js. A view, no inputs.
+  def carousel_autoplay; end
 
   # studio/_section_header under the real chrome, with a table inside a section.
   # ?timeline=1 puts the header on the scroll-driven collapse.

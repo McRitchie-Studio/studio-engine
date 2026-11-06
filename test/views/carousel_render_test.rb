@@ -281,4 +281,75 @@ class CarouselRenderTest < Minitest::Test
     assert_equal ["Turf app", "Cyvasse app", "Rolio app"], doc.css(".carousel-slide > .carousel-caption").map(&:text)
     assert_equal "carousel-caption", doc.at_css(".carousel-slide").element_children.last["class"]
   end
+
+  # LOOP AND AUTOPLAY (loop:, autoplay:).
+  def ends(doc) = %w[prev next].map { |t| doc.at_css("[data-carousel-target='#{t}']")["aria-disabled"] }
+  def toggle(doc) = doc.at_css("[data-carousel-target='toggle']")
+
+  def refusal(&block)
+    error = assert_raises(StandardError, &block)
+    chain = []
+    while error
+      chain << error
+      error = error.cause
+    end
+    chain.find { |e| e.is_a?(ArgumentError) }
+  end
+
+  def test_by_default_a_row_neither_loops_nor_plays
+    doc = render_carousel
+
+    assert_nil region(doc)["data-carousel-loop"]
+    assert_nil region(doc)["data-carousel-autoplay"]
+    assert_nil toggle(doc), "no pause button without autoplay"
+    assert_equal 2, doc.css(".carousel-button").size
+  end
+
+  def test_a_looping_row_disables_neither_arrow_at_either_end
+    assert_equal "", region(render_carousel(loop: true))["data-carousel-loop"]
+    assert_equal ["false", nil], ends(render_carousel(loop: true)), "first slide"
+    assert_equal ["false", nil], ends(render_carousel(loop: true, start: 2)), "last slide"
+    assert_equal ["false", nil], ends(render_carousel(loop: true, style: :spotlight, start: 0))
+    assert_equal ["false", nil], ends(render_carousel(loop: true, style: :spotlight, start: 2))
+  end
+
+  def test_a_looping_row_of_one_slide_has_nowhere_to_wrap
+    assert_equal ["true", "true"], ends(render_carousel(items: ITEMS.first(1), loop: true))
+  end
+
+  def test_autoplay_carries_its_seconds_and_a_named_pause_button
+    doc = render_carousel(autoplay: 5, loop: true, style: :spotlight)
+    button = toggle(doc)
+
+    assert_equal "5", region(doc)["data-carousel-autoplay"]
+    assert_equal "button", button["type"]
+    assert_equal "Pause slideshow", button["aria-label"]
+    assert_equal "carousel-portfolio", button["aria-controls"]
+    assert_equal "click->carousel#toggle", button["data-studio-action"]
+    assert_includes button["class"].split, "carousel-button"
+    assert_includes button["class"].split, "carousel-autoplay"
+    assert_equal button, doc.at_css(".carousel-arrows > button"), "the pause button leads the arrows"
+    assert_equal %w[true true], button.css("svg").map { |svg| svg["aria-hidden"] }
+  end
+
+  def test_autoplay_takes_a_fraction_of_a_second
+    assert_equal "2.5", region(render_carousel(autoplay: 2.5))["data-carousel-autoplay"]
+    assert_equal "3", region(render_carousel(autoplay: 3.0))["data-carousel-autoplay"]
+  end
+
+  def test_autoplay_nil_or_false_is_off
+    [nil, false].each do |off|
+      doc = render_carousel(autoplay: off)
+      assert_nil region(doc)["data-carousel-autoplay"]
+      assert_nil toggle(doc)
+    end
+  end
+
+  def test_autoplay_refuses_what_is_not_seconds
+    [0, -2, "5", true, Float::INFINITY].each do |bad|
+      refused = refusal { render_carousel(autoplay: bad) }
+      assert refused, "autoplay: #{bad.inspect} is refused"
+      assert_match(/not a number of seconds above 0 or nil/, refused.message)
+    end
+  end
 end

@@ -48,8 +48,15 @@ export function perPage(clientWidth, slideWidth, gap) {
 }
 
 // The stop an arrow or a key takes the row to, held to the first and last stop.
-export function targetStop(action, current, page, count) {
+// A LOOPING row (loop: true) wraps instead: Next at the last stop goes to the
+// first, Previous at the first goes to the last. A page that would overshoot an
+// end still lands on that end first, so no slide is skipped on the way round.
+export function targetStop(action, current, page, count, loop = false) {
   const last = Math.max(0, count - 1)
+  if (loop && last > 0) {
+    if (action === "next" && current >= last) return 0
+    if (action === "prev" && current <= 0) return last
+  }
   const to = {
     prev: current - page,
     next: current + page,
@@ -58,6 +65,64 @@ export function targetStop(action, current, page, count) {
   }[action]
   if (to === undefined) return current
   return Math.min(last, Math.max(0, to))
+}
+
+// AUTOPLAY (the partial's autoplay:, data-carousel-autoplay): the row moves one
+// stop each interval, never while a reason holds it still.
+
+// The interval in seconds from the attribute, or null for no autoplay.
+export function autoplaySeconds(value) {
+  if (value === null || value === undefined || value === "") return null
+  const seconds = Number(value)
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null
+}
+
+// The stop autoplay moves to from `current`: the next one, round to the first
+// on a looping row. Null where it has nowhere to go: the last stop of a row that
+// does not loop (autoplay stops there), or a row with one stop.
+export function autoplayStop(current, count, loop = false) {
+  if (!(count > 1)) return null
+  if (current < count - 1) return current + 1
+  return loop ? 0 : null
+}
+
+// What holds autoplay still. "stopped" is the reader's own pause button (and
+// reduced motion, which starts the row stopped); it alone shows the play icon.
+// The rest lift on their own: the pointer leaves, focus leaves, the tab shows,
+// the row scrolls back into view, the reader stops touching it.
+export const PAUSE_REASONS = ["stopped", "hover", "focus", "hidden", "offscreen", "interaction"]
+
+// The reasons with one set or lifted. A new Set: the old one is left alone.
+export function withReason(reasons, reason, on) {
+  const next = new Set(reasons)
+  if (on) next.add(reason)
+  else next.delete(reason)
+  return next
+}
+
+// The reasons a row starts with: stopped under reduced motion, hidden in a
+// hidden tab.
+export function initialReasons({ reducedMotion = false, hidden = false } = {}) {
+  const reasons = new Set()
+  if (reducedMotion) reasons.add("stopped")
+  if (hidden) reasons.add("hidden")
+  return reasons
+}
+
+// Whether autoplay runs: it is on and nothing holds it.
+export function autoplayRunning(seconds, reasons) {
+  return seconds !== null && seconds > 0 && reasons.size === 0
+}
+
+// How long after the reader's last swipe, scroll or press autoplay waits to
+// resume: one interval, and never under five seconds.
+export function idleDelay(seconds) {
+  return Math.max(5000, (seconds || 0) * 1000)
+}
+
+// The pause button's name, from whether the reader has stopped the row.
+export function toggleLabel(stopped) {
+  return stopped ? "Play slideshow" : "Pause slideshow"
 }
 
 // Keys inside these belong to the element, not the row: a form field, and a widget

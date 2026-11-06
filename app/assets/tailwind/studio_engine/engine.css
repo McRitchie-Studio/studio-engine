@@ -946,6 +946,23 @@ body.modal-open .studio-app-banner {
   }
 }
 
+/* The pause button of an autoplaying row (autoplay:), a carousel-button beside the
+   arrows. It shows pause while the row may move and play once the reader (or reduced
+   motion) has stopped it; the controller sets data-carousel-stopped and the name. */
+@utility carousel-autoplay {
+  & .carousel-autoplay-play {
+    display: none;
+  }
+
+  &[data-carousel-stopped] .carousel-autoplay-pause {
+    display: none;
+  }
+
+  &[data-carousel-stopped] .carousel-autoplay-play {
+    display: block;
+  }
+}
+
 /* -- The spotlight carousel (studio/_carousel, style: :spotlight) --------------
    The same region, track, arrows, dots and keys, but each slide snaps to the centre.
    The centred slide is full size and full colour, with its caption under it; its
@@ -1152,6 +1169,13 @@ body.modal-open .studio-app-banner {
 
 @utility section-subtarget {
   scroll-margin-top: calc(var(--nav-h, 5rem) + var(--pin-page-h, 0px) + var(--section-header-h));
+}
+
+/* An in-page link's target takes focus when the jump lands (studio/in_page_links). One that
+   is not focusable of itself gets tabindex=-1 and this mark until it loses focus. Focus is
+   for the next Tab, not a ring round a whole section. */
+[data-in-page-focus]:focus {
+  outline: none;
 }
 
 /* -- Scrims: tints and shades ----------------------------------------------
