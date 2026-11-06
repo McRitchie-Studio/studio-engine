@@ -225,6 +225,19 @@ test("under reduced motion nothing scales or greys: the neighbours are only dimm
   expect(await row.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
 });
 
+test("a neighbour holding focus drops the neighbour look, so its focus ring shows", async ({ page }) => {
+  await open(page);
+  await slides(page).nth(1).locator("[data-lab-card]").evaluate((card) => card.insertAdjacentHTML("beforeend", '<a href="#p2" data-lab-link>Open</a>'));
+  await region(page).locator("[data-lab-link]").focus();
+  const all = await restingLooks(page);
+  expect(all[0].current, "focus did not move the spotlight").toBe(true);
+  expect(all[1].current).toBe(false);
+  expect(all[1].opacity, "the focused neighbour is not faded").toBeGreaterThan(0.98);
+  expect(all[1].scale).toBeGreaterThan(0.98);
+  expect(all[1].grey).toBe(false);
+  expect(all[2].opacity, "the other neighbours stay faded").toBeLessThan(0.6);
+});
+
 test("dark and glass keep the spotlight and the arrows' glass fill", async ({ page }) => {
   await open(page);
   await page.evaluate(() => {

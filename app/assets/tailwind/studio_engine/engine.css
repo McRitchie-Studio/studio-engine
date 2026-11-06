@@ -871,6 +871,16 @@ body.modal-open .studio-app-banner {
     opacity: 0;
   }
 
+  /* A neighbour holding focus drops the neighbour look on every path, so its focus
+     ring shows at full strength (WCAG 2.4.7). It outranks the animation and the mark. */
+  & .carousel-slide:focus-within .carousel-spotlight-body,
+  &[data-carousel-ready] .carousel-slide:focus-within .carousel-spotlight-body {
+    animation: none;
+    scale: 1;
+    opacity: 1;
+    filter: none;
+  }
+
   /* The scroll-driven path. It needs no controller, so it runs from the first paint. */
   @supports (animation-timeline: view()) and (animation-range: cover 0% cover 100%) {
     & .carousel-spotlight-body,
