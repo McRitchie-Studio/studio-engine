@@ -16,6 +16,13 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 //     scroll-driven spec (the slides lose the neighbour look, scale 1).
 //   - the controller's data-current toggle removed: 8 red (no slide is marked).
 //   - `scroll-snap-align: center` back to start: 8 red (the slide no longer centres).
+//
+// CONTROLS FOR THE START (the three "middle slide" specs, 2026-11-05):
+//   - `scroll-initial-target: nearest` removed: the controller-blocked spec red.
+//   - the controller's openAtStart() call removed: the no-scroll-initial-target spec red.
+//   - openAtStart's scrollTo given behavior "smooth": the same spec red (837px off
+//     on the first frame).
+//   - the spotlight's default start set to 0: all three red.
 
 const DESKTOP = { width: 1280, height: 900 };
 const PHONE = { width: 390, height: 844 };
@@ -301,21 +308,25 @@ test("without scroll-initial-target the controller opens the row on the middle s
   await blockOffsiteRequests(page);
   // Take the browser's own start away before the first layout, and record the row
   // one frame after the controller marks it ready: a glide would still be near 0.
+  await page.route(/\/tailwind\.css/, async (route) => {
+    const response = await route.fetch();
+    const body = `${await response.text()}\n[data-carousel-start-slide] { scroll-initial-target: none !important; }`;
+    await route.fulfill({ response, body });
+  });
   await page.addInitScript(() => {
-    const style = document.createElement("style");
-    style.textContent = "[data-carousel-start-slide] { scroll-initial-target: none !important; }";
-    document.documentElement.appendChild(style);
     window.__firstLeft = null;
     new MutationObserver((_, observer) => {
       const region = document.querySelector("section[data-lab='spot-default'][data-carousel-ready]");
       if (!region) return;
       observer.disconnect();
       requestAnimationFrame(() => { window.__firstLeft = region.querySelector(".carousel-track").scrollLeft; });
-    }).observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ["data-carousel-ready"] });
+    }).observe(document, { subtree: true, attributes: true, attributeFilter: ["data-carousel-ready"] });
   });
   await page.goto(LAB);
   await expect(defaultRegion(page)).toHaveAttribute("data-carousel-ready", "");
-  await expect.poll(() => page.evaluate(() => window.__firstLeft)).not.toBeNull();
+  await expect.poll(() => page.evaluate(() => typeof window.__firstLeft)).toBe("number");
+  // The override reached the page: the browser's own start is off.
+  expect(await defaultTrack(page).locator("[data-carousel-start-slide]").evaluate((el) => getComputedStyle(el).scrollInitialTarget)).toBe("none");
   const centre = await middleCentre(page);
   expect(Math.abs(await page.evaluate(() => window.__firstLeft) - centre), "the first frame already rests there").toBeLessThan(3);
   expect(await centredIndex(page)).toBe(3);
