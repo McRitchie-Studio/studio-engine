@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs"
 import { runInNewContext } from "node:vm"
 
 const source = readFileSync(new URL("../../app/javascript/studio/page_transitions.js", import.meta.url), "utf8")
-const { STYLES, DEFAULT_STYLE, STILL, READY_CAP_MS, FULL_LOAD_STYLE_KEY, styleFor, planVisit, planFullLoad, leaveStyle, withCap, shareName, holdRender, installPageTransitions } =
+const { STYLES, DEFAULT_STYLE, STILL, READY_CAP_MS, FULL_LOAD_STYLE_KEY, REVERSE, BACK_LINK, styleFor, planVisit, planFullLoad, visitIsBack, fullLoadIsBack, sameAddress, leaveStyle, withCap, shareName, holdRender, installPageTransitions } =
   await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 const visit = { direction: "left", from: "/", to: "/chat", transitions: true, sharedName: false }
@@ -182,7 +182,7 @@ test("the style goes to the next document, and a refusal reads as a plain load",
 })
 
 // A module-level flag lets one document install once, so each case imports its own copy.
-async function installed(pathname = "/a") {
+async function installed(pathname = "/a", { motion = false } = {}) {
   const { installPageTransitions: install } = await import(`data:text/javascript,${encodeURIComponent(`${source}\n// ${Math.random()}`)}`)
   const on = { doc: {}, win: {} }
   const store = new Map()
@@ -191,8 +191,10 @@ async function installed(pathname = "/a") {
     location: { pathname },
     addEventListener: (name, handler) => { on.win[name] = handler },
     sessionStorage: { setItem: (key, value) => store.set(key, value), removeItem: (key) => store.delete(key) },
+    matchMedia: () => ({ matches: false }),
   }
   const doc = {
+    ...(motion ? { startViewTransition() {} } : {}),
     defaultView: win,
     documentElement: root,
     querySelector: (selector) => (selector.startsWith("meta") ? { content: "left" } : null),
@@ -288,6 +290,127 @@ test("back from the back/forward cache, the page plans from where it now stands"
   store.clear()
   on.win.pageshow({ persisted: true })
   assert.equal(swap("/c"), true, "the restored page is at /c, so /c is the same path")
+})
+
+// ---- Back: the app's move the other way --------------------------------------------------
+
+test("each direction has one reverse, and the reverse of the reverse is the direction", () => {
+  assert.deepEqual({ ...REVERSE }, { left: "right", right: "left", top: "bottom", bottom: "top" })
+  for (const direction of Object.keys(REVERSE)) assert.equal(REVERSE[REVERSE[direction]], direction)
+})
+
+test("a back visit plays the reverse move in the same style, for every pair of settings", () => {
+  for (const style of Object.keys(STYLES)) {
+    for (const direction of Object.keys(STYLES[style])) {
+      const back = planVisit({ ...visit, direction, style, back: true })
+      assert.equal(back, STYLES[style][REVERSE[direction]])
+      assert.notEqual(back, planVisit({ ...visit, direction, style }))
+    }
+  }
+  assert.equal(planVisit({ ...visit, back: true }), "slide-right")
+  assert.equal(planVisit({ ...visit, style: "unfold", back: true }), "unfold-left")
+})
+
+test("a back visit keeps every other rule: same path, shared name, reduced motion", () => {
+  assert.equal(planVisit({ ...visit, to: "/", back: true }), STILL)
+  assert.equal(planVisit({ ...visit, sharedName: true, back: true }), null)
+  assert.equal(planVisit({ ...visit, transitions: false, back: true }), null)
+  assert.equal(styleFor("constructor", "slide", true), null)
+})
+
+test("a restore goes back only when Turbo says back, so Forward keeps the app's direction", () => {
+  assert.equal(visitIsBack({ action: "restore", turboDirection: "back" }), true)
+  assert.equal(visitIsBack({ action: "restore", turboDirection: "forward" }), false)
+  assert.equal(visitIsBack({ action: "restore", turboDirection: undefined }), false)
+})
+
+test("an advance goes back only to the address of the back link clicked", () => {
+  const url = "https://app.test/deployments"
+  assert.equal(visitIsBack({ action: "advance", url, backHref: "https://app.test/deployments" }), true)
+  assert.equal(visitIsBack({ action: "advance", url, backHref: "https://app.test/deployments#top" }), true)
+  assert.equal(visitIsBack({ action: "advance", url, backHref: "https://app.test/epics" }), false)
+  assert.equal(visitIsBack({ action: "advance", url, backHref: null }), false)
+  assert.equal(visitIsBack({ action: "advance", url: "https://app.test/deployments?all=1", backHref: url }), false)
+  assert.equal(sameAddress("not a url", null), false)
+})
+
+test("a full load goes back on a traverse to an earlier entry, or to the back link's address", () => {
+  const traverse = (from, to) => ({ navigationType: "traverse", from: { index: from }, entry: { index: to, url: "https://app.test/a" } })
+  assert.equal(fullLoadIsBack(traverse(3, 2)), true)
+  assert.equal(fullLoadIsBack(traverse(2, 3)), false, "Forward")
+  assert.equal(fullLoadIsBack({ navigationType: "traverse", from: null, entry: { index: 1 } }), false)
+  assert.equal(fullLoadIsBack(traverse(-1, 0)), false, "an entry from another document has index -1")
+  const push = { navigationType: "push", entry: { url: "https://app.test/deployments", index: 4 } }
+  assert.equal(fullLoadIsBack(push, "https://app.test/deployments"), true)
+  assert.equal(fullLoadIsBack(push, "https://app.test/epics"), false)
+  assert.equal(fullLoadIsBack(null, "https://app.test/x"), false)
+  assert.equal(planFullLoad({ ...fullLoad, activation: activation("/x"), back: true }), "slide-right")
+})
+
+// The fake link for the capture-phase click listener.
+const link = (href, back) => ({ href, matches: (selector) => selector === BACK_LINK && back })
+const clickOn = (on, element) => on.doc.click({ target: { closest: () => element } })
+const render = (on, root) => {
+  on.doc["turbo:before-render"]({ detail: { newBody: { querySelector: () => null, querySelectorAll: () => [] } } })
+  return root.dataset.pageTransition
+}
+
+test("a click on a back link turns its visit around, and an ordinary link or a restore Forward does not", async () => {
+  const { on, root } = await installed("/deployments/rel-1", { motion: true })
+  const visitTo = (url, action = "advance", turboDirection) => {
+    if (turboDirection) root.dataset.turboVisitDirection = turboDirection
+    else delete root.dataset.turboVisitDirection
+    on.doc["turbo:visit"]({ detail: { url, action } })
+    const style = render(on, root)
+    on.doc["turbo:render"]({})
+    on.doc["turbo:load"]({})
+    return style
+  }
+
+  clickOn(on, link("https://app.test/deployments", true))
+  assert.equal(visitTo("https://app.test/deployments"), "slide-right")
+  clickOn(on, link("https://app.test/epics", false))
+  assert.equal(visitTo("https://app.test/epics"), "slide-left")
+  clickOn(on, link("https://app.test/deployments", true))
+  assert.equal(visitTo("https://app.test/tasks"), "slide-left", "a visit elsewhere than the back link's address")
+  assert.equal(visitTo("https://app.test/deployments"), "slide-left", "the mark lasts one visit")
+  assert.equal(visitTo("https://app.test/tasks", "restore", "back"), "slide-right")
+  assert.equal(visitTo("https://app.test/deployments", "restore", "forward"), "slide-left")
+})
+
+test("the second half of a redirect keeps the first half's way", async () => {
+  const { on, root } = await installed("/a", { motion: true })
+  clickOn(on, link("https://app.test/b", true))
+  on.doc["turbo:visit"]({ detail: { url: "https://app.test/b", action: "advance" } })
+  assert.equal(render(on, root), "slide-right")
+  on.doc["turbo:render"]({})
+  on.doc["turbo:visit"]({ detail: { url: "https://app.test/c", action: "replace" } })
+  assert.equal(render(on, root), STILL)
+})
+
+test("pageswap on a traverse to an earlier entry leaves the reverse style", async () => {
+  const { on, store } = await installed("/b")
+  on.win.pageswap({
+    viewTransition: { skipTransition() {} },
+    activation: { navigationType: "traverse", from: { index: 2 }, entry: { index: 1, url: "https://app.test/a" } },
+  })
+  assert.equal(store.get(FULL_LOAD_STYLE_KEY), "slide-right")
+  on.win.pageswap({
+    viewTransition: { skipTransition() {} },
+    activation: { navigationType: "traverse", from: { index: 1 }, entry: { index: 2, url: "https://app.test/c" } },
+  })
+  assert.equal(store.get(FULL_LOAD_STYLE_KEY), "slide-left", "Forward keeps the direction")
+})
+
+test("pageswap after a click on a back link leaves the reverse style, and a plain link the direction", async () => {
+  const { on, store } = await installed("/b")
+  const swapTo = (url) => on.win.pageswap({ viewTransition: { skipTransition() {} }, activation: { navigationType: "push", entry: { url, index: 3 } } })
+  clickOn(on, link("https://app.test/a", true))
+  swapTo("https://app.test/a")
+  assert.equal(store.get(FULL_LOAD_STYLE_KEY), "slide-right")
+  clickOn(on, link("https://app.test/a", false))
+  swapTo("https://app.test/a")
+  assert.equal(store.get(FULL_LOAD_STYLE_KEY), "slide-left")
 })
 
 // ---- studio/page_transition_reveal, the classic script ------------------------------------

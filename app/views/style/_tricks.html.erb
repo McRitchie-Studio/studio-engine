@@ -168,7 +168,7 @@
   <section class="space-y-5" data-page-header-specimen>
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Page header</h3>
-      <p class="text-muted text-sm"><code class="font-mono text-2xs">studio/_page_header</code> is the title row, with optional meta and tabs.</p>
+      <p class="text-muted text-sm"><code class="font-mono text-2xs">studio/_page_header</code>: crumbs above the title, tabs on the right, other links under it; the open pill glides.</p>
     </div>
     <div class="grid gap-4 lg:grid-cols-2">
       <%# The classes alone, not the partial: the partial's row is sticky, joins the
@@ -176,8 +176,17 @@
       <% [["At rest", {}], ["Stuck", { stuck: "" }]].each do |state, data| %>
         <%= render layout: "style/specimen",
               locals: { klass: "studio/_page_header (#{state.downcase})",
-                        usage: %(<%= render "studio/page_header",\n      title: "Models", meta: "v1.2.3", label: "Models",\n      tabs: [{ label: "Users", href: users_path, current: "page" }, { label: "Teams", href: teams_path }] %\>) } do %>
+                        usage: %(<%= render "studio/page_header",\n      title: "Models", meta: "v1.2.3", label: "Models",\n      crumbs: studio_crumbs(parent: :admin),\n      tabs: [{ label: "Users", href: users_path, current: "page" }, { label: "Teams", href: teams_path }],\n      links: [{ label: "Sessions", href: sessions_path }] %\>) } do %>
           <%= tag.div(class: "page-header w-full px-4", data: data) do %>
+            <div class="page-header-trail">
+              <nav class="page-header-crumbs" aria-label="Breadcrumb (specimen)">
+                <ol>
+                  <li><a href="#tricks" class="page-header-crumb">Admin</a></li>
+                  <li><span class="page-header-crumb-current">Models</span></li>
+                </ol>
+              </nav>
+              <a href="#tricks" class="page-header-parent"><span aria-hidden="true">&lsaquo;</span> Admin</a>
+            </div>
             <div class="page-header-lead">
               <p class="page-header-title">Models</p>
               <p class="page-header-meta label-upper">v1.2.3</p>
@@ -187,6 +196,10 @@
                 <a href="#tricks" class="btn btn-sm btn-primary">Users</a>
                 <a href="#tricks" class="btn btn-sm btn-neutral">Teams</a>
               </div>
+            </div>
+            <div class="page-header-links">
+              <a href="#tricks" class="page-header-link">Sessions</a>
+              <a href="#tricks" class="page-header-link">Invites</a>
             </div>
           <% end %>
         <% end %>

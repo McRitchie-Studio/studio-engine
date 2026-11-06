@@ -1,4 +1,4 @@
-<%# locals: (title:, meta: nil, meta_title: nil, label: nil, tabs: [], tabs_data: {}, actions_html: nil, data: {}, row_class: "-mx-4 px-4") %>
+<%# locals: (title:, crumbs: [], crumb_label: nil, meta: nil, meta_title: nil, label: nil, tabs: [], tabs_data: {}, actions_html: nil, links: [], links_label: "More links", data: {}, row_class: "-mx-4 px-4") %>
 <%# THE PAGE HEADER: the second layer of the pinned stack (docs/PAGE_HEADER.md).
     navbar, then this row, then a section's header (studio/_section_header), then a
     table's sticky header, each below the last.
@@ -8,6 +8,14 @@
     between the two, so a state change moves nothing and republishes nothing.
 
       title         the page's one h1.
+      crumbs        the trail above the title: the page's ancestors, root first, as
+                    [{ label:, href: }]. studio_crumbs builds it from the app's one
+                    parent map (Studio::Crumbs). The trail ends with the page itself,
+                    crumb_label or else the title. Below 40rem the trail gives way to
+                    one link to the parent. Every ancestor link carries
+                    data-page-transition-back, so the page transition plays the
+                    app's move the other way (docs/PAGE_TRANSITIONS.md).
+      crumb_label   the page's own name in the trail, when the title is long.
       meta          short text beside the title, such as the version. Hidden on a
                     phone, where the tabs need the width.
       meta_title    the meta's title attribute.
@@ -15,7 +23,11 @@
       tabs          [{ label:, href:, current:, data: }]. `current` is the
                     aria-current value ("page" or "true"), and blank on the others.
       tabs_data     data attributes for the tabs' scroller.
-      actions_html  a control on the right, for a row with no tabs.
+      actions_html  a control on the right, such as the page's one primary action.
+                    After the tabs, when the row has both.
+      links         the page's other links, [{ label:, href:, current: }], on a line of
+                    their own at the foot of the row, so they stick with it.
+      links_label   that line's accessible name.
       data          data attributes for the row, such as the page's own controller.
       row_class     the bleed. The default fits a container with px-4; pass "" in a
                     container with no gutter of its own.
@@ -45,6 +57,21 @@
       style: "top: var(--pin-page-top, var(--nav-bottom, var(--nav-h, 0px))); z-index: var(--z-sticky, 30)",
       aria: { label: label.presence },
       data: data.merge(pin: "page")) do %>
+  <% if crumbs.any? %>
+    <% parent = crumbs.last %>
+    <div class="page-header-trail">
+      <nav class="page-header-crumbs" aria-label="Breadcrumb">
+        <ol>
+          <% crumbs.each do |crumb| %>
+            <li><%= link_to crumb.fetch(:label), crumb.fetch(:href), class: "page-header-crumb", data: { page_transition_back: "" } %></li>
+          <% end %>
+          <li><span class="page-header-crumb-current" aria-current="page"><%= crumb_label.presence || title %></span></li>
+        </ol>
+      </nav>
+      <%= link_to parent.fetch(:href), class: "page-header-parent", data: { page_transition_back: "" },
+            aria: { label: "Back to #{parent.fetch(:label)}" } do %><span aria-hidden="true">&lsaquo;</span> <%= parent.fetch(:label) %><% end %>
+    </div>
+  <% end %>
   <div class="page-header-lead">
     <h1 class="page-header-title"><%= title %></h1>
     <% if meta.present? %>
@@ -53,16 +80,29 @@
   </div>
   <% if tabs.any? %>
     <%= tag.div(class: "page-header-tabs", data: tabs_data) do %>
+      <%# The glide: one pill, drawn once, that CSS anchors to the tab with aria-current and
+          slides from tab to tab (engine.css, "The gliding pill"). Each tab keeps its own
+          fill where the browser has no anchor positioning. %>
       <div class="page-header-track">
         <% tabs.each do |tab| %>
-          <%= link_to tab.fetch(:label), tab.fetch(:href),
-                class: "btn btn-sm #{tab[:current].present? ? 'btn-primary' : 'btn-neutral'}",
+          <%= link_to tab.fetch(:href),
+                class: "page-header-tab btn btn-sm #{tab[:current].present? ? 'btn-primary' : 'btn-neutral'}",
                 aria: { current: tab[:current].presence },
-                data: tab.fetch(:data, {}) %>
+                data: tab.fetch(:data, {}) do %><span class="page-header-tab-label"><%= tab.fetch(:label) %></span><% end %>
         <% end %>
+        <span class="page-header-glide btn btn-sm btn-primary" aria-hidden="true"></span>
       </div>
     <% end %>
-  <% elsif actions_html.present? %>
+  <% end %>
+  <% if actions_html.present? %>
     <div class="page-header-actions"><%= actions_html %></div>
+  <% end %>
+  <% if links.any? %>
+    <nav class="page-header-links" aria-label="<%= links_label %>">
+      <% links.each do |link| %>
+        <%= link_to link.fetch(:label), link.fetch(:href), class: "page-header-link",
+              aria: { current: link[:current].presence }, data: link.fetch(:data, {}) %>
+      <% end %>
+    </nav>
   <% end %>
 <% end %>

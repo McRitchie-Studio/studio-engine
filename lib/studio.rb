@@ -77,6 +77,7 @@ require "studio/cable"
 require "studio/survey"
 require "studio/survey/breakdown"
 require "studio/survey/export"
+require "studio/crumbs"
 
 module Studio
   mattr_accessor :app_name,            default: "Studio"
