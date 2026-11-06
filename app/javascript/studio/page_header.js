@@ -29,3 +29,20 @@ export function revealBy(box, tab, margin = 32) {
   if (tab.right > box.right) return tab.right - box.right + margin
   return 0
 }
+
+// Where the quick-links list goes when the browser has no anchor positioning: under the
+// button, its right edge on the button's, and kept on the screen with a gap of `gap`. It
+// opens above the button when there is no room below and more room above. Fixed
+// coordinates, as the list is a popover in the top layer.
+export function menuPlacement(button, list, viewport, gap = 8) {
+  const below = viewport.height - button.bottom
+  const above = button.top
+  const top = below < list.height + gap && above > below
+    ? Math.max(gap, button.top - list.height - 4)
+    : button.bottom + 4
+  const left = Math.min(
+    Math.max(gap, button.right - list.width),
+    Math.max(gap, viewport.width - list.width - gap)
+  )
+  return { top, left }
+}

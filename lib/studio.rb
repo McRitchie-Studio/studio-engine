@@ -79,6 +79,7 @@ require "studio/survey"
 require "studio/survey/breakdown"
 require "studio/survey/export"
 require "studio/crumbs"
+require "studio/page_header"
 
 module Studio
   mattr_accessor :app_name,            default: "Studio"

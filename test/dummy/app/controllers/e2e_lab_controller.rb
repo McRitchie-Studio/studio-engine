@@ -776,6 +776,22 @@ class E2eLabController < ActionController::Base
     @lab_right = params[:right].presence || "tabs"
   end
 
+  # studio/_page_header's four kinds of control together (docs/PAGE_HEADER.md, "The four
+  # kinds of control"): ?pills=tabs (the default) or ?pills=anchors, then the menu, the
+  # action and the tools.
+  PAGE_HEADER_KIND_TABS = [{ label: "Deployments", href: "/lab/page_header_kinds", current: "page" },
+                           { label: "Triage", href: "/lab/page_header_kinds?view=triage" }].freeze
+  PAGE_HEADER_KIND_ANCHORS = %w[Colors Buttons Forms].map { |name| { label: name, href: "##{name.downcase}" } }.freeze
+  PAGE_HEADER_KIND_MENU = [{ label: "Stages", href: "/lab/page_header_kinds?to=stages" },
+                           { label: "Docs", href: "/lab/page_header_kinds?to=docs" },
+                           { label: "Activities", href: "/lab/page_header_kinds?to=activities" }].freeze
+  PAGE_HEADER_KIND_ACTION = { label: "New Task", href: "/lab/page_header_kinds?to=new" }.freeze
+
+  def page_header_kinds
+    bar_stack_locals
+    @lab_pills = params[:pills] == "anchors" ? "anchors" : "tabs"
+  end
+
   # studio/_carousel, three ways: a row of nine linked cards three to a view (the
   # hub's /websites shape), a row of plain text slides with nothing to focus, and
   # a row of two that fits. A view, no inputs.

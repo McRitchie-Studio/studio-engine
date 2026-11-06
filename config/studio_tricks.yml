@@ -129,6 +129,10 @@ page_header:
       token: "[data-stuck]"
       note: "How it looks once pinned under the navbar."
       resolve: [css:page-header]
+    controls:
+      token: "tabs: or anchors:, menu:, action:, tools_html:"
+      note: "Tabs or anchors, a Links menu, one action, then tools, at one height."
+      resolve: [partial:studio/page_header, css:page-header-menu, css:page-header-menu-list, css:page-header-tools]
 
 section_header:
   name: Section Header

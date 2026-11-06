@@ -293,6 +293,7 @@ class E2eLaneContractTest < Minitest::Test
       "page_transitions.html.erb" => ["studio/banners/stack", "layouts/navbar", "studio/agent_chat/header"],
       "admin_models.html.erb" => ["studio/banners/stack", "layouts/navbar"],
       "page_header.html.erb" => ["studio/banners/stack", "layouts/navbar", "studio/page_header"],
+      "page_header_kinds.html.erb" => ["studio/banners/stack", "layouts/navbar", "studio/page_header"],
       "style_chrome.html.erb" => ["studio/banners/stack", "layouts/navbar"],
       "section_header.html.erb" => ["studio/banners/stack", "layouts/navbar", "studio/page_header", "studio/section_header"],
       "toast_over_banner.html.erb" => [

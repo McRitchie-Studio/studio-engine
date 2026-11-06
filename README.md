@@ -293,17 +293,23 @@ actions; the engine supplies only the banner.
 ### The page header — `studio/_page_header`
 
 An admin page's title: a crumb trail from the app's one parent map (`Studio.crumbs`,
-`studio_crumbs`) above an h2-size title, tabs with a gliding pill and one action on the right,
-and the page's other links on a line under it. A plain header at rest, a bar once stuck under
+`studio_crumbs`) above an h2-size title, the right side's four kinds of control (tabs or
+anchors with a gliding pill, a Links menu, one action, then tools, in that order and at one
+height), and the page's other links on a line under it. A plain header at rest, a bar once stuck under
 the navbar, in the pinned stack so a table's sticky header sits under it
 ([`docs/PAGE_HEADER.md`](docs/PAGE_HEADER.md)).
 
 ```erb
 <%= render "studio/page_header", title: "Deployments", crumbs: studio_crumbs(:deployments),
-      label: "Views", tabs: [{ label: "Board", href: deployments_path, current: "page" }],
-      actions_html: link_to("New Task", new_task_path, class: "btn btn-sm btn-primary"),
+      label: "Views", tabs: [{ label: "Board", href: deployments_path, current: "page" },
+                             { label: "Triage", href: triage_path }],
+      menu: [{ label: "Stages", href: stages_path }, { label: "Docs", href: docs_path }],
+      action: { label: "New Task", href: new_task_path },
       links: [{ label: "Epics", href: epics_path }] %>
 ```
+
+`actions_html:` is deprecated for one release; the decision rule for which kind a link is
+lives in [`docs/PAGE_HEADER.md`](docs/PAGE_HEADER.md#the-four-kinds-of-control).
 
 ### The section header — `studio/_section_header`
 

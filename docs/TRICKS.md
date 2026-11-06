@@ -41,6 +41,7 @@ lower-case word (`Border Glow · clear`). Every name is unique across the guide.
 |------|-------|--------------|
 | **Page Header** | `render "studio/page_header"` | Crumbs above the title, tabs on the right, links under it. |
 | Page Header · stuck | `[data-stuck]` | How it looks once pinned under the navbar. |
+| Page Header · controls | `tabs: or anchors:, menu:, action:, tools_html:` | Tabs or anchors, a Links menu, one action, then tools, at one height. |
 
 ## Section header
 

@@ -9,8 +9,14 @@
 // row's tabs are links, so they work without it. If it fails to load, the sentinel
 // carries data-studio-controller-failed and engine.css gives the row its bar at
 // all times, so a stuck row never lays a transparent title over the page.
+//
+// It also keeps each quick-links menu's button honest: aria-expanded follows the
+// popover, ArrowDown from the button walks into the list, and where the browser has
+// no anchor positioning it places the list under the button. The popover itself
+// opens, closes on Escape and gives focus back with no script, so a failed load
+// leaves a menu that still works.
 import { Controller } from "@hotwired/stimulus"
-import { hiddenEnds, isStuck, revealBy, sentinelMarksThePlace } from "studio/page_header"
+import { hiddenEnds, isStuck, menuPlacement, revealBy, sentinelMarksThePlace } from "studio/page_header"
 
 export default class extends Controller {
   connect() {
@@ -22,6 +28,7 @@ export default class extends Controller {
     window.addEventListener("resize", this.schedule, { passive: true })
     this.tabs?.addEventListener("scroll", this.schedule, { passive: true })
     this.revealOpenTab()
+    this.connectMenus()
     this.sync()
   }
 
@@ -31,6 +38,53 @@ export default class extends Controller {
     this.tabs?.removeEventListener("scroll", this.schedule)
     if (this.frame) cancelAnimationFrame(this.frame)
     this.frame = null
+    this.disconnectMenus()
+  }
+
+  connectMenus() {
+    this.menus = [...this.row.querySelectorAll(".page-header-menu")].map((menu) => {
+      const button = menu.querySelector("[popovertarget]")
+      const list = menu.querySelector("[popover]")
+      if (!button || !list) return null
+      button.setAttribute("aria-expanded", "false")
+      const onToggle = (event) => this.menuToggled(button, list, event.newState === "open")
+      const onKey = (event) => {
+        if (event.key !== "ArrowDown") return
+        event.preventDefault()
+        if (!list.matches(":popover-open")) list.showPopover?.()
+        list.querySelector("a")?.focus()
+      }
+      list.addEventListener("toggle", onToggle)
+      button.addEventListener("keydown", onKey)
+      return { button, list, onToggle, onKey }
+    }).filter(Boolean)
+  }
+
+  disconnectMenus() {
+    for (const { button, list, onToggle, onKey } of this.menus || []) {
+      list.removeEventListener("toggle", onToggle)
+      button.removeEventListener("keydown", onKey)
+      if (list.matches?.(":popover-open")) list.hidePopover?.()
+    }
+    this.menus = []
+  }
+
+  menuToggled(button, list, open) {
+    button.setAttribute("aria-expanded", String(open))
+    if (open) {
+      if (!anchorsSupported()) this.placeMenu(button, list)
+      return
+    }
+    // The browser gives focus back on Escape; a focus left on nothing comes back too.
+    if (document.activeElement === document.body || list.contains(document.activeElement)) button.focus()
+  }
+
+  placeMenu(button, list) {
+    const place = menuPlacement(button.getBoundingClientRect(), list.getBoundingClientRect(),
+      { width: window.innerWidth, height: window.innerHeight })
+    list.style.top = `${place.top}px`
+    list.style.left = `${place.left}px`
+    list.style.right = "auto"
   }
 
   schedule() {
@@ -46,6 +100,11 @@ export default class extends Controller {
     const ends = this.tabs ? hiddenEnds(this.tabs) : null
 
     this.row.toggleAttribute("data-stuck", stuck)
+    if (!anchorsSupported()) {
+      for (const { button, list } of this.menus || []) {
+        if (list.matches(":popover-open")) this.placeMenu(button, list)
+      }
+    }
     if (!ends) return
     this.tabs.toggleAttribute("data-fade-start", ends.start)
     this.tabs.toggleAttribute("data-fade-end", ends.end)
@@ -71,4 +130,8 @@ export default class extends Controller {
     if (!open) return
     this.tabs.scrollLeft += revealBy(this.tabs.getBoundingClientRect(), open.getBoundingClientRect())
   }
+}
+
+function anchorsSupported() {
+  return typeof CSS !== "undefined" && CSS.supports?.("anchor-name: --a") && CSS.supports("position-anchor: --a")
 }

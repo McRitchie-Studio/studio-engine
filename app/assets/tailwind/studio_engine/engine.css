@@ -377,6 +377,13 @@ body.modal-open .studio-app-banner {
 
 @utility page-header-actions {
   flex-shrink: 0;
+  /* The fixed order of the right side (docs/PAGE_HEADER.md, "The four kinds of control"):
+     the menu, then the action, then the tools. Each is a .btn-sm, so all share one height. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
   /* Never wider than the row: a group of controls wraps inside it on a phone, and the
      page does not scroll sideways. */
   max-width: 100%;
@@ -385,6 +392,116 @@ body.modal-open .studio-app-banner {
   /* After the tabs, the tabs' own auto margin already pushes both right. */
   .page-header-tabs + & {
     margin-left: 0;
+  }
+}
+
+/* ONE CONTROL HEIGHT. A .btn-neutral carries a 1px border and a .btn-primary none, so side
+   by side the neutral one stood 2px taller (30px to 28px, measured in the e2e lab). In the
+   row every small primary takes a clear border of the same width, so a tab, the menu, the
+   action and a tool all stand at one height. */
+.page-header .btn-sm.btn-primary {
+  border: 1px solid transparent;
+}
+
+/* THE QUICK-LINKS MENU: related pages elsewhere, behind one neutral "Links" button. The
+   list is the browser's popover, so Escape, a click outside and the focus return need no
+   script. Where the browser has anchor positioning, CSS hangs the list under the button's
+   right edge; elsewhere the page-header controller places it (studio/page_header,
+   menuPlacement). anchor-scope keeps each row's button its own anchor. */
+@utility page-header-menu {
+  position: relative;
+  anchor-scope: --page-header-menu;
+}
+
+@utility page-header-menu-button {
+  gap: 0.375rem;
+  anchor-name: --page-header-menu;
+}
+
+/* A chevron that points down, and up while the list is open. CSS, so a reader hears the
+   button's name alone. */
+@utility page-header-menu-caret {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-0.125rem) rotate(45deg);
+  transition: transform 150ms ease;
+
+  .page-header-menu:has(> .page-header-menu-list:popover-open) & {
+    transform: translateY(0.125rem) rotate(225deg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+@utility page-header-menu-list {
+  /* The popover's own styles centre it on the screen; this is a dropdown. */
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  min-width: 10rem;
+  max-width: min(20rem, calc(100vw - 2rem));
+  padding: 0.25rem;
+  @apply rounded-lg border border-subtle bg-surface text-body shadow-lg;
+
+  & ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @supports (anchor-name: --a) and (position-anchor: --a) {
+    position-anchor: --page-header-menu;
+    top: anchor(bottom);
+    right: anchor(right);
+    margin-top: 0.25rem;
+    position-try-fallbacks: flip-block, flip-inline;
+  }
+}
+
+@utility page-header-menu-item {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: calc(var(--type-base, 16px) * 0.875);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  @apply text-body;
+
+  &:hover,
+  &:focus-visible {
+    @apply bg-surface-alt text-heading;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+  }
+}
+
+/* THE TOOLS: local-only and dev controls, after the action. Muted, behind a dashed rule, so
+   they never read as the page's own controls; full strength while a pointer or focus is on
+   them. */
+@utility page-header-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding-left: 0.5rem;
+  border-left: 1px dashed;
+  @apply border-subtle;
+  opacity: 0.7;
+  transition: opacity 150ms ease;
+
+  &:hover,
+  &:focus-within {
+    opacity: 1;
   }
 }
 

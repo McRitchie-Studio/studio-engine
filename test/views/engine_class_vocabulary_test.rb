@@ -68,6 +68,7 @@ class EngineClassVocabularyTest < ActiveSupport::TestCase
     "nav-toggle-icon"      => "JS hook: layouts/studio/_head.html.erb drives it by querySelectorAll, inline styles",
     "geo-grid-countries"   => "test hook: e2e/geo_settings.spec.js locates the grid by it",
     "geo-grid-states"      => "test hook: the states twin of geo-grid-countries",
+    "page-header-action"   => "test and e2e hook: the page header's one action, styled by .btn btn-sm btn-primary beside it",
     "is-scrolled"          => "state marker bound beside real utilities in layouts/_navbar (shadow-lg border-b ...)",
     "studio-avatar-badge"  => "structural wrapper; its child .studio-avatar-badge-icon carries the styling",
     "studio-board-column"  => "board primitive namespace",
