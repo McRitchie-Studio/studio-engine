@@ -35,7 +35,7 @@ from the pinned stack ([`NAVBAR_SETUP.md`](NAVBAR_SETUP.md#reading-the-pinned-st
 | `crumbs` | The trail above the title: the page's ancestors, root first, as `[{ label:, href: }]`. Build it with `studio_crumbs` (below). |
 | `crumb_label` | The page's own name at the end of the trail, when the title is too long for it. The default is the title. |
 | `meta`, `meta_title` | Short text beside the title, such as the version, and its `title` attribute. Hidden below 640px. |
-| `label` | The nav's accessible name. A row with tabs needs it. |
+| `label` | The tabs' `<nav>` accessible name. A row with tabs needs it. |
 | `tabs` | `[{ label:, href:, current:, data: }]`. `current` is the `aria-current` value (`"page"`, or `"true"` for a tab that follows the scroll). Leave it blank on the others. |
 | `tabs_data` | Data attributes for the tabs' scroller. |
 | `actions_html` | A control on the right, such as the page's one primary action. With tabs, it comes after them. |
@@ -75,7 +75,9 @@ end
 A label or an address is a String, a Symbol (a route helper, read in the view and then on
 `main_app`) or a lambda. The view runs a lambda with the keywords it names, taken from the
 call. An unknown page raises `Studio::Crumbs::UnknownPage`, and a loop raises
-`Studio::Crumbs::Cycle`.
+`Studio::Crumbs::Cycle`. `studio_crumbs` lets them raise only in development and test.
+In any other environment (QA and production alike) it reports the error to `ErrorLog`, or
+else `Rails.logger`, once per message per process, and the page draws no trail.
 
 ```erb
 <%# A page in the map: its ancestors. %>
@@ -118,6 +120,8 @@ source of truth.
 - The tab with `aria-current` gives up its own fill, and each label sits above the pill.
 - With reduced motion, the pill jumps.
 - With no tab current, there is no pill.
+- The track sets `anchor-scope: --page-header-current`, so two rows on one page each
+  anchor their own pill.
 - **Support.** The block is inside `@supports (anchor-name: --a) and (position-anchor: --a)
   and selector(:has(a))`. Where that fails, the block does nothing, and each tab keeps its
   own fill, as before. Measured: Chromium (the e2e lane) supports it and plays the glide.
@@ -159,7 +163,8 @@ sees no difference. A `fixed` reader that must sit right under the navbar reads
 `--nav-bottom` instead.
 
 The row is never a `<header>`: the publisher takes the document's first `<header>` as
-the navbar.
+the navbar. Nor is it a landmark: the row is a `<div>`, and the tabs, the crumb trail and
+the links line are each their own `<nav>`, side by side, so no landmark nests in another.
 
 The partial is `studio/_page_header`, not `components/_page_header`. A host's view
 wins over the engine's at the same path, and the hub has its own

@@ -10,7 +10,7 @@
 <% sidebar_admin = respond_to?(:admin?) && admin? %>
 <button type="button"
         @click.stop="$store.sidebars.linkTreeOpen = !$store.sidebars.linkTreeOpen"
-        class="<%= extra_classes %> h-9 w-9 items-center justify-center rounded-md text-secondary hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition"
+        class="<%= extra_classes %> h-9 w-9 items-center justify-center rounded-md text-secondary hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ink transition"
         title="<%= sidebar_admin ? 'Admin Menu' : 'Links' %>"
         aria-label="<%= sidebar_admin ? 'Toggle admin menu' : 'Toggle links menu' %>"
         aria-controls="studio-link-sidebar studio-link-sidebar-mobile"

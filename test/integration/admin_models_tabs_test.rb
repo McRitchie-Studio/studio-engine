@@ -96,7 +96,7 @@ class AdminModelsTabsTest < ActionDispatch::IntegrationTest
     get "/admin/models"
     assert_response :success
 
-    assert_select "nav[aria-label='Models'] h1", text: "Models", count: 1
+    assert_select ".page-header:has(> nav[aria-label='Models']) h1", text: "Models", count: 1
     assert_equal %w[Users Sessions Widgets], tabs.map(&:text)
     assert_equal ["Users"], open_tabs
     assert_select "table", count: 1
@@ -107,7 +107,7 @@ class AdminModelsTabsTest < ActionDispatch::IntegrationTest
   test "the row is the engine's page header, in the stack" do
     get "/admin/models"
 
-    row = css_select("nav[aria-label='Models']").first
+    row = css_select(".page-header:has(> nav[aria-label='Models'])").first
     assert_includes row["class"].split, "page-header"
     assert_equal "page", row["data-pin"]
     assert_equal "page-header", css_select(".page-header-sentinel").first["data-studio-controller"]

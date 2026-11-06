@@ -49,6 +49,14 @@ class CarouselRenderTest < Minitest::Test
     assert_equal ["1 of 3", "2 of 3", "3 of 3"], slides.map { |slide| slide["aria-label"] }
   end
 
+  def test_the_focusable_track_has_an_accessible_name
+    track = render_carousel.at_css(".carousel-track")
+
+    assert_equal "0", track["tabindex"]
+    assert_equal "group", track["role"], "a bare div may not carry a name"
+    assert_equal "Portfolio slides", track["aria-label"]
+  end
+
   def test_a_slide_label_names_each_slide_from_its_item
     slides = render_carousel(slide_label: ->(item) { item.name }).css(".carousel-slide")
 
@@ -96,6 +104,7 @@ class CarouselRenderTest < Minitest::Test
     assert_equal "keydown->carousel#key", section["data-studio-action"]
     assert_equal "track", section.at_css(".carousel-track")["data-carousel-target"]
     assert_equal "polite", section.at_css("[role='status']")["aria-live"]
+    assert_equal "true", section.at_css("[role='status']")["aria-atomic"], "the whole line is read, not the changed words"
   end
 
   def test_per_view_sets_the_wide_row_and_is_held_to_one_to_six

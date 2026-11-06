@@ -8,7 +8,7 @@ const { test, expect } = require("@playwright/test");
 //     fails, Theme stays highlighted however far the page scrolls.
 
 const LAB = "/lab/style_nav";
-const row = (page) => page.locator("nav[aria-label='Style guide sections']");
+const row = (page) => page.locator(".page-header:has(> nav[aria-label='Style guide sections'])");
 const current = (page) => row(page).locator("a[aria-current='true']");
 
 test("the title and the tabs sit on one row", async ({ page }) => {

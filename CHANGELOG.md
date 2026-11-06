@@ -6,6 +6,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **`.studio-border-glow--clear`.** The border glow on a clear button: no fill, only the
+  moving rainbow ring and its halo, with the heading ink as the label (16:1 light, 18:1 dark,
+  measured). `<button class="btn studio-border-glow studio-border-glow--clear">`. Under
+  reduced motion the ring and halo of every `.studio-border-glow` stand still.
 - **The loader family: the eight ways a page says wait, in one place.** From the
   reel Alex McRitchie shared (task `engine-loader-family`). `studio_loader` takes
   three plain styles that draw no icon: `style: :spinner`, `style: :dots` and
@@ -89,6 +93,26 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **Review follow-ups on the sidebar, the carousel and the page header** (/tasks/engine-ui-polish-follow-ups).
+  The link sidebar's focus ring (its rows, close button, Log out, trigger and geo rows) is
+  `ring-primary-ink`, a new ring colour from the theme's primary ink: measured 5.4 to 8.9:1
+  beside every surface in dark, light and glass on five palettes, from 1.3 to 2.0:1 for
+  `ring-primary/40`. A carousel arrow or key that goes nowhere scrolls and announces nothing;
+  keys inside a slider, listbox, combobox, tab list, other arrow-key widget or nested carousel
+  stay theirs; and the focusable track is a group named "<label> slides". The page header row
+  is now always a `<div>`: with tabs, the tabs are their own `<nav>` named by `label`, beside
+  the crumb and links navs, so no landmark nests in another (a host test that found the row by
+  `nav[aria-label=…]` now finds the tabs). The `/admin/style` specimen adds no landmark.
+  The current link under the title is bold as well as coloured, and the pill's track sets
+  `anchor-scope`. `studio_crumbs` with a key the map lacks still raises in development and
+  test; elsewhere it logs to ErrorLog and draws no trail, not a 500. The dead redirect guard
+  in `studio/page_transitions` is gone.
+- **`/admin/style`: Tricks is second, and nothing in the header is cut off.** The sections and
+  their pills run Theme, Tricks, Loaders, Modals, Tasks, Components (a host's own modals still
+  follow Modals). The tab scroller gives its pills 4px of room on every side, so their shadow, lit
+  edge and focus ring show, and the last pill's right edge too; phones still scroll sideways.
+  Each specimen card has one Copy (the snippet's, or the class name's when there is no
+  snippet), and the code wraps clear of it.
 - **The talk modal's opener is never dropped.** A visitor who sent a message before the
   thread first loaded lost the opener: `studio/agent_chat` marked it sent, then the
   post returned early because the visitor's send was in flight. Now a send made

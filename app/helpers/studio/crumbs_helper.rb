@@ -9,9 +9,17 @@ module Studio
   #   studio_crumbs(parent: :deployments)         a page not in the map: its parent and up
   #   studio_crumbs(:release, release: @release)  keywords for the map's lambdas
   #   studio_crumbs_here                          an engine page: the map's page at this address
+  #
+  # A key the map lacks raises in development and test, and in production logs and
+  # draws no trail (Studio::Crumbs.strict?), so a typo is not a 500.
   module CrumbsHelper
     def studio_crumbs(key = nil, parent: nil, **locals)
       Studio.crumbs.trail(self, key, parent: parent, **locals)
+    rescue Studio::Crumbs::UnknownPage, Studio::Crumbs::Cycle => error
+      raise if Studio::Crumbs.strict?
+
+      Studio::Crumbs.report(error)
+      []
     end
 
     # The trail for the page at this request's address, from the host's map, or none. An
@@ -20,7 +28,7 @@ module Studio
       return [] unless respond_to?(:request) && request
 
       key = Studio.crumbs.key_for_path(self, request.path)
-      key ? Studio.crumbs.trail(self, key) : []
+      key ? studio_crumbs(key) : []
     end
   end
 end

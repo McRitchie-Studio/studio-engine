@@ -53,7 +53,7 @@ class StyleHostSectionTest < ActiveSupport::TestCase
   MARKER = "HOST-SECTION-MARKER"
 
   # The engine's own sections, in the order the page publishes them.
-  ENGINE_SECTIONS = %w[theme modals tricks loaders tasks components].freeze
+  ENGINE_SECTIONS = %w[theme tricks loaders modals tasks components].freeze
 
   # --- absent: the page is what it was ------------------------------------
 
@@ -75,7 +75,7 @@ class StyleHostSectionTest < ActiveSupport::TestCase
   end
 
   def test_a_base_app_navs_exactly_the_six_engine_pills
-    assert_equal [%w[#theme Theme], %w[#modals Modals], %w[#tricks Tricks], %w[#loaders Loaders], %w[#tasks Tasks],
+    assert_equal [%w[#theme Theme], %w[#tricks Tricks], %w[#loaders Loaders], %w[#modals Modals], %w[#tasks Tasks],
                   %w[#components Components]],
                  nav_pills(base_html)
   end
@@ -104,16 +104,16 @@ class StyleHostSectionTest < ActiveSupport::TestCase
                     "the intro names the file that contributed the section"
   end
 
-  def test_the_section_lands_between_modals_and_tricks
-    assert_equal %w[theme modals host-modals tricks loaders tasks components], top_section_ids(host_html)
+  def test_the_section_lands_between_modals_and_tasks
+    assert_equal %w[theme tricks loaders modals host-modals tasks components], top_section_ids(host_html)
   end
 
   # --- the nav pill follows the section ------------------------------------
 
   def test_the_nav_grows_one_pill_for_the_host_section_in_the_same_place
-    assert_equal [["#theme", "Theme"], ["#modals", "Modals"],
+    assert_equal [["#theme", "Theme"], ["#tricks", "Tricks"], ["#loaders", "Loaders"], ["#modals", "Modals"],
                   ["##{ANCHOR}", Studio.app_name],
-                  ["#tricks", "Tricks"], ["#loaders", "Loaders"], ["#tasks", "Tasks"], ["#components", "Components"]],
+                  ["#tasks", "Tasks"], ["#components", "Components"]],
                  nav_pills(host_html)
   end
 

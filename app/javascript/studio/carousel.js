@@ -60,6 +60,24 @@ export function targetStop(action, current, page, count) {
   return Math.min(last, Math.max(0, to))
 }
 
+// Keys inside these belong to the element, not the row: a form field, and a widget
+// that moves its own selection with the arrow keys.
+export const KEY_OWNERS = [
+  "input", "textarea", "select", "[contenteditable]:not([contenteditable='false'])",
+  "[role='slider']", "[role='spinbutton']", "[role='listbox']", "[role='combobox']",
+  "[role='tablist']", "[role='radiogroup']", "[role='menu']", "[role='menubar']",
+  "[role='grid']", "[role='tree']", "[role='treegrid']", "video", "audio"
+].join(", ")
+
+// Whether a key pressed on `target` is the carousel `region`'s to handle: not
+// when the target sits in a key owner, or in a carousel nested inside this one,
+// which handles its own keys.
+export function ownsKey(target, region, carousel = ".carousel") {
+  if (!target?.closest) return false
+  if (target.closest(KEY_OWNERS)) return false
+  return target.closest(carousel) === region
+}
+
 // The action a key asks for, or null for a key the carousel leaves alone.
 export function keyAction(key) {
   return { ArrowLeft: "prev", ArrowRight: "next", Home: "first", End: "last" }[key] || null

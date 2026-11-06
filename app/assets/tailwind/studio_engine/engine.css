@@ -347,6 +347,11 @@ body.modal-open .studio-app-banner {
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
+  /* A sideways scroller clips both axes, so the pills get room inside it: their contact
+     shadow (3px below), the lit edge (1px) and a focus ring (2px). The negative margin
+     gives the room back, so the row's box does not move. */
+  padding: 0.25rem;
+  margin: -0.25rem;
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--page-header-fade-start), #000 calc(100% - var(--page-header-fade-end)), transparent 100%);
           mask-image: linear-gradient(to right, transparent 0, #000 var(--page-header-fade-start), #000 calc(100% - var(--page-header-fade-end)), transparent 100%);
 
@@ -490,6 +495,11 @@ body.modal-open .studio-app-banner {
   &[aria-current] {
     @apply text-heading;
   }
+
+  /* More than colour marks the current link (WCAG 1.4.1). */
+  &[aria-current] {
+    font-weight: 600;
+  }
 }
 
 /* The tab's label sits above the gliding pill. */
@@ -521,6 +531,8 @@ body.modal-open .studio-app-banner {
 @supports (anchor-name: --a) and (position-anchor: --a) and selector(:has(a)) {
   .page-header-track {
     position: relative;
+    /* Each row's pill anchors to its own current tab, not the last one on the page. */
+    anchor-scope: --page-header-current;
   }
 
   .page-header-track > [aria-current] {
@@ -554,6 +566,32 @@ body.modal-open .studio-app-banner {
     .page-header-track > .page-header-glide {
       transition: none !important;
     }
+  }
+}
+
+/* -- The clear border glow (.studio-border-glow--clear) ------------------------
+   Alex McRitchie, 2026-11-05: "a clear background and the glowing circumference". A
+   modifier on .studio-border-glow (engine-motion.css), named as .sheen--loop is: the
+   button has no fill, so the page shows through, and only the moving rainbow ring and
+   its soft halo draw. The label is the heading ink, which clears 4.5:1 on every surface
+   (e2e/border_glow_clear.spec.js). Pair it with .btn alone, not a filled variant.
+
+     <button class="btn studio-border-glow studio-border-glow--clear">Save</button> */
+.btn.studio-border-glow--clear {
+  @apply text-heading;
+  background-color: transparent;
+  background-image: none;
+}
+
+.btn.studio-border-glow--clear:not(:disabled, [aria-disabled="true"]):hover {
+  --studio-border-glow-halo-opacity: 0.4;
+}
+
+/* Reduced motion: the ring and the halo stay, still. */
+@media (prefers-reduced-motion: reduce) {
+  .studio-border-glow::before,
+  .studio-border-glow::after {
+    animation: none;
   }
 }
 
@@ -656,8 +694,15 @@ body.modal-open .studio-app-banner {
   gap: 0.75rem;
   margin-top: 0.75rem;
 
-  .carousel:not([data-carousel-ready]) &,
-  .carousel[data-carousel-static] & {
+  /* Until the controller connects the row is hidden but keeps its room, so nothing
+     below moves when the arrows arrive (a hash landing, CLS). A row that fits, or a
+     controller that failed to load, gives the room back. */
+  .carousel:not([data-carousel-ready]) & {
+    visibility: hidden;
+  }
+
+  .carousel[data-carousel-static] &,
+  .carousel[data-studio-controller-failed] & {
     display: none;
   }
 }

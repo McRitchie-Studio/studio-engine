@@ -86,7 +86,7 @@
         line at rest, its description on hover or focus. %>
     <% if geo_live %>
       <%= link_to admin_geo_path,
-            class: "group flex items-center gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition",
+            class: "group flex items-center gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ink focus-visible:ring-inset transition",
             "data-sidebar-row-described": "",
             "aria-current": (Studio.sidebar_style == :glass && respond_to?(:request) && request&.path == admin_geo_path ? "page" : nil),
             "@click": geo_close do %>
@@ -104,7 +104,7 @@
           omission: the row's whole job in this state is to hand over the string, and
           select-none made it unselectable. role/aria-disabled give a screen reader
           the "unavailable destination" this paints for a sighted eye. %>
-      <span class="flex items-center gap-3 px-4 py-3 text-sm text-muted cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset"
+      <span class="flex items-center gap-3 px-4 py-3 text-sm text-muted cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ink focus-visible:ring-inset"
             role="link"
             aria-disabled="true"
             tabindex="0"
