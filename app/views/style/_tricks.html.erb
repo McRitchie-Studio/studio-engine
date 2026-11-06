@@ -230,6 +230,31 @@
     </div>
   </section>
 
+  <!-- Carousel -->
+  <section class="space-y-5" data-carousel-specimen>
+    <div class="space-y-1">
+      <h3 class="type-h4 text-heading">Carousel</h3>
+      <p class="text-muted text-sm"><code class="font-mono text-2xs">studio/_carousel</code> is a swipeable row of any slides, with arrows, dots and arrow keys.</p>
+    </div>
+    <%# The live partial: a carousel joins no stack and holds no title, so the
+        specimen is the real thing. Swipe it, press its arrows, or focus it and
+        use the arrow keys. %>
+    <%= render layout: "style/specimen",
+          locals: { klass: "studio/_carousel",
+                    note: "Shows a set too long to grid, a few slides at a time.",
+                    usage: %(<%= render layout: "studio/carousel",\n      locals: { label: "Portfolio", items: @apps, per_view: 3 } do |app| %\>\n  <%= render "apps/card", app: app %\>\n<% end %\>) } do %>
+      <div class="w-full min-w-0">
+        <%= render layout: "studio/carousel",
+              locals: { label: "Specimen slides", items: (1..7).to_a, per_view: 3, id: "style-carousel-specimen" } do |n| %>
+          <div class="card h-full p-5 space-y-1">
+            <p class="label-upper">Slide <%= n %></p>
+            <p class="text-sm text-body">Any block content.</p>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  </section>
+
   <!-- Surfaces, text and form -->
   <section class="space-y-5">
     <div class="space-y-1">

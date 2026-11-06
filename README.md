@@ -313,6 +313,19 @@ with a bar once stuck ([`docs/PAGE_HEADER.md`](docs/PAGE_HEADER.md#the-section-h
       tabs: [{ label: "Users", href: users_path, current: "page" }, { label: "Teams", href: teams_path }] %>
 ```
 
+### The carousel — `studio/_carousel`
+
+The apps' standard for a set too long to grid: a swipeable scroll-snap row with
+arrows, dots and arrow keys, a peek of the next slide, and an edge fade. Render it
+as a layout; the block draws each slide. `per_view:` is the wide row's count
+(default 3). `/admin/style` shows it under Tricks.
+
+```erb
+<%= render layout: "studio/carousel", locals: { label: "Portfolio", items: @apps, per_view: 3 } do |app| %>
+  <%= render "apps/card", app: app %>
+<% end %>
+```
+
 ### The "at" time stamp — `at_time_tag`
 
 Stamps WHEN something happened, on the reader's own clock: `at 3:53p`, gaining a

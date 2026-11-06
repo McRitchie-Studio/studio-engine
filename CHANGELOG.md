@@ -29,6 +29,21 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `docs/PAGE_TRANSITIONS.md`, "Back".
 - **The page header's title is the type scale's h2 from 40rem** (30px, weight 800), Alex
   McRitchie's "H2 header"; a phone keeps 1.5x the base. It is still the page's one `h1`.
+- **A carousel standard for the apps: `studio/_carousel`.** Render it as a layout, with
+  `label:` and `items:`, and the block draws each slide, so a slide is any block content.
+  The track is a native scroll-snap row: a swipe, a trackpad and a focused link move it with
+  no script. A wide row shows `per_view:` slides (default 3), a medium row up to two and a
+  phone one, each with a sliver of the next; the widths come from container queries on the
+  region, not the window. The lazy `carousel` controller adds the edge fade, arrows that
+  set `aria-disabled` at an end, dots that hide past the last stop, the arrow keys with Home
+  and End, and a polite status line after a press. It follows the APG carousel pattern:
+  a labelled region with `aria-roledescription="carousel"`, and each slide a labelled
+  group (`slide_label:` names it from its item). It honours `prefers-reduced-motion`, and
+  its arrows take the card fill, so they are glass under the glass surfaces. Until the
+  controller connects, the controls stay hidden and the row keeps a thin scrollbar. New
+  classes: `carousel`, `carousel-track`, `carousel-slide`, `carousel-controls`,
+  `carousel-dots`, `carousel-dot`, `carousel-arrows` and `carousel-button`. `/admin/style`
+  shows it under Tricks.
 
 ## 0.130.0 — 2026-11-05
 

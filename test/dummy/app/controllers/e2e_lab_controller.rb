@@ -767,6 +767,11 @@ class E2eLabController < ActionController::Base
     @lab_right = params[:right].presence || "tabs"
   end
 
+  # studio/_carousel, three ways: a row of nine linked cards three to a view (the
+  # hub's /websites shape), a row of plain text slides with nothing to focus, and
+  # a row of two that fits. A view, no inputs.
+  def carousel; end
+
   # studio/_section_header under the real chrome, with a table inside a section.
   # ?timeline=1 puts the header on the scroll-driven collapse.
   def section_header

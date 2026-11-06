@@ -557,6 +557,219 @@ body.modal-open .studio-app-banner {
   }
 }
 
+/* -- The carousel (studio/_carousel) -----------------------------------------
+   One sideways row of slides on a native scroll-snap track: a swipe, a trackpad and
+   a focused link move it with no script. The carousel controller adds the edge fade,
+   the arrows, the dots and the keys (studio/controllers/carousel_controller).
+
+   WIDTHS COME FROM THE REGION, NOT THE WINDOW. The region is an inline-size container,
+   so a carousel in a narrow column lays out as a phone does. A phone row shows one
+   slide, a medium row up to two, a wide row --carousel-per-view (the partial's
+   per_view). Every row adds --carousel-peek of the next slide, so a visitor sees
+   there is more. n slides and their n gaps plus the peek fill the row:
+   n * w + n * gap + peek * w = 100 percent.
+
+   BEFORE THE CONTROLLER CONNECTS, or when it failed to load, the controls are hidden
+   (they would do nothing) and the track keeps a thin scrollbar, so the row still
+   scrolls with a mouse. */
+@utility carousel {
+  --carousel-gap: 1rem;
+  --carousel-peek: 0.2;
+  --carousel-fade: 2.5rem;
+  position: relative;
+  min-width: 0;
+  container-type: inline-size;
+
+  /* The track's focus ring is drawn here: the track's edge mask clips anything
+     outside its own box, an outline included. */
+  &:has(> .carousel-track:focus-visible) {
+    outline: 2px solid color-mix(in srgb, var(--color-cta) 70%, transparent);
+    outline-offset: 2px;
+    border-radius: 0.75rem;
+  }
+}
+
+@utility carousel-track {
+  --carousel-n: min(var(--carousel-per-view, 3), 1);
+  --carousel-fade-start: 0px;
+  --carousel-fade-end: 0px;
+  position: relative;
+  display: flex;
+  gap: var(--carousel-gap);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  /* Room for a slide's hover shadow and focus ring: the scroll box clips both ways. */
+  padding-block: 0.25rem 0.5rem;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--carousel-fade-start), #000 calc(100% - var(--carousel-fade-end)), transparent 100%);
+          mask-image: linear-gradient(to right, transparent 0, #000 var(--carousel-fade-start), #000 calc(100% - var(--carousel-fade-end)), transparent 100%);
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  &[data-fade-start] {
+    --carousel-fade-start: var(--carousel-fade);
+  }
+
+  &[data-fade-end] {
+    --carousel-fade-end: var(--carousel-fade);
+  }
+
+  &:focus-visible {
+    outline: none;
+  }
+
+  .carousel:not([data-carousel-ready]) & {
+    scrollbar-width: thin;
+  }
+
+  .carousel:not([data-carousel-ready]) &::-webkit-scrollbar {
+    display: initial;
+  }
+
+  @container (width >= 36rem) {
+    --carousel-n: min(var(--carousel-per-view, 3), 2);
+  }
+
+  @container (width >= 56rem) {
+    --carousel-n: var(--carousel-per-view, 3);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    scroll-behavior: auto;
+  }
+}
+
+@utility carousel-slide {
+  flex: 0 0 calc((100% - var(--carousel-n) * var(--carousel-gap)) / (var(--carousel-n) + var(--carousel-peek)));
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+@utility carousel-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+
+  .carousel:not([data-carousel-ready]) &,
+  .carousel[data-carousel-static] & {
+    display: none;
+  }
+}
+
+@utility carousel-dots {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+}
+
+/* A 1.5rem tap target around a small pill. The open stop's pill is wider and wears
+   the primary, so the dots read as a progress line. */
+@utility carousel-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.5rem;
+  padding-inline: 0.1875rem;
+  border-radius: 9999px;
+  cursor: pointer;
+
+  &::before {
+    content: "";
+    display: block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background-color: color-mix(in srgb, var(--color-text-muted) 45%, transparent);
+    transition: width 200ms ease, background-color 200ms ease;
+  }
+
+  &:hover::before {
+    background-color: var(--color-text-muted);
+  }
+
+  &[aria-current="true"]::before {
+    width: 1.5rem;
+    background-color: var(--color-primary);
+  }
+
+  &[hidden] {
+    display: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-cta) 70%, transparent);
+    outline-offset: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::before {
+      transition: none;
+    }
+  }
+}
+
+@utility carousel-arrows {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+/* Round arrows on the card fill, so under the glass surfaces they are glass too. */
+@utility carousel-button {
+  @apply border border-subtle text-heading;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  background-color: var(--surface-card-fill, var(--color-surface));
+  -webkit-backdrop-filter: var(--surface-glass-filter, none);
+          backdrop-filter: var(--surface-glass-filter, none);
+  box-shadow: var(--surface-glass-highlight, 0 0 #0000), var(--surface-glass-shadow, 0 0 #0000);
+  cursor: pointer;
+  transition: border-color 150ms ease, opacity 150ms ease, transform 150ms ease;
+
+  & svg {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+
+  &:hover:not([aria-disabled="true"]) {
+    @apply border-primary;
+  }
+
+  &:active:not([aria-disabled="true"]) {
+    transform: scale(0.94);
+  }
+
+  &[aria-disabled="true"] {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-cta) 70%, transparent);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:active:not([aria-disabled="true"]) {
+      transform: none;
+    }
+  }
+}
+
 /* -- The section header (studio/_section_header, docs/PAGE_HEADER.md) --------
    A section's title that sticks under the rest of the stack, inside its own <section>,
    so the next section's header takes its place with no scroll script. At rest it reads as

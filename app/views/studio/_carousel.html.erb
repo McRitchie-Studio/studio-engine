@@ -1,0 +1,75 @@
+<%# locals: (label:, items:, per_view: 3, id: nil, slide_label: nil, data: {}, class_name: nil) %>
+<%# THE CAROUSEL: one sideways row of slides, the apps' standard for a set too
+    long to grid. Render it as a layout, so each slide is your own block:
+
+      render layout: "studio/carousel", locals: { label: "Portfolio", items: @apps } do |app|
+        render "apps/card", app: app
+      end
+
+      label        the region's accessible name. Required: a screen reader says
+                   "Portfolio, carousel".
+      items        one slide per item; the block draws it.
+      per_view     whole slides in view on a wide row (1 to 6). A medium row shows
+                   up to two, a phone one, and every width shows a sliver of the
+                   next slide, so a visitor sees there is more.
+      id           the track's id, for the arrows' aria-controls. Defaults from
+                   the label; pass one when two carousels on a page share a label.
+      slide_label  a callable that names a slide from its item. Without one a
+                   slide is "2 of 6".
+      data         data attributes for the region, such as a test hook.
+      class_name   classes for the region, such as its width.
+
+    THE TRACK IS A NATIVE SCROLL-SNAP ROW (engine.css, carousel). A swipe, a
+    trackpad, a wheel and a focused link move it with no script. The carousel
+    controller (studio/controllers/carousel_controller) adds the edge fade, the
+    arrows, the dots and the keys, and until it connects the controls stay
+    hidden and the row keeps a thin scrollbar. The widths come from container
+    queries on the region, so a carousel in a narrow column lays out as a phone
+    does.
+
+    ACCESSIBLE BY THE APG CAROUSEL PATTERN: a labelled region with
+    aria-roledescription carousel, each slide a group with aria-roledescription
+    slide and its own label, named arrows that set aria-disabled at an end (not
+    disabled, so focus stays on the arrow), and a polite status line that speaks
+    only after a press. %>
+<%
+  per_view = per_view.to_f.clamp(1, 6)
+  per_view = per_view.to_i if per_view == per_view.floor
+  items = items.to_a
+  total = items.size
+  track_id = id.presence || "carousel-#{label.to_s.parameterize.presence || 'slides'}"
+%>
+<%= tag.section(class: ["carousel", class_name].compact.join(" "),
+      role: "region",
+      aria: { roledescription: "carousel", label: label },
+      style: "--carousel-per-view: #{per_view}",
+      data: { studio_controller: "carousel", studio_action: "keydown->carousel#key" }.merge(data)) do %>
+  <div id="<%= track_id %>" class="carousel-track" tabindex="0" data-carousel-target="track">
+    <% items.each_with_index do |item, index| %>
+      <div class="carousel-slide" role="group" aria-roledescription="slide"
+           aria-label="<%= slide_label ? slide_label.call(item) : "#{index + 1} of #{total}" %>"
+           data-carousel-target="slide"><%= yield(item) %></div>
+    <% end %>
+  </div>
+  <div class="carousel-controls">
+    <div class="carousel-dots" role="group" aria-label="Choose a slide">
+      <% total.times do |index| %>
+        <button type="button" class="carousel-dot" aria-label="Go to slide <%= index + 1 %>"
+                aria-controls="<%= track_id %>"<%= ' aria-current="true"'.html_safe if index.zero? %>
+                data-carousel-target="dot" data-carousel-index="<%= index %>"
+                data-studio-action="click->carousel#goTo"></button>
+      <% end %>
+    </div>
+    <div class="carousel-arrows">
+      <button type="button" class="carousel-button" aria-label="Previous slides" aria-controls="<%= track_id %>"
+              aria-disabled="true" data-carousel-target="prev" data-studio-action="click->carousel#prev">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12.5 15 7.5 10l5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button type="button" class="carousel-button" aria-label="Next slides" aria-controls="<%= track_id %>"
+              data-carousel-target="next" data-studio-action="click->carousel#next">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m7.5 5 5 5-5 5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </div>
+  <p class="sr-only" role="status" aria-live="polite" data-carousel-target="status"></p>
+<% end %>

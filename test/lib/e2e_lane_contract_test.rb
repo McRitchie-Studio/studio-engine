@@ -374,6 +374,9 @@ class E2eLaneContractTest < Minitest::Test
       "site_footer_index.html.erb" => ["studio_booking_link"],
       # The kit's copy control and downloads are the engine's markup and program.
       "marketing_kit.html.erb" => ["studio/marketing_kit/kit"],
+      # The region, track, controls and controller are the engine's; the slides are
+      # the host's blocks, which is the partial's whole contract.
+      "carousel.html.erb" => ["studio/carousel"],
       # The voice row's recorder, meter and save are the engine's program
       # (studio/voice_profile), mounted by the row's own markup.
       "voice_profile.html.erb" => ["studio/profiles/voice_section"],
@@ -385,8 +388,9 @@ class E2eLaneContractTest < Minitest::Test
       source = File.read(File.join(lab, page))
 
       partials.each do |partial|
-        # `render "partial"`, or `<%= helper` for a primitive whose API is a helper.
-        assert_match(/render\s+"#{Regexp.escape(partial)}"|<%=\s*#{Regexp.escape(partial)}\b/, source,
+        # `render "partial"`, `render layout: "partial"` for a primitive that yields
+        # (studio/carousel), or `<%= helper` for a primitive whose API is a helper.
+        assert_match(/render\s+(?:layout:\s*)?"#{Regexp.escape(partial)}"|<%=\s*#{Regexp.escape(partial)}\b/, source,
                      "#{page} must render the engine partial #{partial} BY NAME. A lab page that " \
                      "reimplements the partial turns its spec into a test of the lab.")
       end
