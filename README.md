@@ -621,23 +621,22 @@ inline transport nothing listens, so the dispatch is a harmless no-op there.
 
 #### The auth modal's credential slot
 
-**This engine ships no sign-in card.** Each app owns its own and computes its
-credential buttons itself: turf-monster's is `app/views/modals/_auth.html.erb`,
-which is also the authority `lib/studio.rb` cites beside the Solana routes. The
-engine's one auth card was the living style guide's MIRROR of turf's,
-`style/modals/_auth`, and it was retired with the other mirrors on 2026-09-09
-(PR #319). For sign-in the engine now ships fragments, not a card:
-`studio/modals/shared/_email_field` and `studio/modals/auth/_resend_footer`,
-each carded on the style guide.
+**This engine ships the standard sign-in card:** `studio/auth/_sign_in_card`
+(a page) and `studio/auth/_sign_in_modal` (a modal), Google, then "or", then the
+email magic link, built from `studio/modals/shared/_email_field` and
+`studio/modals/auth/_resend_footer` ([`docs/SIGN_IN_CARD.md`](docs/SIGN_IN_CARD.md)).
+It is the one authority `lib/studio.rb` cites beside the Solana routes. It
+reverses the 2026-09-09 call (PR #319) that the engine ships only the fragments
+(Alex McRitchie, 2026-11-06). Until the apps adopt it, each still renders its
+own card: turf-monster's `app/views/modals/_auth.html.erb` computes its wallet
+button from `auth_methods` and `feature?(:web3)`.
 
-**The wallet credential slot has no host today.** solana-studio still ships
-`solana_studio/auth/_wallet_credential`, a Solana button written to be
-*contributed* into a sign-in card rather than copied into one. The retired
-mirror was its only renderer. Neither turf-monster nor mcritchie-studio names
-the path; turf's card draws its wallet button directly. So bundling solana-studio
-no longer puts a wallet button anywhere. Whether the engine should host the slot
-again, or the convention should be retired, is an open call, not a fact this
-README can settle.
+**The wallet credential slot is the card's `extras:` local.** solana-studio
+still ships `solana_studio/auth/_wallet_credential`, a Solana button written to
+be *contributed* into a sign-in card rather than copied into one. The engine
+card takes extra providers as named partials, after Google and before "or", so
+an app passes `extras: "solana_studio/auth/wallet_credential"` (or its own
+wallet button). Turf's adoption decides which one it keeps.
 
 **A card that does host it owns the gate.** The retired mirror's rules still
 hold; they simply live in that app's view now. Two layers answer two different

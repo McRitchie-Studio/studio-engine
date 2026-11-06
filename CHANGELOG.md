@@ -20,7 +20,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   the card in demo mode; the separate Email field and Resend footer specimens are
   gone, and both partials stay. `studio/modals/auth/_resend_footer` takes
   `close: false` for a host that is not a modal. The hub and turf-monster still
-  render their own cards; adoption is follow-up work. Docs: `docs/SIGN_IN_CARD.md`
+  render their own cards; adoption is follow-up work. This reverses the 2026-09-09
+  call (PR #319) that the engine ships only the fragments, not a card. Docs: `docs/SIGN_IN_CARD.md`
   (task `engine-ships-sign-in-card`).
 
 ## 0.132.0 — 2026-11-06

@@ -14,8 +14,8 @@
      card behind ours. So this section owns a tiny, self-contained store + overlay
      and registers all specimen content itself.
 
-     Groups: Auth (the engine-owned FRAGMENTS an app's own sign-in card is built
-     from — the engine ships no auth card), Eligibility and entry (the
+     Groups: Auth (the engine's standard sign-in card, studio/auth/_sign_in_modal,
+     in demo mode), Eligibility and entry (the
      app-supplied-policy age-gate DOB primitive, gated by Studio.feature?(:age_gate)),
      Profile (crop / upload, opened
      through studio/cropper_assets), Web3 (wallet-connect and web3-step-up now
@@ -97,7 +97,8 @@
   # THE AUTH METHOD-TOGGLE DEFAULTS USED TO LIVE HERE (ml_default / g_default /
   # w_default / auth_toggles) and are gone with the card they configured. They
   # belonged to style/modals/_auth, a MIRROR of turf-monster's sign-in modal,
-  # retired on 2026-09-09. The engine ships no auth card to configure.
+  # retired on 2026-09-09. The engine's own card (studio/auth/_sign_in_modal,
+  # 2026-11-06) has no toggles: its specimen runs it in demo mode as shipped.
   #
   # The rule they were built to enforce OUTLIVES them and is worth keeping: a
   # TRIGGER must carry at least the gate its target's REGISTRATION carries, or

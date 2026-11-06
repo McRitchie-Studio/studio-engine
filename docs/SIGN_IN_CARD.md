@@ -75,7 +75,10 @@ caller's block from the layout's content (`Studio::PartialBlock`).
   OmniAuth callback does not read it yet; an app whose callback reads
   `omniauth.params` (turf-monster does) gets it. When the app has no OAuth
   client yet, the card draws `studio/google_sign_in/_button`, which opens the
-  setup modal instead (docs/GOOGLE_AUTH_SETUP.md).
+  setup modal instead (docs/GOOGLE_AUTH_SETUP.md). That button mounts one
+  `googleSetupModals` host, and its rule is one per page: a page that renders
+  this card while no OAuth client is set must not also render `sessions/new`'s
+  button, or a second card. Demo mode never renders it.
 - **Email** is a real `form_tag` to the magic-link endpoint, with `email` and
   `return_to`, so it works with no JavaScript. With JavaScript, the card posts
   the same fields by `fetch()` with `Accept: application/json` and the page's
