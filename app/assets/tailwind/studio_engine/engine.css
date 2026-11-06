@@ -694,8 +694,15 @@ body.modal-open .studio-app-banner {
   gap: 0.75rem;
   margin-top: 0.75rem;
 
-  .carousel:not([data-carousel-ready]) &,
-  .carousel[data-carousel-static] & {
+  /* Until the controller connects the row is hidden but keeps its room, so nothing
+     below moves when the arrows arrive (a hash landing, CLS). A row that fits, or a
+     controller that failed to load, gives the room back. */
+  .carousel:not([data-carousel-ready]) & {
+    visibility: hidden;
+  }
+
+  .carousel[data-carousel-static] &,
+  .carousel[data-studio-controller-failed] & {
     display: none;
   }
 }

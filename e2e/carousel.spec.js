@@ -208,6 +208,18 @@ test("a carousel whose controller never loads still scrolls, with its controls h
   expect(await settled(track(page, "apps"))).toBeGreaterThan(100);
 });
 
+test("the controls row keeps its room before the controller connects, so nothing below moves", async ({ page }) => {
+  await page.setViewportSize(DESKTOP);
+  await blockOffsiteRequests(page);
+  await page.route(/carousel_controller.*\.js/, async (route) => { await new Promise((r) => setTimeout(r, 800)); await route.continue(); });
+  await page.goto(LAB, { waitUntil: "domcontentloaded" });
+  const apps = region(page, "apps");
+  await expect(apps).not.toHaveAttribute("data-carousel-ready", "");
+  const before = await apps.evaluate((el) => el.getBoundingClientRect().height);
+  await expect(apps).toHaveAttribute("data-carousel-ready", "");
+  expect(await apps.evaluate((el) => el.getBoundingClientRect().height)).toBe(before);
+});
+
 const status = (page, name) => region(page, name).locator("> [role='status']");
 
 test("the status line stays empty after the first paint and after a swipe", async ({ page }) => {
