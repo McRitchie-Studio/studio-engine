@@ -776,8 +776,8 @@ body.modal-open .studio-app-banner {
    neighbours are smaller, faded and grey, and the next ones peek at the edges.
 
    WIDTHS. A slide is --carousel-spot-w wide, in units of the region (cqi, since the
-   region is the inline-size container). n slides and a 0.4 peek fill the row:
-   n * w + (n - 1) * gap + 0.4 * w = 100cqi. The track pads each end by half the
+   region is the inline-size container). n slides and a 0.6 peek fill the row:
+   n * w + (n - 1) * gap + 0.6 * w = 100cqi. The track pads each end by half the
    rest, so the first and the last slide can centre too.
 
    THE EFFECT FOLLOWS THE SCROLL where the browser has scroll-driven animations:
@@ -822,7 +822,9 @@ body.modal-open .studio-app-banner {
   /* On the track, not the region: the track's container queries set --carousel-n,
      and a container query cannot read the element it sits on. */
   & > .carousel-track {
-    --carousel-spot-w: calc((100cqi - (var(--carousel-n) - 1) * var(--carousel-gap)) / (var(--carousel-n) + 0.4));
+    /* A smaller gap: the neighbours' scale already opens space around the centre. */
+    --carousel-gap: 0.5rem;
+    --carousel-spot-w: calc((100cqi - (var(--carousel-n) - 1) * var(--carousel-gap)) / (var(--carousel-n) + 0.6));
     --carousel-spot-step: calc(var(--carousel-spot-w) + var(--carousel-gap));
     padding-inline: calc((100cqi - var(--carousel-spot-w)) / 2);
     /* The neighbours are already dimmed; an edge fade over them reads as a smear. */
