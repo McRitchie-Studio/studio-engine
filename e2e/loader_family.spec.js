@@ -201,6 +201,10 @@ test("the style guide carries the Loaders section, all eight, and its pill", asy
     await expect(specimen(page, name), name).toHaveCount(1);
   }
   await expect(section(page).locator("article")).toHaveCount(8);
+  // Every usage snippet wraps inside its box, clear of its Copy button.
+  const clipped = await section(page).locator("pre").evaluateAll((els) =>
+    els.filter((el) => el.scrollWidth > el.clientWidth).map((el) => el.textContent.slice(0, 40)));
+  expect(clipped).toEqual([]);
 
   await page.goto("/lab/style_nav");
   await expect(page.locator('a[href="#loaders"]').first()).toHaveText("Loaders");
