@@ -4,7 +4,7 @@
   and a ×. Single root, for a modal host's <template x-if>:
 
     <template x-if="$store.modals.current()?.id === 'sign-in'">
-      <div><%= render "studio/auth/sign_in_modal", return_to: request.path %></div>
+      <div>render "studio/auth/sign_in_modal", return_to: request.path</div>
     </template>
 
     $store.modals.open('sign-in')

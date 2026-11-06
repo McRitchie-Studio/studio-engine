@@ -3,11 +3,11 @@
   card with Google, "or", and the email magic link. Sending the link flips the
   same card to its link-sent step, with the resend footer. No modal is needed.
 
-    <%= render "studio/auth/sign_in_card" %>
-    <%= render "studio/auth/sign_in_card", return_to: "/contests/42",
+    render "studio/auth/sign_in_card"
+    render "studio/auth/sign_in_card", return_to: "/contests/42",
           subheading: "Sign in to play",
           preamble: "studio/modals/shared/age_attestation",
-          extras: "shared/solana_wallet_connect" %>
+          extras: "shared/solana_wallet_connect"
 
   Locals (all optional):
     heading      — default "Sign in to <Studio.app_name>" (Studio::AuthLabels.to_app)
