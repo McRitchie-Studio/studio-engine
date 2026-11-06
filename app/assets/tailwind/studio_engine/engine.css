@@ -647,6 +647,20 @@ body.modal-open .studio-app-banner {
   flex: 0 0 calc((100% - var(--carousel-n) * var(--carousel-gap)) / (var(--carousel-n) + var(--carousel-peek)));
   min-width: 0;
   scroll-snap-align: start;
+
+  /* The partial's start: past the first slide. A browser with scroll-initial-target
+     opens the row on this slide before the first paint, so the start costs no jump;
+     elsewhere the controller sets it when it connects. */
+  &[data-carousel-start-slide] {
+    scroll-initial-target: nearest;
+  }
+}
+
+/* The caption's line under a slide (the partial's caption:). A standard row shows it
+   under every slide; the spotlight (below) shows it under the centred slide only. */
+@utility carousel-caption {
+  margin-top: 0.5rem;
+  @apply text-sm text-body;
 }
 
 @utility carousel-controls {
@@ -2240,7 +2254,7 @@ html[data-theme-flip]::view-transition-new(*) {
        oklch (the gradient would drop out and leave white text on nothing), it stays solid. */
     @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) and (color: oklch(from red l c h)) {
       html.dark[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(.btn-sm, :disabled, [aria-disabled="true"], [class*=" bg-"], [class^="bg-"]) {
-        --lit-fill-alpha: 0.85;
+        --lit-fill-alpha: 0.65;
         background-color: transparent;
         -webkit-backdrop-filter: blur(6px);
         backdrop-filter: blur(6px);

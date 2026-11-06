@@ -146,7 +146,8 @@ class CarouselRenderTest < Minitest::Test
     assert_equal %w[Turf Cyvasse Rolio], bodies.map { |body| body.at_css("a.card").text }
     assert_equal "carousel", section["data-studio-controller"], "the same controller"
     assert_equal "region", section["role"]
-    assert_equal ["Previous slides", "Next slides"], doc.css(".carousel-button").map { |b| b["aria-label"] }
+    assert_equal ["Previous slide", "Next slide"], doc.css(".carousel-button").map { |b| b["aria-label"] },
+                 "a spotlight arrow moves one slide, so its name is singular"
     assert_equal 3, doc.css(".carousel-dot").size
     assert_includes region(render_carousel(style: "spotlight"))["class"].split, "carousel-spotlight",
                     "a string style works as the symbol does"
@@ -181,5 +182,94 @@ class CarouselRenderTest < Minitest::Test
     refused = chain.find { |e| e.is_a?(ArgumentError) }
     assert refused, "an ArgumentError in #{chain.map(&:class).inspect}"
     assert_match(/not :standard or :spotlight/, refused.message)
+  end
+
+  # THE START: the slide the row opens on (start:).
+  FOUR = (ITEMS + [Item.new("Moms")]).freeze
+
+  def current_dot(doc) = doc.at_css(".carousel-dot[aria-current='true']")["data-carousel-index"]
+  def arrows(doc) = doc.css(".carousel-button").map { |b| b["aria-disabled"] }
+
+  def test_a_spotlight_opens_on_its_middle_slide_by_default
+    doc = render_carousel(style: :spotlight)
+
+    assert_equal "1", region(doc)["data-carousel-start"]
+    assert_equal ["2 of 3"], doc.css(".carousel-slide[data-carousel-start-slide]").map { |s| s["aria-label"] }
+    assert_equal ["2 of 3"], doc.css(".carousel-slide[data-current]").map { |s| s["aria-label"] }
+    assert_equal "1", current_dot(doc)
+    assert_equal ["false", nil], arrows(doc), "neither arrow is at an end"
+  end
+
+  def test_the_middle_of_an_even_set_is_the_later_of_the_two
+    doc = render_carousel(items: FOUR, style: :spotlight)
+
+    assert_equal "2", region(doc)["data-carousel-start"]
+    assert_equal "2", current_dot(doc)
+  end
+
+  def test_a_standard_row_opens_on_its_first_slide_by_default
+    doc = render_carousel
+
+    assert_nil region(doc)["data-carousel-start"]
+    assert_empty doc.css("[data-carousel-start-slide], .carousel-slide[data-current]")
+    assert_equal "0", current_dot(doc)
+    assert_equal ["true", nil], arrows(doc)
+  end
+
+  def test_start_takes_an_index
+    doc = render_carousel(items: FOUR, start: 1)
+
+    assert_equal "1", region(doc)["data-carousel-start"]
+    assert_equal ["2 of 4"], doc.css(".carousel-slide[data-carousel-start-slide]").map { |s| s["aria-label"] }
+    assert_equal "1", current_dot(doc)
+  end
+
+  def test_a_standard_row_takes_middle_too
+    assert_equal "2", region(render_carousel(items: FOUR, start: :middle))["data-carousel-start"]
+    assert_equal "2", region(render_carousel(items: FOUR, start: "middle"))["data-carousel-start"]
+  end
+
+  def test_start_on_the_last_slide_turns_next_off
+    doc = render_carousel(style: :spotlight, start: 2)
+
+    assert_equal ["false", "true"], arrows(doc)
+  end
+
+  def test_start_is_held_to_the_row
+    assert_equal "2", region(render_carousel(start: 99))["data-carousel-start"]
+    assert_nil region(render_carousel(start: -3))["data-carousel-start"]
+    assert_nil region(render_carousel(items: [], style: :spotlight))["data-carousel-start"]
+  end
+
+  def test_start_zero_on_a_spotlight_adds_no_start_mark
+    doc = render_carousel(style: :spotlight, start: 0)
+
+    assert_nil region(doc)["data-carousel-start"]
+    assert_empty doc.css("[data-carousel-start-slide]")
+    assert_equal "0", current_dot(doc)
+    assert_equal ["true", nil], arrows(doc)
+  end
+
+  def test_an_unknown_start_is_refused
+    error = assert_raises(StandardError) { render_carousel(start: :end) }
+    chain = []
+    while error
+      chain << error
+      error = error.cause
+    end
+    refused = chain.find { |e| e.is_a?(ArgumentError) }
+    assert refused, "an ArgumentError in #{chain.map(&:class).inspect}"
+    assert_match(/not an index or :middle/, refused.message)
+  end
+
+  def test_a_standard_arrow_keeps_its_plural_name
+    assert_equal ["Previous slides", "Next slides"], render_carousel.css(".carousel-button").map { |b| b["aria-label"] }
+  end
+
+  def test_a_standard_caption_writes_a_line_under_each_slide
+    doc = render_carousel(caption: ->(item) { "#{item.name} app" })
+
+    assert_equal ["Turf app", "Cyvasse app", "Rolio app"], doc.css(".carousel-slide > .carousel-caption").map(&:text)
+    assert_equal "carousel-caption", doc.at_css(".carousel-slide").element_children.last["class"]
   end
 end

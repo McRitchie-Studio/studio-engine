@@ -4,7 +4,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/carousel.js", import.meta.url), "utf8")
-const { centerStops, currentStop } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
+const { centerStops, currentStop, startStop } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 // A 1000px row padded 350px each end, five 300px slides 8px apart: each slide's
 // centre is half a row from its stop, and the row runs 0 to 1232.
@@ -30,4 +30,12 @@ test("the centred slide is the nearest stop, and the last from the end", () => {
   assert.equal(currentStop(150, positions), 0)
   assert.equal(currentStop(160, positions), 1)
   assert.equal(currentStop(1231, positions), 4)
+})
+
+test("a row opens on its start stop, held to the stops it has", () => {
+  assert.equal(startStop(3, 7), 3)
+  assert.equal(startStop(5, 4), 3)
+  assert.equal(startStop(-1, 4), 0)
+  assert.equal(startStop("2", 4), 2)
+  assert.equal(startStop(2, 0), 0)
 })

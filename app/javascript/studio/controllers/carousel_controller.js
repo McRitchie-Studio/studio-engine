@@ -19,9 +19,14 @@
 // slide is a stop, an arrow moves one slide, and the slide nearest the centre
 // carries data-current, which the CSS styles where scroll-driven animations are
 // missing and under reduced motion.
-import { centerStops } from "studio/carousel"
+//
+// THE START (the partial's start:, data-carousel-start): a row that opens past its
+// first slide. The browser lands there before the first paint where it has
+// scroll-initial-target (engine.css); elsewhere connect() jumps there, with no glide
+// and nothing in the status line. A row already moved (the browser's own start, a
+// restored scroll, a #fragment inside it) is left where it is.
 import { Controller } from "@hotwired/stimulus"
-import { currentStop, hiddenEnds, keyAction, perPage, positionText, stops, targetStop } from "studio/carousel"
+import { TOLERANCE, centerStops, currentStop, hiddenEnds, keyAction, perPage, positionText, startStop, stops, targetStop } from "studio/carousel"
 
 // Keys inside these belong to the field, not the row.
 const TYPING = "input, textarea, select, [contenteditable]"
@@ -37,7 +42,25 @@ export default class extends Controller {
       this.observer.observe(this.trackTarget)
     }
     this.element.setAttribute("data-carousel-ready", "")
+    this.openAtStart()
     this.sync()
+  }
+
+  openAtStart() {
+    const start = Number(this.element.dataset.carouselStart)
+    if (!(start > 0)) return
+    const track = this.trackTarget
+    if (Math.abs(track.scrollLeft) > TOLERANCE) return
+    const hash = window.location?.hash
+    if (hash && hash.length > 1) {
+      let target = null
+      try { target = document.getElementById(decodeURIComponent(hash.slice(1))) } catch { target = null }
+      if (target && track.contains(target)) return
+    }
+    const { positions } = this.measure()
+    const left = positions[startStop(start, positions.length)]
+    if (left === undefined) return
+    track.scrollTo({ left, behavior: "instant" })
   }
 
   disconnect() {

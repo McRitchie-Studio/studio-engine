@@ -85,6 +85,14 @@ test("the first paint rests at the start: prev off, next on, the end faded", asy
   await expect(apps.locator(".carousel-dot[aria-current='true']")).toHaveAttribute("data-carousel-index", "0");
 });
 
+test("a standard row still opens on its first slide: no start mark, no scroll", async ({ page }) => {
+  await open(page);
+  const apps = region(page, "apps");
+  await expect(apps).not.toHaveAttribute("data-carousel-start", /.*/);
+  await expect(apps.locator("[data-carousel-start-slide]")).toHaveCount(0);
+  expect(await settled(track(page, "apps"))).toBe(0);
+});
+
 test("next moves a page, prev comes back, and the status says where", async ({ page }) => {
   await open(page);
   const apps = region(page, "apps");

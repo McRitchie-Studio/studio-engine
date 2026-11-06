@@ -58,4 +58,23 @@ class CarouselSpotlightCssTest < Minitest::Test
     assert_match(/0%, 100% \{[^}]*scale: var\(--carousel-spot-scale\)/m, frames)
     assert_match(/50% \{[^}]*scale: 1;/m, frames)
   end
+
+  def test_the_start_slide_is_the_browsers_initial_scroll_target
+    slide = CSS[/^@utility carousel-slide \{\n.*?\n\}\n/m]
+    refute_nil slide
+    rule = slide[/&\[data-carousel-start-slide\] \{[^}]*\}/]
+    refute_nil rule, "the partial's start slide opens the row before the first paint"
+    assert_includes rule, "scroll-initial-target: nearest"
+  end
+
+  def test_a_standard_caption_is_styled
+    caption = CSS[/^@utility carousel-caption \{\n.*?\n\}\n/m]
+    refute_nil caption, "a standard row's caption is a styled line, not bare text"
+    assert_includes caption, "text-sm"
+  end
+
+  def test_a_dark_full_size_lit_button_fills_at_065
+    assert_includes CSS, "--lit-fill-alpha: 0.65;"
+    refute_includes CSS, "--lit-fill-alpha: 0.85;"
+  end
 end
