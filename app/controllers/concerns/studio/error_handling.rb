@@ -213,23 +213,49 @@ module Studio
     rescue ActiveRecord::RecordNotFound => e
       raise e
     rescue StandardError => e
-      error_log = create_error_log(e)
-      # `slug` is NOT in the engine's User contract (REQUIRED_USER_INSTANCE_METHODS
-      # is admin? + display_name), and `target` is routinely a User. Unguarded,
-      # the LOGGER raises NoMethodError and MASKS the original exception — the
-      # exact inverse of what this method exists to do. The name is a convenience
-      # column; its absence must never cost the record.
-      if target
-        error_log.target = target
-        error_log.target_name = target.slug if target.respond_to?(:slug)
+      begin
+        error_log = create_error_log(e)
+        attach_error_context(error_log, :target, target)
+        attach_error_context(error_log, :parent, parent)
+        error_log.save!
+      rescue StandardError => log_error
+        # The row could not be written. The original error still reaches the
+        # caller, and the process log keeps both, so a passwordless rescue that
+        # redirects never leaves the failure with no trace at all.
+        Rails.logger.error(
+          "[Studio::ErrorHandling] ErrorLog write failed (#{log_error.class}: #{log_error.message}) " \
+          "while logging #{e.class}: #{e.message}"
+        )
       end
-      if parent
-        error_log.parent = parent
-        error_log.parent_name = parent.slug if parent.respond_to?(:slug)
-      end
-      error_log.save!
+      # Set on a failed write too: the catch-all would only try the same write
+      # again, and its raise would replace the friendly reply with a raw 500.
       @_error_logged = true
       raise e
+    end
+
+    # Names `record` on the row as its target or parent.
+    #
+    # An UNSAVED record is named, never linked. ErrorLog `belongs_to` it, and a
+    # belongs_to autosaves a new record: the logger would run the failing save a
+    # second time, and that raise escaped before @_error_logged was set, so the
+    # catch-all wrote the same failure twice. It also created the account a
+    # failed signup was meant not to create.
+    #
+    # `slug` is NOT in the engine's User contract (REQUIRED_USER_INSTANCE_METHODS
+    # is admin? + display_name), and a target is routinely a User. Unguarded, the
+    # LOGGER raises NoMethodError and MASKS the original exception. The name is a
+    # convenience column; its absence must never cost the record.
+    def attach_error_context(error_log, role, record)
+      return unless record
+
+      name_column = :"#{role}_name"
+      named = error_log.has_attribute?(name_column)
+      if record.respond_to?(:new_record?) && record.new_record?
+        error_log[name_column] = "unsaved #{record.class.name}" if named
+      else
+        error_log.public_send(:"#{role}=", record)
+        error_log[name_column] = record.slug if named && record.respond_to?(:slug)
+      end
     end
 
     # Layer 1: RecordNotFound — Rails' own 404, never an ErrorLog row.
