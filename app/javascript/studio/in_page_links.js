@@ -40,6 +40,9 @@ export const FOCUS_MARK = "data-in-page-focus"
 export const SETTLE_MS = 150
 // A scroll the reader never sees move still ends: the cap for a scroll that never starts.
 export const START_CAP_MS = 400
+// A scroll aims again at a target that moved more than this, at most this many times.
+export const AIM_SLACK_PX = 2
+export const MAX_AIMS = 6
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)"
 const FOCUSABLE = "a[href], area[href], button, input, select, textarea, summary, iframe, [contenteditable], [tabindex]"
 
@@ -170,31 +173,6 @@ export function installInPageLinks(doc) {
   }
   const reduced = () => !!(win.matchMedia && win.matchMedia(REDUCED_MOTION).matches)
 
-  // The scroll's end, once: the browser's scrollend where it has one, a quiet spell where not.
-  const settle = () => {
-    if (settling) settling()
-    let quiet = null
-    let cap = null
-    const done = () => {
-      win.removeEventListener("scroll", onScroll)
-      win.removeEventListener("scrollend", done)
-      win.clearTimeout(quiet)
-      win.clearTimeout(cap)
-      if (settling !== done) return
-      settling = null
-      doc.dispatchEvent(new win.CustomEvent(SCROLL_END_EVENT))
-    }
-    const onScroll = () => {
-      win.clearTimeout(cap)
-      win.clearTimeout(quiet)
-      quiet = win.setTimeout(done, SETTLE_MS)
-    }
-    settling = done
-    win.addEventListener("scroll", onScroll, { passive: true })
-    if ("onscrollend" in win) win.addEventListener("scrollend", done, { once: true })
-    cap = win.setTimeout(done, START_CAP_MS)
-  }
-
   const scrollTo = (target, behavior) => {
     const declared = parseFloat(win.getComputedStyle(target).scrollMarginTop) || 0
     const stack = win.studioPinnedStack && win.studioPinnedStack.bottom ? win.studioPinnedStack.bottom() : 0
@@ -203,6 +181,64 @@ export function installInPageLinks(doc) {
     if (margin !== null) target.style.scrollMarginTop = `${margin}px`
     target.scrollIntoView({ behavior, block: "start" })
     if (margin !== null) target.style.scrollMarginTop = inline
+  }
+  const pageTop = (target) => target.getBoundingClientRect().top + win.scrollY
+
+  // One jump, from its start to its end. The browser fixes a smooth scroll's end where the
+  // target was at the start. Content that grows on the way (a lazy frame the scroll passes,
+  // the navbar's collapse) moves the target, so the scroll aims again, up to MAX_AIMS times,
+  // until the reader takes over (a wheel, a touch, a key, a press). The end is the browser's
+  // scrollend where it has one, a quiet spell where not; then the end event, once.
+  const jump = (target, behavior) => {
+    if (settling) settling()
+    let quiet = null
+    let cap = null
+    let aims = 0
+    let reader = false
+    let live = true
+    let aimed = pageTop(target)
+    const takeOver = () => { reader = true }
+    const INPUTS = ["wheel", "touchstart", "keydown", "pointerdown"]
+    const reaim = () => {
+      if (reader || aims >= MAX_AIMS || Math.abs(pageTop(target) - aimed) <= AIM_SLACK_PX) return false
+      aims += 1
+      scrollTo(target, behavior)
+      aimed = pageTop(target)
+      return true
+    }
+    const wait = (ms) => {
+      win.clearTimeout(quiet)
+      quiet = win.setTimeout(end, ms)
+    }
+    const end = () => {
+      if (!live) return
+      // The target moved after the scroll stopped: aim once more and wait for that end.
+      if (reaim()) return wait(START_CAP_MS)
+      win.removeEventListener("scroll", onScroll)
+      win.removeEventListener("scrollend", end)
+      for (const name of INPUTS) win.removeEventListener(name, takeOver, true)
+      win.clearTimeout(quiet)
+      win.clearTimeout(cap)
+      live = false
+      if (settling === stop) settling = null
+      doc.dispatchEvent(new win.CustomEvent(SCROLL_END_EVENT))
+    }
+    const onScroll = () => {
+      win.clearTimeout(cap)
+      reaim()
+      wait(SETTLE_MS)
+    }
+    const stop = () => {
+      reader = true
+      end()
+    }
+    settling = stop
+    win.addEventListener("scroll", onScroll, { passive: true })
+    if ("onscrollend" in win) win.addEventListener("scrollend", end)
+    for (const name of INPUTS) win.addEventListener(name, takeOver, { capture: true, passive: true })
+    cap = win.setTimeout(end, START_CAP_MS)
+    scrollTo(target, behavior)
+    aimed = pageTop(target)
   }
 
   doc.addEventListener("click", (event) => {
@@ -228,9 +264,9 @@ export function installInPageLinks(doc) {
     shownUrl = win.location.href
 
     // A scroll still running from an earlier click ends first, so its end cannot release this one.
-    settle()
+    if (settling) settling()
     link.dispatchEvent(new win.CustomEvent(SCROLL_EVENT, { bubbles: true, detail: { link, target, hash: new URL(href).hash } }))
-    scrollTo(target, behavior)
+    jump(target, behavior)
     focusTarget(target)
     if (href !== oldURL) win.dispatchEvent(new win.HashChangeEvent("hashchange", { oldURL, newURL: href }))
   })
