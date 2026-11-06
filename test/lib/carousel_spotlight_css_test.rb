@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "bundler/setup"
 require "minitest/autorun"
 
 # [unit] engine.css, the spotlight carousel's two paths. The e2e lane runs Chromium,
