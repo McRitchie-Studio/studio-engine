@@ -111,7 +111,7 @@
       </div>
     <% end %>
   <% end %>
-  <% if actions_html.present? && defined?(Studio::PageHeader) %>
+  <% if actions_html.present? && defined?(Studio::PageHeader) && Studio::PageHeader.warning_enabled? %>
     <% site = caller_locations.find { |loc| loc.path.to_s.end_with?(".erb") && !loc.path.to_s.end_with?("_page_header.html.erb") } %>
     <% Studio::PageHeader.deprecate_actions_html(site: site && "#{site.path}:#{site.lineno}") %>
   <% end %>

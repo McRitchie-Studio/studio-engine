@@ -19,7 +19,7 @@ module Studio
       # site: the caller's "path:line", so each page warns once. env and logger default to
       # Rails' and are injectable for a test.
       def deprecate_actions_html(site: nil, env: rails_env, logger: rails_logger)
-        return false unless env.to_s == "development" && logger
+        return false unless warning_enabled?(env: env) && logger
 
         key = site.to_s
         first = @mutex.synchronize { @warned[key] ? false : (@warned[key] = true) }
@@ -27,6 +27,12 @@ module Studio
 
         logger.warn([ACTIONS_HTML_WARNING, (" Called from #{site}." if site)].compact.join)
         true
+      end
+
+      # Whether a render should look for its call site at all: development only, so no
+      # other environment pays for the caller walk.
+      def warning_enabled?(env: rails_env)
+        env.to_s == "development"
       end
 
       def reset_warnings!
