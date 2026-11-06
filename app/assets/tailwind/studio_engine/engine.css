@@ -490,6 +490,11 @@ body.modal-open .studio-app-banner {
   &[aria-current] {
     @apply text-heading;
   }
+
+  /* More than colour marks the current link (WCAG 1.4.1). */
+  &[aria-current] {
+    font-weight: 600;
+  }
 }
 
 /* The tab's label sits above the gliding pill. */
@@ -521,6 +526,8 @@ body.modal-open .studio-app-banner {
 @supports (anchor-name: --a) and (position-anchor: --a) and selector(:has(a)) {
   .page-header-track {
     position: relative;
+    /* Each row's pill anchors to its own current tab, not the last one on the page. */
+    anchor-scope: --page-header-current;
   }
 
   .page-header-track > [aria-current] {

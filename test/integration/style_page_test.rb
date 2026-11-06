@@ -60,7 +60,7 @@ class StylePageTest < ActiveSupport::TestCase
 
   test "the title and the section tabs share one sticky row" do
     doc = Nokogiri::HTML.fragment(render_index)
-    row = doc.at_css("nav[aria-label='Style guide sections']")
+    row = doc.at_css(".page-header:has(> nav[aria-label='Style guide sections'])")
 
     assert_includes row["class"].split, "sticky"
     assert_equal "style-section-nav", row["data-studio-controller"]
@@ -77,7 +77,7 @@ class StylePageTest < ActiveSupport::TestCase
 
   test "the row is the engine's page header, in the stack, and the guide shows the primitive" do
     doc = Nokogiri::HTML.fragment(render_index)
-    row = doc.at_css("nav[aria-label='Style guide sections']")
+    row = doc.at_css(".page-header:has(> nav[aria-label='Style guide sections'])")
 
     assert_includes row["class"].split, "page-header"
     assert_equal "page", row["data-pin"]
@@ -90,6 +90,10 @@ class StylePageTest < ActiveSupport::TestCase
     assert specimen, "the Tricks section documents the primitive"
     assert_equal 1, specimen.css(".page-header[data-stuck]").size
     assert_equal 2, specimen.css(".page-header").size
+    # A specimen draws the classes, not the landmarks: the page's one breadcrumb nav is
+    # the real row's, so the specimens add no nav, region or header of their own.
+    assert_empty specimen.css(".page-header nav, .page-header [role='navigation'], .page-header [role='region'], .page-header header"),
+                 "a page header specimen adds a landmark to the page"
   end
 
   test "the Tricks section shows the live carousel" do
@@ -416,7 +420,7 @@ class StylePageTest < ActiveSupport::TestCase
 
     # The section nav must sit above the portal's --z-raised floor, or the
     # bubbles paint over it as the button scrolls under it.
-    nav = doc.at_css("nav[aria-label='Style guide sections']")
+    nav = doc.at_css(".page-header:has(> nav[aria-label='Style guide sections'])")
     assert_includes nav["style"], "z-index: var(--z-sticky", "the nav sits on the sticky rung"
     refute_includes nav["class"].split, "z-20", "not tied with the portal floor"
 

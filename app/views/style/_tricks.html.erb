@@ -179,12 +179,13 @@
                         usage: %(<%= render "studio/page_header",\n      title: "Models", meta: "v1.2.3", label: "Models",\n      crumbs: studio_crumbs(parent: :admin),\n      tabs: [{ label: "Users", href: users_path, current: "page" }, { label: "Teams", href: teams_path }],\n      links: [{ label: "Sessions", href: sessions_path }] %\>) } do %>
           <%= tag.div(class: "page-header w-full px-4", data: data) do %>
             <div class="page-header-trail">
-              <nav class="page-header-crumbs" aria-label="Breadcrumb (specimen)">
+              <%# A div, not the partial's <nav>: a specimen adds no landmark to the page. %>
+              <div class="page-header-crumbs">
                 <ol>
                   <li><a href="#tricks" class="page-header-crumb">Admin</a></li>
                   <li><span class="page-header-crumb-current">Models</span></li>
                 </ol>
-              </nav>
+              </div>
               <a href="#tricks" class="page-header-parent"><span aria-hidden="true">&lsaquo;</span> Admin</a>
             </div>
             <div class="page-header-lead">

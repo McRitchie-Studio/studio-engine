@@ -19,7 +19,7 @@
       meta          short text beside the title, such as the version. Hidden on a
                     phone, where the tabs need the width.
       meta_title    the meta's title attribute.
-      label         the nav's accessible name. A row with tabs needs it.
+      label         the tabs' nav's accessible name. A row with tabs needs it.
       tabs          [{ label:, href:, current:, data: }]. `current` is the
                     aria-current value ("page" or "true"), and blank on the others.
       tabs_data     data attributes for the tabs' scroller.
@@ -39,6 +39,9 @@
     <header> as the navbar, so on a page with no navbar this row would publish as
     --nav-bottom.
 
+    NOR IS IT A LANDMARK. The row is a div; the tabs, the crumbs and the links line
+    are each their own <nav>, side by side, so no landmark nests in another.
+
     IT JOINS THE STACK WITH data-pin="page" AND POSITIONS OFF --pin-page-top, the
     bottom of everything above it. --pin-stack-bottom includes the row's own edge,
     so a row positioned off it would chase itself down the page. Anything below,
@@ -52,10 +55,8 @@
     page's own. So the row carries no top margin: the space above it belongs to its
     container. %>
 <div class="page-header-sentinel" data-studio-controller="page-header" aria-hidden="true"></div>
-<%= content_tag(tabs.any? ? :nav : :div,
-      class: "page-header sticky #{row_class}".strip,
+<%= tag.div(class: "page-header sticky #{row_class}".strip,
       style: "top: var(--pin-page-top, var(--nav-bottom, var(--nav-h, 0px))); z-index: var(--z-sticky, 30)",
-      aria: { label: label.presence },
       data: data.merge(pin: "page")) do %>
   <% if crumbs.any? %>
     <% parent = crumbs.last %>
@@ -79,7 +80,7 @@
     <% end %>
   </div>
   <% if tabs.any? %>
-    <%= tag.div(class: "page-header-tabs", data: tabs_data) do %>
+    <%= tag.nav(class: "page-header-tabs", aria: { label: label.presence }, data: tabs_data) do %>
       <%# The glide: one pill, drawn once, that CSS anchors to the tab with aria-current and
           slides from tab to tab (engine.css, "The gliding pill"). Each tab keeps its own
           fill where the browser has no anchor positioning. %>

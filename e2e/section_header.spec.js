@@ -31,7 +31,7 @@ const STYLE = "/lab/style_chrome";
 
 const TRANSPARENT = "rgba(0, 0, 0, 0)";
 const header = (page, id) => page.locator(`#${id} > .section-header`);
-const styleRow = (page) => page.locator("nav[aria-label='Style guide sections']");
+const styleRow = (page) => page.locator(".page-header:has(> nav[aria-label='Style guide sections'])");
 
 async function open(page, url, viewport) {
   await blockOffsiteRequests(page);

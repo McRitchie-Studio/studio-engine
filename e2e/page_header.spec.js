@@ -23,6 +23,8 @@ const { watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive } = requ
 //   - overflow-wrap removed: 1 red, the long title, on the page's sideways overflow.
 //   - the flex and grid measure removed from the controller: 1 red, the parents, on
 //     the bar at rest.
+//   - anchor-scope removed from the track: 1 red, each row's own pill.
+//   - font-weight 600 removed from the current link: 1 red, the current link.
 
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
@@ -31,8 +33,8 @@ const TIMELINE = `${MODELS}?timeline=1`;
 const STYLE = "/lab/style_nav";
 const LAB = "/lab/page_header";
 
-const modelsRow = (page) => page.locator("nav[aria-label='Models']");
-const styleRow = (page) => page.locator("nav[aria-label='Style guide sections']");
+const modelsRow = (page) => page.locator(".page-header:has(> nav[aria-label='Models'])");
+const styleRow = (page) => page.locator(".page-header:has(> nav[aria-label='Style guide sections'])");
 
 const TRANSPARENT = "rgba(0, 0, 0, 0)";
 
@@ -58,7 +60,7 @@ async function expectBar(locator) {
 const READ = () => {
   const box = (el) => el.getBoundingClientRect();
   const nav = box(document.querySelector("header.nav-shell"));
-  const row = box(document.querySelector("nav[aria-label='Models']"));
+  const row = box(document.querySelector(".page-header:has(> nav[aria-label='Models'])"));
   const clone = document.querySelector(".sticky-table-header-clone");
   const shown = !!clone && getComputedStyle(clone).display !== "none";
   const round = (n) => Math.round(n * 10) / 10;
@@ -383,6 +385,38 @@ test("with reduced motion the pill jumps, and with no current tab there is no pi
 
   await page.goto(LAB);
   expect(await page.locator(".page-header-glide").evaluate((el) => getComputedStyle(el).display)).toBe("none");
+});
+
+test("the current link under the title is marked by weight as well as colour", async ({ page }) => {
+  await open(page, `${LAB}?crumbs=1&links=1&right=actions`, DESKTOP);
+  const weight = (name) => page.locator(".page-header-links a", { hasText: name }).evaluate((el) => getComputedStyle(el).fontWeight);
+  await expect(page.locator(".page-header-links a[aria-current='page']")).toHaveText("Recent");
+  expect(await weight("Recent")).toBe("600");
+  expect(Number(await weight("Epics"))).toBeLessThan(600);
+});
+
+test("each row's pill anchors to its own current tab, not a later row's", async ({ page }) => {
+  await open(page, `${LAB}?current=0`, DESKTOP);
+  expect(await page.locator(".page-header-track").evaluate((el) => getComputedStyle(el).anchorScope)).toBe("--page-header-current");
+  // A second row's track after the first, its own tab current: without the scope the
+  // first row's pill anchors to the last --page-header-current in the document.
+  await page.evaluate(() => {
+    const row = document.querySelector(".page-header-tabs");
+    const copy = row.cloneNode(true);
+    const tabs = copy.querySelectorAll(".page-header-track > a");
+    tabs[0].removeAttribute("aria-current");
+    tabs[2].setAttribute("aria-current", "true");
+    copy.dataset.copy = "";
+    document.querySelector(".page-header").after(copy);
+  });
+  await expect.poll(() => glideGap(page)).toEqual({ left: 0, width: 0, shown: true });
+  const copyGap = await page.evaluate(() => {
+    const copy = document.querySelector("[data-copy]");
+    const glide = copy.querySelector(".page-header-glide").getBoundingClientRect();
+    const tab = copy.querySelector(".page-header-track > [aria-current]").getBoundingClientRect();
+    return { left: Math.round(glide.left - tab.left), top: Math.round(glide.top - tab.top) };
+  });
+  expect(copyGap).toEqual({ left: 0, top: 0 });
 });
 
 test("a wide group of actions wraps inside the row on a phone, and the page does not scroll sideways", async ({ page }) => {
