@@ -146,8 +146,10 @@ the opener as the visitor's message (`data-agent-chat-opener`; default "I'd like
 talk about <topic>."), so the thinking line shows during the open and the hub's
 dispatcher is already answering. The opener is sent once per soul and topic per tab
 (`sessionStorage`, `data-agent-chat-opener-key`): opening the same topic again shows
-the thread and sends nothing. A send the app refuses (a cap, an expired page) puts the
-words in the box with the reason. The visitor sees the opener as their own bubble: the
+the thread and sends nothing. A visitor who sends before the thread loads still gets
+the opener: it is posted first, then their words, and never twice (the tab remembers it
+as its POST starts and forgets it if that POST fails). A send the app refuses (a cap,
+an expired page) puts the words in the box with the reason. The visitor sees the opener as their own bubble: the
 page never sends words on their behalf that they cannot read.
 
 **Not streamed.** The hub answers whole (the hub's `agent-message-loop.md`,
@@ -354,7 +356,12 @@ machine (a developer's local hub).
   `data-agent-chat-reveal="true"`, types a new answer in ("Talk to an agent in a
   modal").
 
-Turn text is set as text, never HTML. The log is `position: relative` on purpose: a turn's
+Turn text is built as text nodes, never HTML. A visitor's words are plain text. An
+agent's words show a small Markdown subset (`markdownBlocks` in `studio/agent_chat`):
+`**bold**`, `*italics*`, `` `code` ``, `[label](https://…)` links (http and https only;
+any other target shows as its own text), `- ` and `1. ` lists, and line breaks. A
+leading `> ` is dropped. Anything else, HTML included, shows as the characters it is.
+The log is `position: relative` on purpose: a turn's
 screen-reader name is absolutely positioned, and with no positioned ancestor it escapes
 the scroller and stretches the document by the thread's scrolled height. The look is the partials under
 `app/views/studio/agent_chat/` and `.studio-agent-typing` in `engine-motion.css`,

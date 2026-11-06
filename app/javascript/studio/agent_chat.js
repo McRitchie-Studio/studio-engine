@@ -3,7 +3,7 @@
 // app for it (GET /agent_chat/turns, POST /agent_chat/messages), which proxies.
 //
 // The look is the ERB: each turn is a clone of a <template data-agent-chat-template>
-// (studio/agent_chat/_turn), filled with textContent, never HTML.
+// (studio/agent_chat/_turn), filled with text nodes, never HTML (MARKDOWN below).
 //
 //   LOAD     on connect, the thread's latest turns; a failure shows the offline
 //            notice with Try again (and retries itself, slowly).
@@ -44,6 +44,11 @@
 //            opens). Sent once per data-agent-chat-opener-key per tab
 //            (sessionStorage): opening the same topic again shows the thread and
 //            sends nothing. A send the app refuses puts the words in the box.
+//            A visitor who sends before the thread loads gets the opener posted
+//            first, then their words; it is never dropped and never sent twice.
+//   MARKDOWN an agent turn's words show a small, safe Markdown subset (bold,
+//            italics, code, http(s) links, lists, line breaks), built as nodes,
+//            never HTML; a visitor's words stay plain text (markdownBlocks).
 //   TYPE-IN  data-agent-chat-reveal="true" on the section: an agent answer that
 //            arrives while the chat is open types itself in (revealPlan, about
 //            REVEAL_CPS characters a second, REVEAL_MIN_MS to REVEAL_MAX_MS), as
@@ -169,6 +174,131 @@ function prefersReducedMotion() {
   try { return Boolean(globalThis.matchMedia && globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches) } catch (_error) { return false }
 }
 
+// MARKDOWN: an agent turn's words as a small, safe subset of Markdown, for agent
+// turns only (a visitor's words stay plain text). markdownBlocks is pure: it turns
+// the words into paragraphs and lists of inline pieces. renderMarkdown builds them
+// as DOM nodes with createElement and text nodes, never as HTML, so any other
+// markup in the words shows as the characters it is.
+//
+//   **bold** __bold__   *italics*   `code`   [label](https://…)
+//   "- ", "* ", "+ " and "1. " lines make a list; a leading "> " is dropped;
+//   any other line break stays a line break.
+//
+// A link's target must be http: or https: (SAFE_LINK); anything else shows as
+// its own text. No _underscore_ italics: snake_case words are common in answers,
+// and the regex stays free of lookbehind, which older Safari cannot parse.
+export const SAFE_LINK = /^https?:\/\/[^\s<>"'`]+$/i
+const INLINE = /\*\*([^\s*](?:[^\n]*?[^\s*])?)\*\*|__([^\s_](?:[^\n]*?[^\s_])?)__|\[([^\]\n]+)\]\(([^()\s]+)\)|`([^`\n]+)`|\*([^*\s](?:[^*\n]*?[^*\s])?)\*/g
+const BULLET = /^\s{0,3}[-*+]\s+(.*)$/
+const NUMBERED = /^\s{0,3}\d{1,3}[.)]\s+(.*)$/
+const QUOTE = /^\s{0,3}>\s?/
+
+export function safeHref(url) {
+  const href = String(url ?? "").trim()
+  if (!SAFE_LINK.test(href)) return null
+  try {
+    const parsed = new URL(href)
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? href : null
+  } catch (_error) { return null }
+}
+
+// Inline pieces: {text} | {strong: [...]} | {em: [...]} | {code} | {link, href}.
+export function markdownInline(text) {
+  const pieces = []
+  const words = String(text ?? "")
+  let at = 0
+  // A fresh regex per call: bold and italics recurse, and a shared /g regex's
+  // lastIndex would jump.
+  const inline = new RegExp(INLINE.source, "g")
+  for (let match = inline.exec(words); match; match = inline.exec(words)) {
+    const [whole, bold, bold2, label, url, code, em] = match
+    let piece = null
+    if (bold != null || bold2 != null) piece = { strong: markdownInline(bold ?? bold2) }
+    else if (label != null) { const href = safeHref(url); if (href) piece = { link: label, href } }
+    else if (code != null) piece = { code }
+    else piece = { em: markdownInline(em) }
+    if (!piece) continue
+    if (match.index > at) pieces.push({ text: words.slice(at, match.index) })
+    pieces.push(piece)
+    at = match.index + whole.length
+  }
+  if (at < words.length) pieces.push({ text: words.slice(at) })
+  return pieces
+}
+
+// Blocks: {lines: [inline, ...]} for a run of text lines, {list: "ul"|"ol", items: [inline, ...]}.
+export function markdownBlocks(text) {
+  const blocks = []
+  for (const raw of String(text ?? "").split(/\r?\n/)) {
+    const line = raw.replace(QUOTE, "")
+    const bullet = line.match(BULLET)
+    const numbered = bullet ? null : line.match(NUMBERED)
+    const kind = bullet ? "ul" : numbered ? "ol" : null
+    const last = blocks.at(-1)
+    if (kind) {
+      const item = markdownInline((bullet || numbered)[1])
+      if (last && last.list === kind) last.items.push(item)
+      else blocks.push({ list: kind, items: [item] })
+    } else if (last && last.lines) {
+      last.lines.push(markdownInline(line))
+    } else {
+      blocks.push({ lines: [markdownInline(line)] })
+    }
+  }
+  return blocks
+}
+
+function inlineNodes(d, pieces) {
+  return pieces.map((piece) => {
+    if (piece.text != null) return d.createTextNode(piece.text)
+    if (piece.code != null) { const el = d.createElement("code"); el.textContent = piece.code; return el }
+    if (piece.link != null) {
+      const el = d.createElement("a")
+      el.setAttribute("href", piece.href)
+      el.setAttribute("target", "_blank")
+      el.setAttribute("rel", "noopener noreferrer nofollow")
+      el.style.textDecoration = "underline"
+      el.textContent = piece.link
+      return el
+    }
+    const el = d.createElement(piece.strong ? "strong" : "em")
+    el.append(...inlineNodes(d, piece.strong || piece.em))
+    return el
+  })
+}
+
+// Fills `el` with the words as Markdown nodes. Where the element cannot build
+// nodes (no document), the words go in as text, as before.
+export function renderMarkdown(el, words, doc = globalThis.document) {
+  const d = (el && el.ownerDocument) || doc
+  if (!el || !d || typeof d.createElement !== "function" || typeof el.replaceChildren !== "function") {
+    if (el) el.textContent = String(words ?? "")
+    return
+  }
+  const nodes = []
+  for (const block of markdownBlocks(words)) {
+    if (block.list) {
+      const list = d.createElement(block.list)
+      list.style.paddingLeft = "1.25rem"
+      list.style.listStyle = block.list === "ul" ? "disc" : "decimal"
+      for (const item of block.items) {
+        const li = d.createElement("li")
+        li.append(...inlineNodes(d, item))
+        list.append(li)
+      }
+      nodes.push(list)
+    } else {
+      // The text keeps its own line breaks (the turn's text is pre-wrap); a list
+      // sits on its own lines, so no break is added next to one.
+      block.lines.forEach((line, index) => {
+        if (index > 0) nodes.push(d.createTextNode("\n"))
+        nodes.push(...inlineNodes(d, line))
+      })
+    }
+  }
+  el.replaceChildren(...nodes)
+}
+
 export function turnsUrl(base, { soul, after, limit = LIMIT }) {
   const params = new URLSearchParams({ soul, limit: String(limit) })
   if (after != null) params.set("after", after)
@@ -202,7 +332,7 @@ export function mountAgentChat(root, {
   const openerKey = openerStorageKey(root.dataset.agentChatOpenerKey)
   const typeIn = root.dataset.agentChatReveal === "true"
 
-  const state = { turns: [], pending: false, waitingSince: null, offline: false, inFlight: false, pollAgain: false, sending: false, timer: null, alive: true, following: true, revealFollowing: true, revealOwed: false, loaded: false, typing: new Map() }
+  const state = { turns: [], pending: false, waitingSince: null, offline: false, inFlight: false, pollAgain: false, sending: false, timer: null, alive: true, following: true, revealFollowing: true, revealOwed: false, loaded: false, typing: new Map(), openerPhase: "owed", openerPost: null }
 
   const onScroll = () => { state.following = isFollowing(log) }
   log.addEventListener("scroll", onScroll, { passive: true })
@@ -285,11 +415,12 @@ export function mountAgentChat(root, {
       node.dataset.status = turn.status || ""
       const text = node.querySelector("[data-agent-chat-text]")
       const words = String(turn.text ?? "")
+      const agent = turn.role === "agent"
       if (text && state.typing.has(key)) {
-        if (state.typing.get(key).words !== words) { stopTyping(key); text.textContent = words }
-      } else if (text && text.textContent !== words) {
-        if (typeIn && state.loaded && turn.role === "agent" && words && !reducedMotion()) startTyping(key, text, words)
-        else text.textContent = words
+        if (state.typing.get(key).words !== words) { stopTyping(key); showWords(text, words, agent) }
+      } else if (text && shownWords(text, agent) !== words) {
+        if (typeIn && state.loaded && agent && words && !reducedMotion()) startTyping(key, text, words)
+        else showWords(text, words, agent)
       }
       const failed = node.querySelector("[data-agent-chat-failed]")
       if (failed) failed.hidden = turn.status !== "failed"
@@ -305,19 +436,35 @@ export function mountAgentChat(root, {
     }
   }
 
+  // What a turn's text element shows: an agent's words as Markdown, a visitor's
+  // as text. `shown` remembers the words behind each element, since an agent's
+  // rendered text no longer reads back as its Markdown.
+  const shown = new WeakMap()
+  function showWords(el, words, agent) {
+    shown.set(el, words)
+    if (agent) renderMarkdown(el, words, doc)
+    else el.textContent = words
+  }
+  // An agent turn the page rendered itself (studio/agent_chat/_turn prints raw
+  // words) has no entry, so it is rendered once as Markdown.
+  function shownWords(el, agent) {
+    if (shown.has(el)) return shown.get(el)
+    return agent ? null : el.textContent
+  }
+
   // TYPE-IN: one answer's words, filled in REVEAL_FRAME_MS steps.
   function startTyping(key, el, words) {
     const started = now()
     const entry = { words, timer: null }
     state.typing.set(key, entry)
-    el.textContent = ""
+    showWords(el, "", true)
     if (log && log.setAttribute) log.setAttribute("aria-busy", "true")
     const step = () => {
       if (!state.alive || state.typing.get(key) !== entry) return
-      const { shown } = revealPlan(words.length, now() - started)
-      el.textContent = words.slice(0, shown)
+      const { shown: count } = revealPlan(words.length, now() - started)
+      showWords(el, words.slice(0, count), true)
       if (state.following) toEnd()
-      if (shown >= words.length) { stopTyping(key); return }
+      if (count >= words.length) { stopTyping(key); return }
       entry.timer = setTimer(step, REVEAL_FRAME_MS)
     }
     step()
@@ -398,20 +545,33 @@ export function mountAgentChat(root, {
     refresh(event.detail || {})
   }
 
-  // OPENER: the section's opener, once per key per tab, after the thread loaded.
+  // OPENER: the section's opener, once per key per tab. It goes once the thread
+  // has loaded, or at once, AHEAD of the visitor's words, when they send before the
+  // thread loads (submit). The tab remembers it as its POST starts (so a chat
+  // mounted again mid-flight cannot send it twice) and forgets it if that POST
+  // fails; nothing marks it without posting it. While another send is in flight it
+  // stays owed, unmarked, and the next send carries it first.
   function sendOpener() {
-    if (!opener) return undefined
+    if (!opener || state.openerPhase !== "owed") return state.openerPost || undefined
+    if (openerKey && storage) {
+      try {
+        if (storage.getItem(openerKey)) { state.openerPhase = "done"; return undefined }
+      } catch (_error) { /* a refused store sends it anyway */ }
+    }
     // The thread already ends with these words from the visitor (another tab
     // sent them): showing it is enough.
     const last = state.turns.filter((turn) => turn.role !== "agent").at(-1)
-    if (last && String(last.text ?? "").trim() === opener) return undefined
+    if (last && String(last.text ?? "").trim() === opener) { state.openerPhase = "done"; return undefined }
+    if (state.sending) return undefined
+    state.openerPhase = "posting"
     if (openerKey && storage) {
-      try {
-        if (storage.getItem(openerKey)) return undefined
-        storage.setItem(openerKey, "1")
-      } catch (_error) { /* a refused store sends it anyway */ }
+      try { storage.setItem(openerKey, "1") } catch (_error) { /* a refused store sends it anyway */ }
     }
-    return post(opener, { typed: false })
+    state.openerPost = post(opener, { typed: false }).finally(() => {
+      state.openerPhase = "done"
+      state.openerPost = null
+    })
+    return state.openerPost
   }
 
   function forgetOpener() {
@@ -430,7 +590,13 @@ export function mountAgentChat(root, {
   async function submit(event) {
     if (event) event.preventDefault()
     const text = (input.value || "").trim()
-    if (!text || state.sending) return
+    if (!text) return
+    // The opener goes first, even before the thread has loaded, and a send
+    // waits for an opener already on its way: the visitor's words are never
+    // dropped for it, and they always follow it.
+    if (state.openerPhase === "owed") await sendOpener()
+    if (state.openerPost) await state.openerPost
+    if (state.sending) return
     await post(text, { typed: true })
   }
 
