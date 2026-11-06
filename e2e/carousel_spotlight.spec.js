@@ -128,45 +128,61 @@ test("this browser runs the scroll-driven path", async ({ page }) => {
   expect(mid).toBeLessThan(0.97);
 });
 
-for (const path of ["scroll-driven", "fallback"]) {
-  test(`${path}: next, prev and the arrow keys move the spotlight one slide`, async ({ page }) => {
-    await open(page);
-    if (path === "fallback") await page.addStyleTag({ content: FALLBACK });
-    const spot = region(page);
+// Each path runs the same two checks. The specs are declared bare, one per path,
+// because the lane's census counts bare `test(` declarations.
+async function arrowsAndKeys(page, path) {
+  await open(page);
+  if (path === "fallback") await page.addStyleTag({ content: FALLBACK });
+  const spot = region(page);
 
-    await spot.getByRole("button", { name: "Next slides" }).click();
-    expectSpotlightOn(await restingLooks(page), 1);
-    await expect(spot.locator("[role='status']")).toHaveText("Slide 2 of 7");
-    await expect(spot.locator(".carousel-dot[aria-current='true']")).toHaveAttribute("data-carousel-index", "1");
+  await spot.getByRole("button", { name: "Next slides" }).click();
+  expectSpotlightOn(await restingLooks(page), 1);
+  await expect(spot.locator("[role='status']")).toHaveText("Slide 2 of 7");
+  await expect(spot.locator(".carousel-dot[aria-current='true']")).toHaveAttribute("data-carousel-index", "1");
 
-    await track(page).focus();
-    await page.keyboard.press("ArrowRight");
-    expectSpotlightOn(await restingLooks(page), 2);
-    await page.keyboard.press("ArrowLeft");
-    expectSpotlightOn(await restingLooks(page), 1);
-    await page.keyboard.press("End");
-    expectSpotlightOn(await restingLooks(page), 6);
-    await expect(spot.getByRole("button", { name: "Next slides" })).toHaveAttribute("aria-disabled", "true");
+  await track(page).focus();
+  await page.keyboard.press("ArrowRight");
+  expectSpotlightOn(await restingLooks(page), 2);
+  await page.keyboard.press("ArrowLeft");
+  expectSpotlightOn(await restingLooks(page), 1);
+  await page.keyboard.press("End");
+  expectSpotlightOn(await restingLooks(page), 6);
+  await expect(spot.getByRole("button", { name: "Next slides" })).toHaveAttribute("aria-disabled", "true");
 
-    await spot.getByRole("button", { name: "Go to slide 4" }).click();
-    expectSpotlightOn(await restingLooks(page), 3);
-    await spot.getByRole("button", { name: "Previous slides" }).click();
-    expectSpotlightOn(await restingLooks(page), 2);
-  });
-
-  test(`${path}: a plain scroll moves the spotlight to the slide it snaps to`, async ({ page }) => {
-    await open(page);
-    if (path === "fallback") await page.addStyleTag({ content: FALLBACK });
-    const row = track(page);
-    // A swipe's worth, a little past the fifth slide's stop: the snap centres the fifth.
-    const target = await row.evaluate((el) => {
-      const s = el.children[4];
-      return s.offsetLeft + s.offsetWidth / 2 - el.clientWidth / 2 + 20;
-    });
-    await row.evaluate((el, left) => el.scrollTo({ left, behavior: "auto" }), target);
-    expectSpotlightOn(await restingLooks(page), 4);
-  });
+  await spot.getByRole("button", { name: "Go to slide 4" }).click();
+  expectSpotlightOn(await restingLooks(page), 3);
+  await spot.getByRole("button", { name: "Previous slides" }).click();
+  expectSpotlightOn(await restingLooks(page), 2);
 }
+
+async function plainScroll(page, path) {
+  await open(page);
+  if (path === "fallback") await page.addStyleTag({ content: FALLBACK });
+  const row = track(page);
+  // A swipe's worth, a little past the fifth slide's stop: the snap centres the fifth.
+  const target = await row.evaluate((el) => {
+    const s = el.children[4];
+    return s.offsetLeft + s.offsetWidth / 2 - el.clientWidth / 2 + 20;
+  });
+  await row.evaluate((el, left) => el.scrollTo({ left, behavior: "auto" }), target);
+  expectSpotlightOn(await restingLooks(page), 4);
+}
+
+test("scroll-driven: next, prev and the arrow keys move the spotlight one slide", async ({ page }) => {
+  await arrowsAndKeys(page, "scroll-driven");
+});
+
+test("fallback: next, prev and the arrow keys move the spotlight one slide", async ({ page }) => {
+  await arrowsAndKeys(page, "fallback");
+});
+
+test("scroll-driven: a plain scroll moves the spotlight to the slide it snaps to", async ({ page }) => {
+  await plainScroll(page, "scroll-driven");
+});
+
+test("fallback: a plain scroll moves the spotlight to the slide it snaps to", async ({ page }) => {
+  await plainScroll(page, "fallback");
+});
 
 test("a phone row centres one slide with its neighbours peeking either side", async ({ page }) => {
   await open(page, PHONE);
