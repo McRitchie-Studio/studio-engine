@@ -19,4 +19,9 @@
         locals: { label: "Pair", items: %w[Left Right], per_view: 3, data: { lab: "pair" } } do |word| %>
     <div class="card h-full p-5 text-body"><%= word %></div>
   <% end %>
+  <%= render layout: "studio/carousel",
+        locals: { label: "Captioned", items: %w[One Two Three Four Five], per_view: 3,
+                  caption: ->(word) { "Caption #{word}" }, data: { lab: "captioned" } } do |word| %>
+    <div class="card h-full p-5 text-body"><%= word %></div>
+  <% end %>
 </main>

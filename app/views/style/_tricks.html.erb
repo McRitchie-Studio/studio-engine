@@ -256,7 +256,7 @@
 
     <%= render layout: "style/specimen",
           locals: { klass: "studio/_carousel (style: :spotlight)",
-                    note: "Centres one slide at full size and colour, with its caption, and shrinks, fades and greys its neighbours as they scroll by.",
+                    note: "Centres one slide at full size and colour, with its caption, and shrinks, fades and greys its neighbours as they scroll by. It opens on its middle slide; start: takes an index instead.",
                     usage: %(<%= render layout: "studio/carousel",\n      locals: { label: "Team", items: @people, style: :spotlight,\n                caption: ->(person) { person.title } } do |person| %\>\n  <%= render "people/card", person: person %\>\n<% end %\>) } do %>
       <div class="w-full min-w-0" data-carousel-spotlight-specimen>
         <%= render layout: "studio/carousel",

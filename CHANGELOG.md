@@ -38,7 +38,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   same carousel, arrows, dots and keys, but each slide snaps to the centre. The centred
   slide is full size and colour, with an optional `caption:` line under it (a callable on
   the item); its neighbours are smaller (0.75), faded and grey, and the next ones peek at
-  the edges. An arrow or key moves one slide, and every slide gets a dot. Where the browser
+  the edges. An arrow ("Previous slide", "Next slide") or key moves one slide, and every
+  slide gets a dot. It opens on its middle slide (`start:`, below). Where the browser
   has scroll-driven animations (`animation-timeline: view()`), each slide's own view
   timeline drives the look, so it follows the finger; elsewhere the controller marks the
   centred slide `data-current` and CSS transitions it. Reduced motion scales and greys
@@ -91,8 +92,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   pixels at the label's median: a dark page 3.95 to 5.62, the lab photo 3.16 to 3.29, a mid-grey
   backdrop (#808080) 3.25 to 3.42, a lighter one (#a0a0a0) 3.06 to 2.98. Light pages stay solid
   (3.10).
-- **A spotlight's arrows say "Previous slide" and "Next slide"**: they move one slide. A
-  standard row keeps "slides".
 - **Back plays the app's page move the other way.** Browser Back (a Turbo restore that Turbo
   marks `back`, or a full load that traverses to an earlier entry) and a click on a link with
   `data-page-transition-back` (every ancestor crumb and the phone's parent link) play the

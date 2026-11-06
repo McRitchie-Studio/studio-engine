@@ -93,6 +93,18 @@ test("a standard row still opens on its first slide: no start mark, no scroll", 
   expect(await settled(track(page, "apps"))).toBe(0);
 });
 
+test("a standard row's caption is a small styled line under every slide", async ({ page }) => {
+  await open(page);
+  const captions = region(page, "captioned").locator(".carousel-slide > .carousel-caption");
+  await expect(captions).toHaveCount(5);
+  const look = await captions.first().evaluate((el) => {
+    const s = getComputedStyle(el);
+    return { size: s.fontSize, top: s.marginTop, opacity: s.opacity };
+  });
+  expect(look).toEqual({ size: "14px", top: "8px", opacity: "1" });
+  for (const i of [0, 1, 2]) await expect(captions.nth(i)).toBeVisible();
+});
+
 test("next moves a page, prev comes back, and the status says where", async ({ page }) => {
   await open(page);
   const apps = region(page, "apps");

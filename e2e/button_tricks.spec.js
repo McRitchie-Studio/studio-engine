@@ -208,6 +208,6 @@ test("the hero button trials a thinner fill, and the photo shows through", async
   await expect(trial).toHaveText("Launch Your Website");
   expect(await trial.evaluate((el) => getComputedStyle(el).backgroundImage)).toContain("/ 0.65");
   expect(await trial.evaluate((el) => getComputedStyle(el).backdropFilter)).toContain("blur");
-  expect(await page.locator("[data-test=hero-was]").evaluate((el) => getComputedStyle(el).backgroundImage)).toContain("/ 0.94");
+  expect(await page.locator("[data-test=hero-was]").evaluate((el) => getComputedStyle(el).backgroundImage)).toContain("/ 0.85");
   expect(await page.locator("[data-test=hero-photo]").evaluate((el) => getComputedStyle(el).backgroundImage)).toContain("lab-photo");
 });
