@@ -897,20 +897,17 @@ class StylePageTest < ActiveSupport::TestCase
   # "the Magic link resent step has its own specimen". All three read
   # style/modals/_auth, which was a MIRROR of turf-monster's sign-in card.
   #
-  # THE ENGINE SHIPS NO AUTH CARD, and that is the fact these tests were quietly
-  # obscuring. A sign-in modal is a product decision — which methods, whose terms,
-  # whose legal copy — so each app owns one and cards it against the partial that
-  # actually renders in production. turf-monster does exactly that now, on its own
-  # host section, and its round-trip is guarded there
-  # (turf-monster test/integration/style_host_section_test.rb).
+  # THE ENGINE SHIPPED NO AUTH CARD until 2026-11-06, and these notes kept that
+  # fact visible. The engine carded only the PIECES, studio/modals/shared/_email_field
+  # and studio/modals/auth/_resend_footer, as ds-email-field and ds-resend-footer.
   #
-  # WHAT THE ENGINE STILL OWES IS THE PIECES, and those gained specimens in the
-  # same change: studio/modals/shared/_email_field and
-  # studio/modals/auth/_resend_footer are carded as ds-email-field and
-  # ds-resend-footer. The email field in particular had NO coverage of any kind
-  # once the mirror went — the mirror was its only renderer — which is the
-  # concrete reason to card a fragment rather than delete the section.
-  #
+  # NOW IT SHIPS ONE (task engine-ships-sign-in-card). Alex McRitchie, looking at
+  # the Email field specimen: "this should use the standard auth component with
+  # Google and Email." So the Auth group is one "Sign in" specimen, ds-sign-in,
+  # which mounts the REAL studio/auth/_sign_in_modal in demo mode, and the two
+  # pieces render inside it. Its posts-nothing contract is asserted in
+  # test/views/sign_in_card_test.rb and in a browser by e2e/style_sign_in_card.spec.js.
+
   # The methodOn/termsOn gating machinery those tests exercised belongs to the
   # consumer's card and is asserted where that card lives.
 
@@ -922,7 +919,7 @@ class StylePageTest < ActiveSupport::TestCase
     html = render_index
     assert_includes html, "Copy an agent-ready reference to this modal",
       "the header Copy affordance is present"
-    assert_includes html, %(the modal family's email input (studio/modals/shared/_email_field)),
+    assert_includes html, "the engine's standard sign-in card as a modal (studio/auth/_sign_in_modal;",
       "the reference names the modal + partial as a sentence"
     assert_includes html, "$refs.ref.textContent",
       "Copy reads the reference text, not a raw snippet"

@@ -408,10 +408,10 @@ Existing code moves in this order, one task each, highest traffic first:
 3. **The three toast systems.** The engine's `toast` window event (the
    `_flash` host), the toast list inside `studioBoard`, and the hub board's
    `showToast` become one toast API on the engine host (piece 4e).
-4. **The auth card.** The engine ships no sign-in card; each app draws its
-   own, four variants in all, with Turf Monster's
-   `app/views/modals/_auth.html.erb` as the authority. It becomes one engine
-   shell component (piece 4e).
+4. **The auth card.** The engine shell shipped 2026-11-06:
+   `studio/auth/_sign_in_card` and `studio/auth/_sign_in_modal`
+   (`docs/SIGN_IN_CARD.md`, piece 4e). The hub and Turf Monster still draw
+   their own, four variants in all; their adoption is pending.
 5. **The heartbeat pages' private palette.** `heartbeat/insights` and
    `heartbeat/pipeline` share one dark palette of 11 raw hex values; they
    move to tokens and the status tone helper (piece 4g).

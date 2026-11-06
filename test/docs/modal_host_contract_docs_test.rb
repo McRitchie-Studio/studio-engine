@@ -270,23 +270,31 @@ class ModalHostContractDocsTest < Minitest::Test
   # ---- the sign-in card has one authority --------------------------------
   #
   # PR #319 retired style/modals/_auth, the style guide's mirror of turf's sign-in
-  # card and the engine's ONLY auth card. lib/studio.rb was corrected in that PR;
-  # the README went on describing the deleted file as the wallet credential
-  # slot's live renderer — two authorities, one release. Both must now say the
-  # engine ships no sign-in card and name the same app-side authority, and the
-  # README must not describe the retired mirror as deciding anything.
-  TURF_AUTH_CARD = "app/views/modals/_auth.html.erb"
+  # card. lib/studio.rb was corrected in that PR; the README went on describing
+  # the deleted file as the wallet credential slot's live renderer — two
+  # authorities, one release. This pinned both to "the engine ships no sign-in
+  # card".
+  #
+  # 2026-11-06 (task engine-ships-sign-in-card) the engine ships one:
+  # studio/auth/_sign_in_card and _sign_in_modal. The pin moves with the fact
+  # rather than going away: README and lib/studio.rb must both name the ENGINE
+  # partial as the authority, neither may still say the engine ships no card,
+  # and the README must not describe the retired mirror as deciding anything.
+  ENGINE_SIGN_IN_PARTIALS = %w[studio/auth/_sign_in_card studio/auth/_sign_in_modal].freeze
 
-  def test_readme_and_lib_studio_agree_the_engine_ships_no_sign_in_card
+  def test_readme_and_lib_studio_agree_the_engine_ships_the_sign_in_card
     readme = File.read(README)
     lib    = File.read(File.join(ROOT, "lib/studio.rb"))
 
     refute File.exist?(File.join(ROOT, "app/views/style/modals/_auth.html.erb")),
            "style/modals/_auth is back — re-read the README's credential-slot section before trusting this pin"
-    assert_includes readme, "This engine ships no sign-in card", "README no longer states it"
-    assert_includes lib, "this engine ships no auth card", "lib/studio.rb no longer states it"
+    ENGINE_SIGN_IN_PARTIALS.each do |partial|
+      assert File.exist?(File.join(ROOT, "app/views", "#{partial}.html.erb")), "#{partial} is gone"
+    end
+    assert_includes readme, "This engine ships the standard sign-in card", "README no longer states it"
+    assert_includes lib, "studio/auth/_sign_in_modal", "lib/studio.rb no longer names the engine card"
     [readme, lib].zip(%w[README.md lib/studio.rb]).each do |text, label|
-      assert_includes text, TURF_AUTH_CARD, "#{label} no longer names turf's card as the authority"
+      refute_match(/engine ships no (?:sign-in|auth) card/i, text, "#{label} still says the engine ships no card")
     end
     refute_match(%r{`style/modals/_auth`\s+(?:looks|renders|gates)|Ruby, in `style/modals/_auth`}, readme,
                  "the README describes the retired style/modals/_auth as a live renderer again")

@@ -68,14 +68,15 @@ class JsIdentifierLocalsTest < ActiveSupport::TestCase
 
   # The census. partial => [store local, other required locals, renders as a layout?]
   #
-  # THE LIST IS THE CLAIM. Twenty-three partials in this engine fetch a store-name local;
-  # twenty-one of them reach identifier position and are here. The two that do not are
+  # THE LIST IS THE CLAIM. Twenty-four partials in this engine fetch a store-name local;
+  # twenty-two of them reach identifier position and are here. The two that do not are
   # asserted separately below, because "we left it alone" is a finding that has to be
   # provable rather than an omission that looks like one.
   VALIDATED = {
     "studio/modals/saving"                   => [:store, {}, false],
     "studio/modals/scoped_host"              => [:store, {}, false],
     "studio/modals/auth/resend_footer"       => [:modal_store, {}, false],
+    "studio/auth/sign_in_modal"              => [:modal_store, {}, false],
     "studio/modals/blocks/age_gate"          => [:modal_store, {}, false],
     "studio/modals/blocks/close_x"           => [:modal_store, {}, false],
     "studio/modals/blocks/cta_redirect"      => [:modal_store, { href_key: "props.url" }, false],
@@ -157,7 +158,7 @@ class JsIdentifierLocalsTest < ActiveSupport::TestCase
     js_bearing_strings(html).sum { |value| value.scan("$store.#{name}").size }
   end
 
-  # --- The twenty-one partials that splice a store name into identifier position ---
+  # --- The twenty-two partials that splice a store name into identifier position ---
 
   VALIDATED.each do |partial, (local, extra, layout)|
     slug = partial.tr("/", "_")

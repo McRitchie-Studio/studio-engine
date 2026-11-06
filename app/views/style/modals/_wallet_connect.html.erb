@@ -86,7 +86,8 @@
     onDeepLink() { this.pick('Phantom'); },
     // A REAL APP SWAPS BACK TO ITS OWN SIGN-IN CARD HERE, reading props.backTo
     // — that is the partial's contract and solana-studio still honours it. This
-    // GUIDE cannot: the engine ships no auth card, and the 'auth' branch that
+    // GUIDE does not: its sign-in card (ds-sign-in, the engine's standard card in
+    // demo mode) carries no wallet button, and the 'auth' branch that
     // used to live here pointed at style/modals/_auth, the retired
     // turf-monster mirror. An unregistered swap target renders an EMPTY card
     // silently, so the branch was removed rather than left aimed at nothing.

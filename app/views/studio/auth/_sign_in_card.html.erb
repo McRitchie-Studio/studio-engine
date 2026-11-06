@@ -1,0 +1,50 @@
+<%#
+  The engine's standard sign-in card, for a page: the app's heading, then one
+  card with Google, "or", and the email magic link. Sending the link flips the
+  same card to its link-sent step, with the resend footer. No modal is needed.
+
+    render "studio/auth/sign_in_card"
+    render "studio/auth/sign_in_card", return_to: "/contests/42",
+          subheading: "Sign in to play",
+          preamble: "studio/modals/shared/age_attestation",
+          extras: "shared/solana_wallet_connect"
+
+  Locals (all optional):
+    heading      — default "Sign in to <Studio.app_name>" (Studio::AuthLabels.to_app)
+    subheading   — default "New here? The same step creates your account."
+    logo         — default true: Studio.logo_for("Auth Logo"), when the app has one
+    return_to    — an in-app path the visitor lands on after sign-in. Anything
+                   but a plain local path is dropped. Rides the magic-link POST
+                   and the Google request URL (?return_to=).
+    preamble     — a partial (or { partial:, locals: }, or an Array) above Google
+    extras       — the same, after Google and before "or": extra providers
+    google       — default Studio.auth_method?(:google)
+    magic_link   — default Studio.auth_method?(:magic_link)
+    magic_link_path — default the engine's POST /magic_link
+    email        — prefill for the email field
+    demo         — default false. true posts nothing (the style guide).
+    dom_id       — id prefix for the email field. Default "sign-in-card".
+
+  The body is studio/auth/_sign_in_body; docs/SIGN_IN_CARD.md has the contract.
+%>
+<%
+  heading    = local_assigns[:heading].presence || Studio::AuthLabels.to_app(Studio.sign_in_label, Studio.app_name)
+  subheading = local_assigns.key?(:subheading) ? local_assigns[:subheading] : "New here? The same step creates your account."
+  logo_path  = local_assigns.fetch(:logo, true) ? Studio.logo_for("Auth Logo") : nil
+  body_locals = local_assigns.slice(:return_to, :preamble, :extras, :google, :magic_link, :magic_link_path,
+                                    :email, :demo, :dom_id, :google_label, :send_label)
+%>
+<div class="min-h-[70vh] flex items-center justify-center" data-sign-in-card-page>
+  <div class="w-full max-w-md">
+    <div class="text-center mb-8">
+      <% if logo_path %>
+        <img src="<%= logo_path %>" alt="" class="w-20 h-20 rounded-full shadow-lg mx-auto mb-4">
+      <% end %>
+      <h1 class="text-3xl font-extrabold text-heading tracking-tight"><%= heading %></h1>
+      <% if subheading.present? %><p class="text-secondary mt-2"><%= subheading %></p><% end %>
+    </div>
+    <div class="card shadow p-8">
+      <%= render "studio/auth/sign_in_body", **body_locals %>
+    </div>
+  </div>
+</div>
