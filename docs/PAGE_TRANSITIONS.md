@@ -48,12 +48,38 @@ arrives. An app with multi-second pages should fix those first. See
 
 The last two columns are the `data-page-transition` values on `<html>`. An unfold is named for
 the way the new page turns, so `:unfold` with `:right` plays `unfold-left`. Set the two
-settings, never the value. Nothing remembers the route. Back and Forward play the same move,
-and Turbo restores the scroll position.
+settings, never the value. Nothing remembers the route. Back plays the move the other way
+(below), Forward plays the app's own, and Turbo restores the scroll position.
+
+## Back
+
+Alex McRitchie's ruling of 2026-11-05: each app has a standard direction and a back direction.
+A Back plays the app's move with the direction reversed, in the same style. `:left` and
+`:right` swap, and so do `:top` and `:bottom`. So a `:left` slide goes back as `slide-right`,
+and `:unfold` with `:right` goes back as `unfold-right`.
+
+| The visit | Way |
+|---|---|
+| Browser Back, a Turbo restore that Turbo marks `data-turbo-visit-direction="back"` | Back |
+| Browser Forward, a restore marked `forward` | The app's own |
+| A click on a link with `data-page-transition-back`, to that link's address | Back |
+| Browser Back by a full load: the `pageswap` activation traverses to an earlier entry | Back |
+| A full load from a link with `data-page-transition-back`, to its address | Back |
+| The second half of a redirect | The first half's way |
+| Anything else | The app's own |
+
+`studio/_page_header` puts `data-page-transition-back` on every ancestor crumb and on the
+phone's parent link ([`PAGE_HEADER.md`](PAGE_HEADER.md#crumbs)). A host can put it on any
+link that leads back up a page's trail. The mark is matched by address and lasts one visit,
+so a modifier click or a cancelled visit cannot turn a later visit around.
+
+Every other rule holds: a same-path visit plays nothing, a shared morph name plays the fade,
+and reduced motion plays nothing. The theme toggle is untouched.
 
 | The visit | What plays |
 |---|---|
-| A change of path, Back or Forward included | The direction |
+| A change of path, Forward included | The direction |
+| Back, or a back link (see [Back](#back)) | The direction reversed |
 | The same path: a refresh, a poll, a change of query only, with no morph name shared | Nothing |
 | The same path, an advance visit, with a morph name on both sides | The engine's fade and the morph |
 | A GET that redirects | The direction once, for the first render. The follow-up visit draws nothing |
@@ -116,8 +142,9 @@ nothing, and the full load after it plays the one motion.
 | Action | What plays |
 |---|---|
 | Reload | Nothing (`viewTransition` is null on both sides) |
-| Back or Forward, the page loads fresh | The direction, and the scroll position returns |
-| Back or Forward, the page returns from the back/forward cache | The direction. `pagereveal` fires on the restored page, and the script first removes what it wore when it left |
+| Back, the page loads fresh | The direction reversed, and the scroll position returns |
+| Forward, the page loads fresh | The direction |
+| Back or Forward, the page returns from the back/forward cache | As above. `pagereveal` fires on the restored page, and the script first removes what it wore when it left |
 | Reduced motion | Nothing |
 | The old page's module has not run yet (a very fast click) | The plain load, not the browser's own fade |
 | A browser without cross-document view transitions | The plain load. Nothing throws |

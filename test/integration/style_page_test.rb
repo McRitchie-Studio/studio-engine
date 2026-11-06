@@ -92,6 +92,19 @@ class StylePageTest < ActiveSupport::TestCase
     assert_equal 2, specimen.css(".page-header").size
   end
 
+  test "the Tricks section shows the live carousel" do
+    doc = Nokogiri::HTML.fragment(render_index)
+    specimen = doc.at_css("section#tricks [data-carousel-specimen]")
+
+    assert specimen, "the Tricks section documents the primitive"
+    assert_equal "Carousel", specimen.at_css("h3").text
+    carousel = specimen.at_css("section.carousel[aria-roledescription='carousel']")
+    assert carousel, "the specimen is the real partial"
+    assert_equal "carousel", carousel["data-studio-controller"]
+    assert_equal 7, carousel.css(".carousel-slide").size
+    assert_equal 1, doc.css("[aria-roledescription='carousel']").size
+  end
+
   test "every section's title is a section header, first in its section, and joins no data-pin" do
     doc = Nokogiri::HTML.fragment(render_index)
     { "theme" => "Theme", "modals" => "Modals", "tricks" => "Tricks", "loaders" => "Loaders", "tasks" => "Tasks", "components" => "Components" }.each do |id, title|
@@ -234,6 +247,7 @@ class StylePageTest < ActiveSupport::TestCase
     btn-neutral btn-outline btn-google btn-sm btn-lg
     card card-hover badge input-field empty-state label-upper
     studio-border-glow spinner loading-dots sheen ping fade-edge progress-meter
+    carousel carousel-track carousel-slide carousel-dot carousel-button
   ].freeze
 
   REQUIRED_THEME_TOKENS = %w[

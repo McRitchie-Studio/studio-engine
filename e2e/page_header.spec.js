@@ -302,3 +302,93 @@ test("a row in a flex or grid parent with a sibling above it has no bar at rest"
     await expectAtRest(row);
   }
 });
+
+// ---- Crumbs, the links line and the gliding pill (Alex McRitchie, 2026-11-05) -------------
+
+test("crumbs sit above the title at desktop width, and give way to one parent link on a phone", async ({ page }) => {
+  await open(page, `${LAB}?crumbs=1&links=1&right=actions`, DESKTOP);
+  const trail = page.locator(".page-header-crumbs");
+  await expect(trail).toBeVisible();
+  await expect(trail.locator("li")).toHaveText(["Admin", "Deployments", "Models"]);
+  await expect(page.locator(".page-header-parent")).toBeHidden();
+  const [crumbBox, titleBox] = [await trail.boundingBox(), await page.locator(".page-header-title").boundingBox()];
+  expect(crumbBox.y + crumbBox.height, "the trail ends above the title").toBeLessThanOrEqual(titleBox.y + 1);
+  expect(Math.abs(crumbBox.x - titleBox.x), "the trail and the title share a left edge").toBeLessThan(2);
+  expect(await page.locator(".page-header-title").evaluate((el) => getComputedStyle(el).fontSize)).toBe("30px");
+
+  await page.setViewportSize(PHONE);
+  await expect(trail).toBeHidden();
+  const parent = page.locator(".page-header-parent");
+  await expect(parent).toBeVisible();
+  await expect(parent).toHaveText(/Deployments/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("the links line sticks with the row, under the title", async ({ page }) => {
+  await open(page, `${LAB}?crumbs=1&links=1&right=actions`, DESKTOP);
+  const row = page.locator(".page-header");
+  const line = page.locator(".page-header-links");
+  await expect(line.locator("a")).toHaveCount(7);
+  await page.evaluate(() => window.scrollTo(0, 1200));
+  await expectBar(row);
+  const [rowBox, lineBox] = [await row.boundingBox(), await line.boundingBox()];
+  expect(lineBox.y).toBeGreaterThan(rowBox.y);
+  expect(lineBox.y + lineBox.height).toBeLessThanOrEqual(rowBox.y + rowBox.height + 1);
+  await expect(line).toBeInViewport();
+});
+
+// Where the pill is, against the tab with aria-current.
+const glideGap = (page) => page.evaluate(() => {
+  const glide = document.querySelector(".page-header-glide").getBoundingClientRect();
+  const tab = document.querySelector(".page-header-track > [aria-current]").getBoundingClientRect();
+  return { left: Math.round(glide.left - tab.left), width: Math.round(glide.width - tab.width), shown: glide.width > 0 };
+});
+
+test("the pill sits on the current tab, then glides to the next one in between frames", async ({ page }) => {
+  await open(page, `${LAB}?current=0`, DESKTOP);
+  // Chromium has anchor positioning: the pill is drawn and the tab gives up its fill.
+  expect(await page.evaluate(() => CSS.supports("anchor-name: --a"))).toBe(true);
+  await expect.poll(() => glideGap(page)).toEqual({ left: 0, width: 0, shown: true });
+  const fill = await page.locator(".page-header-track > [aria-current]").evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(fill).toBe(TRANSPARENT);
+
+  const lefts = await page.evaluate(async () => {
+    const tabs = [...document.querySelectorAll(".page-header-track > a")];
+    tabs[0].removeAttribute("aria-current");
+    tabs[3].setAttribute("aria-current", "true");
+    const seen = [];
+    const glide = document.querySelector(".page-header-glide");
+    for (let i = 0; i < 30; i += 1) {
+      await new Promise((done) => requestAnimationFrame(done));
+      seen.push(Math.round(glide.getBoundingClientRect().left));
+    }
+    return { seen, from: Math.round(tabs[0].getBoundingClientRect().left), to: Math.round(tabs[3].getBoundingClientRect().left) };
+  });
+  const between = lefts.seen.filter((x) => x > lefts.from + 2 && x < lefts.to - 2);
+  expect(between.length, `frames between the two tabs: ${lefts.seen.join(",")}`).toBeGreaterThan(2);
+  await expect.poll(() => glideGap(page)).toEqual({ left: 0, width: 0, shown: true });
+});
+
+test("with reduced motion the pill jumps, and with no current tab there is no pill", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await open(page, `${LAB}?current=0`, DESKTOP);
+  const after = await page.evaluate(async () => {
+    const tabs = [...document.querySelectorAll(".page-header-track > a")];
+    tabs[0].removeAttribute("aria-current");
+    tabs[3].setAttribute("aria-current", "true");
+    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+    return Math.round(document.querySelector(".page-header-glide").getBoundingClientRect().left - tabs[3].getBoundingClientRect().left);
+  });
+  expect(after).toBe(0);
+
+  await page.goto(LAB);
+  expect(await page.locator(".page-header-glide").evaluate((el) => getComputedStyle(el).display)).toBe("none");
+});
+
+test("a wide group of actions wraps inside the row on a phone, and the page does not scroll sideways", async ({ page }) => {
+  await open(page, `${LAB}?crumbs=1&right=wide`, PHONE);
+  await expect(page.locator(".page-header-actions a")).toHaveCount(8);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  const box = await page.locator(".page-header-actions").boundingBox();
+  expect(box.x + box.width).toBeLessThanOrEqual(PHONE.width);
+});

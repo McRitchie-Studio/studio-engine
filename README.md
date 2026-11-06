@@ -290,9 +290,18 @@ actions; the engine supplies only the banner.
 
 ### The page header — `studio/_page_header`
 
-An admin page's title: a plain header at rest, a bar once stuck under the navbar,
-in the pinned stack so a table's sticky header sits under it
+An admin page's title: a crumb trail from the app's one parent map (`Studio.crumbs`,
+`studio_crumbs`) above an h2-size title, tabs with a gliding pill and one action on the right,
+and the page's other links on a line under it. A plain header at rest, a bar once stuck under
+the navbar, in the pinned stack so a table's sticky header sits under it
 ([`docs/PAGE_HEADER.md`](docs/PAGE_HEADER.md)).
+
+```erb
+<%= render "studio/page_header", title: "Deployments", crumbs: studio_crumbs(:deployments),
+      label: "Views", tabs: [{ label: "Board", href: deployments_path, current: "page" }],
+      actions_html: link_to("New Task", new_task_path, class: "btn btn-sm btn-primary"),
+      links: [{ label: "Epics", href: epics_path }] %>
+```
 
 ### The section header — `studio/_section_header`
 
@@ -302,6 +311,19 @@ with a bar once stuck ([`docs/PAGE_HEADER.md`](docs/PAGE_HEADER.md#the-section-h
 ```erb
 <%= render "studio/page_header", title: "Models", meta: "v1.2.3", label: "Models",
       tabs: [{ label: "Users", href: users_path, current: "page" }, { label: "Teams", href: teams_path }] %>
+```
+
+### The carousel — `studio/_carousel`
+
+The apps' standard for a set too long to grid: a swipeable scroll-snap row with
+arrows, dots and arrow keys, a peek of the next slide, and an edge fade. Render it
+as a layout; the block draws each slide. `per_view:` is the wide row's count
+(default 3). `/admin/style` shows it under Tricks.
+
+```erb
+<%= render layout: "studio/carousel", locals: { label: "Portfolio", items: @apps, per_view: 3 } do |app| %>
+  <%= render "apps/card", app: app %>
+<% end %>
 ```
 
 ### The "at" time stamp — `at_time_tag`

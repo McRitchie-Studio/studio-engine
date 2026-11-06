@@ -308,6 +308,13 @@ body.modal-open .studio-app-banner {
   font-size: calc(var(--type-base, 16px) * 1.5);
   font-weight: var(--type-display-weight, 800);
   line-height: 1.25;
+
+  /* From 40rem, the h2 of the type scale (type-h2), Alex McRitchie's "H2 header"
+     (2026-11-05). A phone keeps 1.5x, so a long title leaves the tabs room. */
+  @media (width >= 40rem) {
+    font-size: 30px;
+    line-height: 1.2;
+  }
   min-width: 0;
   overflow-wrap: anywhere;
   display: -webkit-box;
@@ -365,7 +372,402 @@ body.modal-open .studio-app-banner {
 
 @utility page-header-actions {
   flex-shrink: 0;
+  /* Never wider than the row: a group of controls wraps inside it on a phone, and the
+     page does not scroll sideways. */
+  max-width: 100%;
   margin-left: auto;
+
+  /* After the tabs, the tabs' own auto margin already pushes both right. */
+  .page-header-tabs + & {
+    margin-left: 0;
+  }
+}
+
+/* THE TRAIL: the page's ancestors above the title (docs/PAGE_HEADER.md, "Crumbs"). It takes
+   the row's whole first line, so the title, the tabs and the actions share the next one.
+   Ancestors are muted links, the page itself is bold, and a chevron sits between. Below
+   40rem the trail gives way to one link to the parent. The negative margin brings the
+   title up to the trail: the row's gap is for the title and the tabs. */
+@utility page-header-trail {
+  flex: 1 0 100%;
+  min-width: 0;
+  margin-bottom: -0.5rem;
+  font-size: calc(var(--type-base, 16px) * 0.8125);
+  line-height: 1.25;
+}
+
+@utility page-header-crumbs {
+  min-width: 0;
+
+  & ol {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 0.5rem;
+    row-gap: 0.125rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  & li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  /* The chevron is CSS, with empty alt text, so a reader hears the names alone. */
+  & li + li::before {
+    content: "\203A";
+    content: "\203A" / "";
+    @apply text-muted;
+    opacity: 0.6;
+  }
+
+  @media (width < 40rem) {
+    display: none;
+  }
+}
+
+@utility page-header-crumb {
+  @apply text-muted;
+  text-decoration: none;
+  transition: color 150ms ease;
+
+  &:hover,
+  &:focus-visible {
+    @apply text-heading;
+  }
+}
+
+@utility page-header-crumb-current {
+  @apply text-heading;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+@utility page-header-parent {
+  display: none;
+  @apply text-muted;
+  font-size: calc(var(--type-base, 16px) * 0.875);
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    @apply text-heading;
+  }
+
+  @media (width < 40rem) {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: baseline;
+  }
+}
+
+/* THE LINKS LINE: the page's other links, on a line of their own at the foot of the row, so
+   they stick with it. Muted, small, one line; on a phone it scrolls sideways inside the row. */
+@utility page-header-links {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+  margin-top: -0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
+  font-size: calc(var(--type-base, 16px) * 0.8125);
+}
+
+@utility page-header-link {
+  @apply text-muted;
+  text-decoration: none;
+  transition: color 150ms ease;
+
+  &:hover,
+  &:focus-visible,
+  &[aria-current] {
+    @apply text-heading;
+  }
+}
+
+/* The tab's label sits above the gliding pill. */
+@utility page-header-tab-label {
+  position: relative;
+  z-index: 2;
+}
+
+/* The pill is hidden until the browser can anchor it (below). */
+@utility page-header-glide {
+  display: none;
+}
+
+/* -- The gliding pill -------------------------------------------------------
+   Alex McRitchie, 2026-11-05: the current tab's pill glides to the next current tab, as
+   one highlight, instead of each tab switching its own fill. One pill per row
+   (.page-header-glide, the lit primary button's own classes, so it keeps that look in
+   light, dark and glass) is anchored with CSS anchor positioning to whichever tab carries
+   aria-current. aria-current stays the one source of truth: the scroll spy and a page's
+   own markup set it, and the pill follows with no script measuring anything. Its insets
+   transition, so a change of anchor slides it. Reduced motion jumps.
+
+   The tab with aria-current gives up its own fill so the pill shows through, and the
+   labels sit above the pill. !important on the fill: the glass lit button's selectors are
+   heavier than any a row should repeat.
+
+   Where anchor positioning or :has is missing, nothing in this block applies and each tab
+   keeps its own fill, as before. */
+@supports (anchor-name: --a) and (position-anchor: --a) and selector(:has(a)) {
+  .page-header-track {
+    position: relative;
+  }
+
+  .page-header-track > [aria-current] {
+    anchor-name: --page-header-current;
+  }
+
+  .page-header-track:has(> .page-header-tab[aria-current]) > .page-header-glide {
+    display: block;
+    position: absolute;
+    position-anchor: --page-header-current;
+    top: anchor(top);
+    right: anchor(right);
+    bottom: anchor(bottom);
+    left: anchor(left);
+    z-index: 1;
+    margin: 0;
+    padding: 0;
+    pointer-events: none;
+    transition: top 320ms cubic-bezier(0.2, 0.8, 0.2, 1), right 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      bottom 320ms cubic-bezier(0.2, 0.8, 0.2, 1), left 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .page-header-track:has(> .page-header-glide) > .page-header-tab[aria-current] {
+    background-color: transparent !important;
+    background-image: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .page-header-track > .page-header-glide {
+      transition: none !important;
+    }
+  }
+}
+
+/* -- The carousel (studio/_carousel) -----------------------------------------
+   One sideways row of slides on a native scroll-snap track: a swipe, a trackpad and
+   a focused link move it with no script. The carousel controller adds the edge fade,
+   the arrows, the dots and the keys (studio/controllers/carousel_controller).
+
+   WIDTHS COME FROM THE REGION, NOT THE WINDOW. The region is an inline-size container,
+   so a carousel in a narrow column lays out as a phone does. A phone row shows one
+   slide, a medium row up to two, a wide row --carousel-per-view (the partial's
+   per_view). Every row adds --carousel-peek of the next slide, so a visitor sees
+   there is more. n slides and their n gaps plus the peek fill the row:
+   n * w + n * gap + peek * w = 100 percent.
+
+   BEFORE THE CONTROLLER CONNECTS, or when it failed to load, the controls are hidden
+   (they would do nothing) and the track keeps a thin scrollbar, so the row still
+   scrolls with a mouse. */
+@utility carousel {
+  --carousel-gap: 1rem;
+  --carousel-peek: 0.2;
+  --carousel-fade: 2.5rem;
+  position: relative;
+  min-width: 0;
+  container-type: inline-size;
+
+  /* The track's focus ring is drawn here: the track's edge mask clips anything
+     outside its own box, an outline included. */
+  &:has(> .carousel-track:focus-visible) {
+    outline: 2px solid color-mix(in srgb, var(--color-cta) 70%, transparent);
+    outline-offset: 2px;
+    border-radius: 0.75rem;
+  }
+}
+
+@utility carousel-track {
+  --carousel-n: min(var(--carousel-per-view, 3), 1);
+  --carousel-fade-start: 0px;
+  --carousel-fade-end: 0px;
+  position: relative;
+  display: flex;
+  gap: var(--carousel-gap);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  /* Room for a slide's hover shadow and focus ring: the scroll box clips both ways. */
+  padding-block: 0.25rem 0.5rem;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--carousel-fade-start), #000 calc(100% - var(--carousel-fade-end)), transparent 100%);
+          mask-image: linear-gradient(to right, transparent 0, #000 var(--carousel-fade-start), #000 calc(100% - var(--carousel-fade-end)), transparent 100%);
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  &[data-fade-start] {
+    --carousel-fade-start: var(--carousel-fade);
+  }
+
+  &[data-fade-end] {
+    --carousel-fade-end: var(--carousel-fade);
+  }
+
+  &:focus-visible {
+    outline: none;
+  }
+
+  .carousel:not([data-carousel-ready]) & {
+    scrollbar-width: thin;
+  }
+
+  .carousel:not([data-carousel-ready]) &::-webkit-scrollbar {
+    display: initial;
+  }
+
+  @container (width >= 36rem) {
+    --carousel-n: min(var(--carousel-per-view, 3), 2);
+  }
+
+  @container (width >= 56rem) {
+    --carousel-n: var(--carousel-per-view, 3);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    scroll-behavior: auto;
+  }
+}
+
+@utility carousel-slide {
+  flex: 0 0 calc((100% - var(--carousel-n) * var(--carousel-gap)) / (var(--carousel-n) + var(--carousel-peek)));
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+@utility carousel-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+
+  .carousel:not([data-carousel-ready]) &,
+  .carousel[data-carousel-static] & {
+    display: none;
+  }
+}
+
+@utility carousel-dots {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+}
+
+/* A 1.5rem tap target around a small pill. The open stop's pill is wider and wears
+   the primary, so the dots read as a progress line. */
+@utility carousel-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.5rem;
+  padding-inline: 0.1875rem;
+  border-radius: 9999px;
+  cursor: pointer;
+
+  &::before {
+    content: "";
+    display: block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background-color: color-mix(in srgb, var(--color-text-muted) 45%, transparent);
+    transition: width 200ms ease, background-color 200ms ease;
+  }
+
+  &:hover::before {
+    background-color: var(--color-text-muted);
+  }
+
+  &[aria-current="true"]::before {
+    width: 1.5rem;
+    background-color: var(--color-primary);
+  }
+
+  &[hidden] {
+    display: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-cta) 70%, transparent);
+    outline-offset: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::before {
+      transition: none;
+    }
+  }
+}
+
+@utility carousel-arrows {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+/* Round arrows on the card fill, so under the glass surfaces they are glass too. */
+@utility carousel-button {
+  @apply border border-subtle text-heading;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  background-color: var(--surface-card-fill, var(--color-surface));
+  -webkit-backdrop-filter: var(--surface-glass-filter, none);
+          backdrop-filter: var(--surface-glass-filter, none);
+  box-shadow: var(--surface-glass-highlight, 0 0 #0000), var(--surface-glass-shadow, 0 0 #0000);
+  cursor: pointer;
+  transition: border-color 150ms ease, opacity 150ms ease, transform 150ms ease;
+
+  & svg {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+
+  &:hover:not([aria-disabled="true"]) {
+    @apply border-primary;
+  }
+
+  &:active:not([aria-disabled="true"]) {
+    transform: scale(0.94);
+  }
+
+  &[aria-disabled="true"] {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-cta) 70%, transparent);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:active:not([aria-disabled="true"]) {
+      transform: none;
+    }
+  }
 }
 
 /* -- The section header (studio/_section_header, docs/PAGE_HEADER.md) --------

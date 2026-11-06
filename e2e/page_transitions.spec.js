@@ -515,7 +515,7 @@ test("Back between two chat heads still morphs, from Turbo's cache", async ({ pa
   expect(names.filter((name) => name.includes(" pt-"))).toEqual([]);
 });
 
-test("Back from a scrolled page plays the app's direction and restores the scroll", async ({ page }) => {
+test("Back from a scrolled page plays the app's move the other way and restores the scroll", async ({ page }) => {
   await open(page, "direction=left");
   await page.evaluate(() => window.scrollTo(0, 800));
   await page.waitForTimeout(200); // Turbo records the position on a throttled scroll.
@@ -529,7 +529,7 @@ test("Back from a scrolled page plays the app's direction and restores the scrol
   const load = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
   await page.goBack();
   await load;
-  expectPlayed(await seen(page), "pt-out-left", "pt-in-from-right");
+  expectPlayed(await seen(page), "pt-out-right", "pt-in-from-left");
   await expect(page.locator('[data-test="page-a"]')).toBeVisible();
   expect(await page.evaluate(() => window.scrollY)).toBe(800);
 });
@@ -626,4 +626,46 @@ test("a browser without view transitions gets the plain swap, with no pause", as
   expect(attribute.attribute).toBeNull();
   expect(attribute.waited).toBeLessThan(300);
   await expect(page.locator('[data-test="page-b"]')).toBeVisible();
+});
+
+// ---- Back: the app's move the other way (Alex McRitchie, 2026-11-05) ----------------------
+
+test("Back plays the reverse move and Forward the app's own, in the slide and the unfold", async ({ page }) => {
+  for (const [query, out, plays, backOut, backPlays] of [
+    ["direction=left", "pt-out-left", "pt-in-from-right", "pt-out-right", "pt-in-from-left"],
+    ["direction=right&style=unfold", "pt-out-right", "pt-unfold-left", "pt-out-left", "pt-unfold-right"],
+  ]) {
+    await open(page, query);
+    await go(page);
+    await page.waitForTimeout(200); // Past the page's own load: Turbo ignores an early popstate.
+    await page.evaluate(() => { window.__seen.length = 0; });
+    let load = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
+    await page.goBack();
+    await load;
+    expectPlayed(await seen(page), backOut, backPlays);
+    await page.evaluate(() => { window.__seen.length = 0; });
+    load = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
+    await page.goForward();
+    await load;
+    expectPlayed(await seen(page), out, plays);
+  }
+});
+
+test("a crumb back up the trail plays the reverse move, and the next plain link the app's own", async ({ page }) => {
+  await open(page, "direction=left");
+  await page.evaluate(() => { window.__seen.length = 0; });
+  await go(page, "other-back");
+  expectPlayed(await seen(page), "pt-out-right", "pt-in-from-left");
+  expect(await seen(page)).not.toContain("::view-transition-new(root) pt-in-from-right");
+  await page.evaluate(() => { window.__seen.length = 0; });
+  await go(page, "other");
+  expectPlayed(await seen(page), "pt-out-left", "pt-in-from-right");
+});
+
+test("with reduced motion a crumb back plays nothing", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await open(page, "direction=left");
+  await page.evaluate(() => { window.__seen.length = 0; });
+  await go(page, "other-back");
+  expect((await seen(page)).filter((name) => name.includes(" pt-"))).toEqual([]);
 });

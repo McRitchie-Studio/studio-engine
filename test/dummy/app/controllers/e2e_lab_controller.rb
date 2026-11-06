@@ -750,19 +750,27 @@ class E2eLabController < ActionController::Base
   end
 
   # studio/_page_header under the real chrome, for what no adopted page shows: a long
-  # title and a flex or grid parent. ?title=, ?meta=1, ?right=tabs|actions|none,
+  # title and a flex or grid parent. ?title=, ?meta=1, ?right=tabs|actions|wide|none, ?crumbs=1, ?links=1, ?current=N,
   # ?parent=flex|grid. A sibling sits above the row in every parent, as on a real page.
   PAGE_HEADER_PARENTS = {
     "flex" => "display: flex; flex-direction: column; gap: 1.5rem",
     "grid" => "display: grid; gap: 1.5rem"
   }.freeze
   PAGE_HEADER_TABS = %w[Users Sessions Contests Entries Teams Players Games Markets Invoices].freeze
+  # ?crumbs=1, ?links=1 and ?current=<tab index> (the tab with aria-current, for the glide).
+  PAGE_HEADER_CRUMBS = [{ label: "Admin", href: "/lab/page_header?crumbs=1" }, { label: "Deployments", href: "/lab/page_header" }].freeze
+  PAGE_HEADER_LINKS = %w[Epics Intelligence Activities Pokedex Pipeline Insights Recent].map { |name| { label: name, href: "#" } }.freeze
 
   def page_header
     bar_stack_locals
     @lab_parent_style = PAGE_HEADER_PARENTS[params[:parent]]
     @lab_right = params[:right].presence || "tabs"
   end
+
+  # studio/_carousel, three ways: a row of nine linked cards three to a view (the
+  # hub's /websites shape), a row of plain text slides with nothing to focus, and
+  # a row of two that fits. A view, no inputs.
+  def carousel; end
 
   # studio/_section_header under the real chrome, with a table inside a section.
   # ?timeline=1 puts the header on the scroll-driven collapse.

@@ -20,6 +20,45 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   section with all eight, and a live infinite scroll from an admin-only demo feed
   (`/admin/style/loaders_feed`). Busy buttons can show their busy words with
   `data-loader-busy`. Docs: `docs/LOADER.md`, "The family".
+- **A crumb trail on the page header, from one parent map.** `studio/_page_header` takes
+  `crumbs:` (the page's ancestors, root first) and `crumb_label:`. The trail sits above the
+  title: muted ancestor links, the page itself bold, a chevron between. Below 40rem it gives
+  way to one "‹ Parent" link. An app names each parent page once in `Studio.crumbs.draw`
+  (`page :deployments, "Deployments", :deployments_path, parent: :admin`), and a view calls
+  `studio_crumbs(:key)` or `studio_crumbs(parent: :key)`. The row also takes `links:`, the
+  page's other links on a line at its foot that sticks with it, and renders `actions_html`
+  after the tabs when it has both. Detail: `docs/PAGE_HEADER.md`.
+- **The gliding pill.** The page header's open tab is one pill, anchored by CSS anchor
+  positioning to the tab with `aria-current`, so it glides to the next tab when the scroll spy
+  or a click moves `aria-current`. No script measures it. Reduced motion jumps. A browser
+  without anchor positioning keeps each tab's own fill.
+
+- **A carousel standard for the apps: `studio/_carousel`.** Render it as a layout, with
+  `label:` and `items:`, and the block draws each slide, so a slide is any block content.
+  The track is a native scroll-snap row: a swipe, a trackpad and a focused link move it with
+  no script. A wide row shows `per_view:` slides (default 3), a medium row up to two and a
+  phone one, each with a sliver of the next; the widths come from container queries on the
+  region, not the window. The lazy `carousel` controller adds the edge fade, arrows that
+  set `aria-disabled` at an end, dots that hide past the last stop, the arrow keys with Home
+  and End, and a polite status line after a press. It follows the APG carousel pattern:
+  a labelled region with `aria-roledescription="carousel"`, and each slide a labelled
+  group (`slide_label:` names it from its item). It honours `prefers-reduced-motion`, and
+  its arrows take the card fill, so they are glass under the glass surfaces. Until the
+  controller connects, the controls stay hidden and the row keeps a thin scrollbar. New
+  classes: `carousel`, `carousel-track`, `carousel-slide`, `carousel-controls`,
+  `carousel-dots`, `carousel-dot`, `carousel-arrows` and `carousel-button`. `/admin/style`
+  shows it under Tricks.
+
+### Changed
+
+- **Back plays the app's page move the other way.** Browser Back (a Turbo restore that Turbo
+  marks `back`, or a full load that traverses to an earlier entry) and a click on a link with
+  `data-page-transition-back` (every ancestor crumb and the phone's parent link) play the
+  reverse direction in the same style: a `:left` slide goes back as `slide-right`, an
+  `:unfold` with `:right` as `unfold-right`. Forward keeps the app's own direction. Detail:
+  `docs/PAGE_TRANSITIONS.md`, "Back".
+- **The page header's title is the type scale's h2 from 40rem** (30px, weight 800), Alex
+  McRitchie's "H2 header"; a phone keeps 1.5x the base. It is still the page's one `h1`.
 
 ## 0.130.0 — 2026-11-05
 
