@@ -77,7 +77,7 @@ module Studio
     # model pages), which cannot know the host's key for it. Only pages whose address
     # needs no keywords can match.
     def key_for_path(view, path)
-      wanted = path.to_s.chomp("/").presence || "/"
+      wanted = normalize(path)
       @pages.each_value do |page|
         next if page.path.is_a?(Proc) && keywords(page.path, required: true).any?
 
@@ -86,12 +86,35 @@ module Studio
         rescue StandardError
           next
         end
-        return page.key if address.chomp("/").presence == wanted || (wanted == "/" && address == "/")
+        return page.key if normalize(address) == wanted
       end
       nil
     end
 
+    # A name the map lacks, or a loop in it, is a mistake in the app's own code. In
+    # development and test it raises, so the mistake shows at once. Anywhere else the
+    # page renders with no trail and the error is logged: a missing crumb is not
+    # worth a 500.
+    def self.strict?(env = (::Rails.env if defined?(::Rails) && ::Rails.respond_to?(:env)))
+      return true if env.nil?
+
+      env.development? || env.test?
+    end
+
+    def self.report(error)
+      if defined?(::ErrorLog) && ::ErrorLog.respond_to?(:capture!)
+        ::ErrorLog.capture!(error)
+      elsif defined?(::Rails) && ::Rails.respond_to?(:logger) && ::Rails.logger
+        ::Rails.logger.error("[studio-crumbs] no trail drawn: #{error.class}: #{error.message}")
+      end
+    rescue StandardError
+      nil # reporting is best-effort: the page still renders
+    end
+
     private
+
+    # An address with no trailing slash; the root stays "/".
+    def normalize(path) = path.to_s.chomp("/").presence || "/"
 
     def resolve(view, value, locals)
       case value

@@ -80,6 +80,80 @@ class StudioCrumbsTest < Minitest::Test
     assert_nil @crumbs.key_for_path(@view, "/nowhere")
   end
 
+  def test_the_root_page_matches_the_root_address
+    @crumbs.page :home, "Home", "/"
+    assert_equal :home, @crumbs.key_for_path(@view, "/")
+    assert_equal :home, @crumbs.key_for_path(@view, "")
+    assert_equal :deployments, @crumbs.key_for_path(@view, "/deployments")
+  end
+
+  def with_map
+    original = Studio.instance_variable_get(:@crumbs)
+    Studio.instance_variable_set(:@crumbs, @crumbs)
+    yield View.new.extend(Studio::CrumbsHelper)
+  ensure
+    Studio.instance_variable_set(:@crumbs, original)
+  end
+
+  def stub_singleton(object, name, value)
+    original = object.method(name)
+    object.define_singleton_method(name) { |*args| value.respond_to?(:call) ? value.call(*args) : value }
+    yield
+  ensure
+    object.define_singleton_method(name, original) if original
+  end
+
+  def test_an_unknown_key_raises_in_development_and_test
+    with_map do |view|
+      stub_singleton(Studio::Crumbs, :strict?, true) do
+        assert_raises(Studio::Crumbs::UnknownPage) { view.studio_crumbs(:nowhere) }
+        assert_raises(Studio::Crumbs::UnknownPage) { view.studio_crumbs(parent: :nowhere) }
+      end
+    end
+  end
+
+  def test_an_unknown_key_in_production_is_logged_and_draws_no_trail
+    reported = []
+    with_map do |view|
+      stub_singleton(Studio::Crumbs, :strict?, false) do
+        stub_singleton(Studio::Crumbs, :report, ->(error) { reported << error }) do
+          assert_equal [], view.studio_crumbs(:nowhere)
+          assert_equal [], view.studio_crumbs(parent: :nowhere)
+          assert_equal [{ label: "Admin", href: "/admin/dashboard" }], view.studio_crumbs(:deployments),
+                       "a known key still draws its trail"
+        end
+      end
+    end
+    assert_equal [Studio::Crumbs::UnknownPage] * 2, reported.map(&:class)
+  end
+
+  def test_strict_follows_the_rails_env
+    env = Struct.new(:name) do
+      def development? = name == "development"
+      def test? = name == "test"
+    end
+    assert Studio::Crumbs.strict?(env.new("development"))
+    assert Studio::Crumbs.strict?(env.new("test"))
+    refute Studio::Crumbs.strict?(env.new("production"))
+    refute Studio::Crumbs.strict?(env.new("staging"))
+  end
+
+  def test_a_report_goes_to_the_error_log
+    captured = []
+    log = Module.new
+    log.define_singleton_method(:capture!) { |error| captured << error }
+    had = defined?(::ErrorLog)
+    original = (::ErrorLog if had)
+    Object.send(:remove_const, :ErrorLog) if had
+    Object.const_set(:ErrorLog, log)
+    error = Studio::Crumbs::UnknownPage.new("Studio.crumbs has no page :nowhere")
+    Studio::Crumbs.report(error)
+    assert_equal [error], captured
+  ensure
+    Object.send(:remove_const, :ErrorLog) if defined?(::ErrorLog)
+    Object.const_set(:ErrorLog, original) if had
+  end
+
   def test_studio_crumbs_here_reads_the_app_map_at_this_address_and_is_empty_off_it
     view = View.new.extend(Studio::CrumbsHelper)
     request = Struct.new(:path)
