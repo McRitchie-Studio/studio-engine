@@ -13,7 +13,7 @@
 %>
 <%= tag.div(class: classes, data: data, **extra) do %>
   <span class="studio-pull-refresh-indicator" aria-hidden="true" hidden>
-    <span class="spinner" style="--spinner-size: 1.25rem; --spinner-color: currentColor; --spinner-track: color-mix(in srgb, currentColor 22%, transparent)"></span>
+    <span class="spinner studio-pull-refresh-spinner" style="--spinner-size: 1.25rem; --spinner-color: currentColor; --spinner-track: color-mix(in srgb, currentColor 22%, transparent)"></span>
   </span>
   <p class="sr-only" role="status" data-pull-to-refresh-status></p>
   <%= body %>

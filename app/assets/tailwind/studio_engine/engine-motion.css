@@ -2489,7 +2489,10 @@ body.modal-open { overflow: visible; }
      spinner, dots and bar wrap the canonical .spinner, .loading-dots and
      .progress-meter rules (sections 2, 3 and 7 above) and only set their knobs,
      so the family and those classes stay one set of rules. */
-  .studio-loader[data-loader-style="spinner"] .spinner {
+  /* :where() keeps the family's selectors from ending in the bare spinner class: a host
+     counts that one rule to prove the motion layer is imported once
+     (turf-monster test/lib/tailwind_css_first_test.rb). */
+  .studio-loader[data-loader-style="spinner"] :where(.spinner) {
     --spinner-size: var(--studio-loader-size);
     --spinner-thickness: max(2px, calc(var(--studio-loader-size) * 0.1));
     --spinner-color: var(--studio-loader-color);
@@ -2732,8 +2735,8 @@ body.modal-open { overflow: visible; }
     --studio-pull: 1;
     transform: translate(-50%, 1.5rem);
   }
-  .studio-pull-refresh-indicator .spinner { animation-play-state: paused; }
-  .studio-pull-refresh[data-pull-state="refreshing"] .studio-pull-refresh-indicator .spinner { animation-play-state: running; }
+  .studio-pull-refresh-indicator .studio-pull-refresh-spinner { animation-play-state: paused; }
+  .studio-pull-refresh[data-pull-state="refreshing"] .studio-pull-refresh-indicator .studio-pull-refresh-spinner { animation-play-state: running; }
 
   @media (prefers-reduced-motion: reduce) {
     .studio-skeleton-bone { animation: none; background-position: 150% 0, 0 0; }

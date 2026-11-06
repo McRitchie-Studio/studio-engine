@@ -168,10 +168,14 @@ class LoaderFamilyRenderTest < ActiveSupport::TestCase
   test "the plain styles set the canonical rules' knobs rather than restyling them" do
     css = File.read(MOTION_CSS)
 
-    assert_match(/\.studio-loader\[data-loader-style="spinner"\] \.spinner \{[^}]*--spinner-color: var\(--studio-loader-color\)/m, css)
+    assert_match(/\.studio-loader\[data-loader-style="spinner"\] :where\(\.spinner\) \{[^}]*--spinner-color: var\(--studio-loader-color\)/m, css)
     assert_match(/\.studio-loader\[data-loader-style="dots"\] \.loading-dots \{[^}]*--loading-dots-color: var\(--studio-loader-color\)/m, css)
     assert_match(/\.studio-loader\[data-loader-style="bar"\] \.progress-meter \{[^}]*--progress: calc\(var\(--studio-loader-percent, 0\) \* 1%\)/m, css)
     assert_equal 1, css.scan(/^\.spinner \{/).size, "one spinner rule"
+    # A host counts the selectors that end in ".spinner{" to prove the motion layer
+    # is imported once (turf-monster test/lib/tailwind_css_first_test.rb), so the
+    # family never ends a selector in it.
+    assert_equal 1, css.scan(/\.spinner\s*\{/).size, "only the canonical rule ends in .spinner {"
   end
 
   test "the skeleton is a tint of the theme's text and stands still under reduced motion" do
