@@ -92,16 +92,23 @@ module Studio
     end
 
     # A name the map lacks, or a loop in it, is a mistake in the app's own code. In
-    # development and test it raises, so the mistake shows at once. Anywhere else the
-    # page renders with no trail and the error is logged: a missing crumb is not
-    # worth a 500.
+    # development and test it raises, so the mistake shows at once. Anywhere else (QA
+    # dynos run as production, so not Rails.env.production?) the page renders with no
+    # trail and the error is logged: a missing crumb is not worth a 500.
     def self.strict?(env = (::Rails.env if defined?(::Rails) && ::Rails.respond_to?(:env)))
       return true if env.nil?
 
       env.development? || env.test?
     end
 
+    REPORTED = {}
+    REPORTED_LOCK = Mutex.new
+
+    # Once per message per process: a layout renders on every request.
     def self.report(error)
+      first = REPORTED_LOCK.synchronize { REPORTED[error.message] ? false : (REPORTED[error.message] = true) }
+      return unless first
+
       if defined?(::ErrorLog) && ::ErrorLog.respond_to?(:capture!)
         ::ErrorLog.capture!(error)
       elsif defined?(::Rails) && ::Rails.respond_to?(:logger) && ::Rails.logger

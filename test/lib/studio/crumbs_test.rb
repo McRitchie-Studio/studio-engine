@@ -146,9 +146,10 @@ class StudioCrumbsTest < Minitest::Test
     original = (::ErrorLog if had)
     Object.send(:remove_const, :ErrorLog) if had
     Object.const_set(:ErrorLog, log)
-    error = Studio::Crumbs::UnknownPage.new("Studio.crumbs has no page :nowhere")
+    error = Studio::Crumbs::UnknownPage.new("Studio.crumbs has no page :report_once_#{rand(1 << 30)}")
     Studio::Crumbs.report(error)
-    assert_equal [error], captured
+    Studio::Crumbs.report(error)
+    assert_equal [error], captured, "once per message: a layout renders on every request"
   ensure
     Object.send(:remove_const, :ErrorLog) if defined?(::ErrorLog)
     Object.const_set(:ErrorLog, original) if had

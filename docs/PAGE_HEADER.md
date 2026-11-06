@@ -75,7 +75,9 @@ end
 A label or an address is a String, a Symbol (a route helper, read in the view and then on
 `main_app`) or a lambda. The view runs a lambda with the keywords it names, taken from the
 call. An unknown page raises `Studio::Crumbs::UnknownPage`, and a loop raises
-`Studio::Crumbs::Cycle`.
+`Studio::Crumbs::Cycle`. `studio_crumbs` lets them raise only in development and test.
+In any other environment (QA and production alike) it reports the error to `ErrorLog`, or
+else `Rails.logger`, once per message per process, and the page draws no trail.
 
 ```erb
 <%# A page in the map: its ancestors. %>

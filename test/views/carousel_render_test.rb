@@ -104,6 +104,7 @@ class CarouselRenderTest < Minitest::Test
     assert_equal "keydown->carousel#key", section["data-studio-action"]
     assert_equal "track", section.at_css(".carousel-track")["data-carousel-target"]
     assert_equal "polite", section.at_css("[role='status']")["aria-live"]
+    assert_equal "true", section.at_css("[role='status']")["aria-atomic"], "the whole line is read, not the changed words"
   end
 
   def test_per_view_sets_the_wide_row_and_is_held_to_one_to_six

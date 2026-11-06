@@ -66,7 +66,7 @@ export const KEY_OWNERS = [
   "input", "textarea", "select", "[contenteditable]:not([contenteditable='false'])",
   "[role='slider']", "[role='spinbutton']", "[role='listbox']", "[role='combobox']",
   "[role='tablist']", "[role='radiogroup']", "[role='menu']", "[role='menubar']",
-  "[role='grid']", "[role='tree']", "[role='treegrid']"
+  "[role='grid']", "[role='tree']", "[role='treegrid']", "video", "audio"
 ].join(", ")
 
 // Whether a key pressed on `target` is the carousel `region`'s to handle: not

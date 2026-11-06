@@ -93,7 +93,8 @@ test("a key in a field or an arrow-key widget is that element's, not the row's",
   const region = { matches: [".carousel"] }
   assert.equal(ownsKey(node([{ matches: [] }, region]), region), true, "a link in a slide")
   for (const owner of ["input", "textarea", "select", "[role='slider']", "[role='listbox']",
-                       "[role='combobox']", "[role='tablist']", "[role='radiogroup']", "[role='grid']"]) {
+                       "[role='combobox']", "[role='tablist']", "[role='radiogroup']", "[role='grid']",
+                       "video", "audio"]) {
     assert.ok(KEY_OWNERS.includes(owner), `${owner} is a key owner`)
     assert.equal(ownsKey(node([{ matches: [owner] }, region]), region), false, owner)
   }

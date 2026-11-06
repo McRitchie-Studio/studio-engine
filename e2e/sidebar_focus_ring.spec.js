@@ -11,8 +11,8 @@ const { blockOffsiteRequests } = require("./helpers");
 // fill outside it.
 //
 // Graded: a body row (an inset ring), the panel's close button and the Log out row
-// (rings outside the box). The glass sidebar's current row draws its own white
-// outline (e2e/sidebar_glass.spec.js) and is not graded here.
+// (rings outside the box), and under glass the current row, whose ring is its own
+// white outline on its violet fill (e2e/sidebar_glass.spec.js pins its shape).
 //
 // CONTROL: the rows back on focus-visible:ring-primary/40 fail every palette, dark
 // and light, solid and glass, at 1.3 to 2.0:1.
@@ -20,7 +20,7 @@ const { blockOffsiteRequests } = require("./helpers");
 const MIN = 3;
 const PALETTES = ["engine-default", "turf-monster", "cyvasse", "mcritchie-industries", "moms-app"];
 
-const MEASURE = async ({ shot, target, inset }) => {
+const MEASURE = async ({ shot, target, inset, outline }) => {
   const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${shot}`)).blob());
   const cv = document.createElement("canvas");
   cv.width = bitmap.width;
@@ -46,8 +46,12 @@ const MEASURE = async ({ shot, target, inset }) => {
   const r = el.getBoundingClientRect();
   // Down the top edge, clear of any label: a ring two pixels wide, inside the box
   // for an inset ring and outside it otherwise.
+  // The glass current row's ring is a 2px outline 4px inside its edge, with the row's
+  // own fill on both sides of it.
   const x = inset ? r.left + 8 : r.left + r.width / 2;
-  const y = inset ? { ring: r.top + 1, inner: r.top + 4, outer: r.top - 2 } : { ring: r.top - 1, inner: r.top + 2, outer: r.top - 4 };
+  const y = outline ? { ring: r.top + 3, inner: r.top + 6, outer: r.top + 1 }
+    : inset ? { ring: r.top + 1, inner: r.top + 4, outer: r.top - 2 }
+    : { ring: r.top - 1, inner: r.top + 2, outer: r.top - 4 };
   const ring = pixel(x, y.ring);
   const inner = pixel(x, y.inner);
   const outer = pixel(x, y.outer);
@@ -63,6 +67,8 @@ const TARGETS = [
   { name: "log out", target: "#studio-link-sidebar a[href$='logout'], #studio-link-sidebar a[href*='sign_out'], #studio-link-sidebar a[href*='logout']", inset: false },
 ];
 
+const CURRENT_GLASS = { name: "current", target: "#studio-link-sidebar nav a[aria-current='page']", outline: true };
+
 async function grade(page, { palette, glass, dark }) {
   await page.goto(`/lab/sidebar_panels?sidebar=1&signed_in=1&palette=${palette}${glass ? "&glass=1" : ""}`);
   await page.waitForFunction(() => window.Alpine);
@@ -73,7 +79,8 @@ async function grade(page, { palette, glass, dark }) {
   await page.waitForTimeout(450);
 
   const rows = [];
-  for (const { name, target, inset } of TARGETS) {
+  const targets = glass ? [...TARGETS, CURRENT_GLASS] : TARGETS;
+  for (const { name, target, inset, outline } of targets) {
     // A key press first, so the focus that follows is keyboard focus.
     await page.keyboard.press("Shift");
     await page.locator(target).first().evaluate((el) => el.focus());
@@ -81,7 +88,7 @@ async function grade(page, { palette, glass, dark }) {
     expect(await page.locator(target).first().evaluate((el) => el.matches(":focus-visible"))).toBe(true);
     await page.waitForTimeout(200); // the rows' colour transition
     const shot = (await page.screenshot()).toString("base64");
-    rows.push({ name, ...(await page.evaluate(MEASURE, { shot, target, inset })) });
+    rows.push({ name, ...(await page.evaluate(MEASURE, { shot, target, inset, outline })) });
   }
   return rows;
 }
