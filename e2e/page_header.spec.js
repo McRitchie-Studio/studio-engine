@@ -384,3 +384,11 @@ test("with reduced motion the pill jumps, and with no current tab there is no pi
   await page.goto(LAB);
   expect(await page.locator(".page-header-glide").evaluate((el) => getComputedStyle(el).display)).toBe("none");
 });
+
+test("a wide group of actions wraps inside the row on a phone, and the page does not scroll sideways", async ({ page }) => {
+  await open(page, `${LAB}?crumbs=1&right=wide`, PHONE);
+  await expect(page.locator(".page-header-actions a")).toHaveCount(8);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  const box = await page.locator(".page-header-actions").boundingBox();
+  expect(box.x + box.width).toBeLessThanOrEqual(PHONE.width);
+});

@@ -750,7 +750,7 @@ class E2eLabController < ActionController::Base
   end
 
   # studio/_page_header under the real chrome, for what no adopted page shows: a long
-  # title and a flex or grid parent. ?title=, ?meta=1, ?right=tabs|actions|none, ?crumbs=1, ?links=1, ?current=N,
+  # title and a flex or grid parent. ?title=, ?meta=1, ?right=tabs|actions|wide|none, ?crumbs=1, ?links=1, ?current=N,
   # ?parent=flex|grid. A sibling sits above the row in every parent, as on a real page.
   PAGE_HEADER_PARENTS = {
     "flex" => "display: flex; flex-direction: column; gap: 1.5rem",

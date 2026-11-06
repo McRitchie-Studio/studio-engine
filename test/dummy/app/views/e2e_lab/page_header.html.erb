@@ -12,6 +12,9 @@
         crumbs: (params[:crumbs].present? ? E2eLabController::PAGE_HEADER_CRUMBS : []),
         links: (params[:links].present? ? E2eLabController::PAGE_HEADER_LINKS : []),
         tabs: (@lab_right == "tabs" ? E2eLabController::PAGE_HEADER_TABS.each_with_index.map { |name, index| { label: name, href: "#", current: (index.to_s == params[:current] ? "true" : nil) } } : []),
-        actions_html: (@lab_right == "actions" ? link_to("Export", "#", class: "btn btn-sm btn-neutral") : nil) %>
+        actions_html: (case @lab_right
+                       when "actions" then link_to("Export", "#", class: "btn btn-sm btn-neutral")
+                       when "wide" then tag.div(class: "flex flex-wrap items-center gap-2") { safe_join(%w[Tasks Triage Stages New Links Generate Advance Ship].map { |name| link_to(name, "#", class: "btn btn-sm btn-neutral") }) }
+                       end) %>
   <div style="height: 2400px">The page.</div>
 </div>

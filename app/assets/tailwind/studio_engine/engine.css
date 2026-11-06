@@ -372,6 +372,9 @@ body.modal-open .studio-app-banner {
 
 @utility page-header-actions {
   flex-shrink: 0;
+  /* Never wider than the row: a group of controls wraps inside it on a phone, and the
+     page does not scroll sideways. */
+  max-width: 100%;
   margin-left: auto;
 
   /* After the tabs, the tabs' own auto margin already pushes both right. */
