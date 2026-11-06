@@ -75,8 +75,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   linked `target:` with ErrorLog's `belongs_to`, which saves a new record. With an unsaved
   record, the logger ran the failing save a second time. That raise skipped the logged mark,
   so the catch-all wrote the same failure again, and a save that could pass created the
-  record. Now an unsaved target or parent is named on the row (`unsaved User`) and not
-  linked. This covers the SSO, wallet and link sign-ups and the theme save. When the
+  record. Now an unsaved target or parent is named on the row by its slug (else
+  `unsaved User`) and not linked. This covers the SSO, wallet and link sign-ups and the theme save. When the
   ErrorLog write itself fails, in `rescue_and_log` or in the catch-all, `Rails.logger.error`
   records both errors. `rescue_and_log` still raises the original error, and the catch-all
   still gives its friendly reply. Before, the logger's error replaced both.

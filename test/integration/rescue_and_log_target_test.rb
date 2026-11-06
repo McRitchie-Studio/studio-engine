@@ -120,6 +120,22 @@ class RescueAndLogTargetTest < ActiveSupport::TestCase
     assert_equal 0, User.save_attempts
   end
 
+  # The hub's model-pricing page logs an unsaved ModelRateOverride and reads the
+  # model name back from target_name: a slug, when the record has one, wins.
+  test "an unsaved target with a slug is named by its slug" do
+    user = User.new(email: "new@example.com")
+    user.define_singleton_method(:slug) { "claude-opus-4-8" }
+
+    assert_raises(IOError) do
+      @controller.rescue_and_log(target: user) { raise IOError, "lab: boom" }
+    end
+
+    log = ErrorLog.sole
+    assert_equal "claude-opus-4-8", log.target_name
+    assert_nil log.target_id
+    assert_equal 0, User.count
+  end
+
   test "a saved target is still linked to the row" do
     user = User.create!(email: "known@example.com")
 

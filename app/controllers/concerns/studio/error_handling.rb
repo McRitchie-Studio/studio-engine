@@ -239,11 +239,12 @@ module Studio
 
     # Names `record` on the row as its target or parent.
     #
-    # An UNSAVED record is named, never linked. ErrorLog `belongs_to` it, and a
-    # belongs_to autosaves a new record: the logger would run the failing save a
-    # second time, and that raise escaped before @_error_logged was set, so the
-    # catch-all wrote the same failure twice. It also created the account a
-    # failed signup was meant not to create.
+    # An UNSAVED record is named (its slug, else "unsaved <Class>"), never
+    # linked. ErrorLog `belongs_to` it, and a belongs_to autosaves a new record:
+    # the logger would run the failing save a second time, and that raise
+    # escaped before @_error_logged was set, so the catch-all wrote the same
+    # failure twice. It also created the account a failed signup was meant not
+    # to create.
     #
     # `slug` is NOT in the engine's User contract (REQUIRED_USER_INSTANCE_METHODS
     # is admin? + display_name), and a target is routinely a User. Unguarded, the
@@ -253,13 +254,13 @@ module Studio
       return unless record
 
       name_column = :"#{role}_name"
-      named = error_log.has_attribute?(name_column)
+      slug = record.slug.presence if record.respond_to?(:slug)
       if record.respond_to?(:new_record?) && record.new_record?
-        error_log[name_column] = "unsaved #{record.class.name}" if named
+        slug ||= "unsaved #{record.class.name}"
       else
         error_log.public_send(:"#{role}=", record)
-        error_log[name_column] = record.slug if named && record.respond_to?(:slug)
       end
+      error_log[name_column] = slug if slug && error_log.has_attribute?(name_column)
     end
 
     # Layer 1: RecordNotFound — Rails' own 404, never an ErrorLog row.
