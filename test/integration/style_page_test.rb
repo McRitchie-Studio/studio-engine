@@ -248,6 +248,7 @@ class StylePageTest < ActiveSupport::TestCase
     card card-hover badge input-field empty-state label-upper
     studio-border-glow spinner loading-dots sheen ping fade-edge progress-meter
     carousel carousel-track carousel-slide carousel-dot carousel-button
+    carousel-controls carousel-dots carousel-arrows
   ].freeze
 
   REQUIRED_THEME_TOKENS = %w[

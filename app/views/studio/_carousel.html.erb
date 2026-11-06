@@ -44,7 +44,10 @@
       aria: { roledescription: "carousel", label: label },
       style: "--carousel-per-view: #{per_view}",
       data: { studio_controller: "carousel", studio_action: "keydown->carousel#key" }.merge(data)) do %>
-  <div id="<%= track_id %>" class="carousel-track" tabindex="0" data-carousel-target="track">
+  <%# The track takes focus for the keys, so it carries a name: a group, since a
+      bare div may not be named. %>
+  <div id="<%= track_id %>" class="carousel-track" tabindex="0" role="group"
+       aria-label="<%= label %> slides" data-carousel-target="track">
     <% items.each_with_index do |item, index| %>
       <div class="carousel-slide" role="group" aria-roledescription="slide"
            aria-label="<%= slide_label ? slide_label.call(item) : "#{index + 1} of #{total}" %>"
