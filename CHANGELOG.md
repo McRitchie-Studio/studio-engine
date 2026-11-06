@@ -46,6 +46,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **The page header's title is the type scale's h2 from 40rem** (30px, weight 800), Alex
   McRitchie's "H2 header"; a phone keeps 1.5x the base. It is still the page's one `h1`.
 
+### Fixed
+
+- **Review follow-ups on the sidebar, the carousel and the page header** (/tasks/engine-ui-polish-follow-ups).
+  The link sidebar's focus ring (its rows, close button, Log out, trigger and geo rows) is
+  `ring-primary-ink`, a new ring colour from the theme's primary ink: measured 5.4 to 8.9:1
+  beside every surface in dark, light and glass on five palettes, from 1.3 to 2.0:1 for
+  `ring-primary/40`. A carousel arrow or key that goes nowhere scrolls and announces nothing;
+  keys inside a slider, listbox, combobox, tab list, other arrow-key widget or nested carousel
+  stay theirs; and the focusable track is a group named "<label> slides". The page header row
+  is now always a `<div>`: with tabs, the tabs are their own `<nav>` named by `label`, beside
+  the crumb and links navs, so no landmark nests in another (a host test that found the row by
+  `nav[aria-label=…]` now finds the tabs). The `/admin/style` specimen adds no landmark.
+  The current link under the title is bold as well as coloured, and the pill's track sets
+  `anchor-scope`. `studio_crumbs` with a key the map lacks still raises in development and
+  test; elsewhere it logs to ErrorLog and draws no trail, not a 500. The dead redirect guard
+  in `studio/page_transitions` is gone.
+
 ## 0.130.0 — 2026-11-05
 
 ### Added
