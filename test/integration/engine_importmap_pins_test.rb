@@ -76,7 +76,7 @@ class EngineImportmapPinsTest < ActiveSupport::TestCase
                     studio/controllers/link_sidebar_controller
                     studio/controllers/modal_host_controller studio/controllers/nav_collapse_controller
                     studio/controllers/toast_controller studio/cropper studio/email_banner studio/head_chrome
-                    studio/hold_button studio/hold_button_hooks studio/identity_mini studio/image_upload
+                    studio/hold_button studio/hold_button_hooks studio/identity_mini studio/image_upload studio/in_page_links
                     studio/lazy_controllers studio/leveling_activity studio/link_sidebar studio/loader studio/modal_countdown
                     studio/modal_host studio/nav_collapse studio/newsletter_modal studio/pinned_stack
                     studio/profile_form studio/stimulus

@@ -81,6 +81,7 @@ and reduced motion plays nothing. The theme toggle is untouched.
 | A change of path, Forward included | The direction |
 | Back, or a back link (see [Back](#back)) | The direction reversed |
 | The same path: a refresh, a poll, a change of query only, with no morph name shared | Nothing |
+| A link to a `#fragment` on this page, or Back and Forward between such entries | No visit at all: a scroll by `studio/in_page_links` ([`PAGE_HEADER.md`](PAGE_HEADER.md#in-page-links)) |
 | The same path, an advance visit, with a morph name on both sides | The engine's fade and the morph |
 | A GET that redirects | The direction once, for the first render. The follow-up visit draws nothing |
 | Two pages that share a morph name | The engine's fade and the morph |

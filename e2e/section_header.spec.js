@@ -108,6 +108,28 @@ async function expectLanded(page, row, label, id, viewport, exact) {
   }
 }
 
+// The Loaders section's feed lives at /admin/style/loaders_feed, which a host serves to its
+// admins. The dummy gates that route, so it is answered from the lab's own feed. A smooth tab
+// scroll passes the section, and its next page loads as on a reader's own scroll.
+const serveFeed = (page) => page.route("**/admin/style/loaders_feed*", async (route) => {
+  const url = new URL(route.request().url());
+  await route.fulfill({ response: await route.fetch({ url: `${url.origin}/lab/loaders_feed${url.search}` }) });
+});
+
+// A tab's click is a smooth scroll (studio/in_page_links), so a landing is read once the
+// page has stood still for ten frames.
+const landed = (page) => page.waitForFunction(() => new Promise((done) => {
+  let last = window.scrollY;
+  let still = 0;
+  const tick = () => {
+    still = window.scrollY === last ? still + 1 : 0;
+    last = window.scrollY;
+    if (still >= 10) done(true);
+    else requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}));
+
 const TABS = [["Modals", "modals"], ["Tricks", "tricks"], ["Tasks", "tasks"], ["Theme", "theme"]];
 
 // Each check runs without Turbo and under it. Declared bare, twice: the lane's census counts
@@ -116,6 +138,7 @@ async function tabJump(page, url) {
   const errors = watchPageErrors(page);
   for (const viewport of [DESKTOP, PHONE]) {
     await blockOffsiteRequests(page);
+    await serveFeed(page);
     await page.setViewportSize(viewport);
     await page.goto(url);
     await page.waitForFunction(() => document.documentElement.hasAttribute("data-pin-live"));
@@ -123,6 +146,7 @@ async function tabJump(page, url) {
     for (const [index, [label, id]] of TABS.entries()) {
       await row.locator("a", { hasText: label }).click();
       await page.waitForFunction((want) => location.hash === `#${want}`, id);
+      await landed(page);
       await page.waitForTimeout(500);
       await expectLanded(page, row, label, id, viewport, index > 0);
     }
@@ -138,11 +162,13 @@ async function backKeepsPlace(page, url) {
   // Tricks comes before Modals, so the second jump lands further down.
   await row.locator("a", { hasText: "Tricks" }).click();
   await page.waitForFunction(() => location.hash === "#tricks");
+  await landed(page);
   await page.waitForTimeout(300);
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
   await page.waitForTimeout(300);
   await row.locator("a", { hasText: "Modals" }).click();
   await page.waitForFunction(() => location.hash === "#modals");
+  await landed(page);
   await page.waitForTimeout(300);
   const before = await page.evaluate(() => window.scrollY);
   await page.goBack();
@@ -160,6 +186,7 @@ async function scrollHolds(page, url) {
   await page.waitForFunction(() => document.documentElement.hasAttribute("data-pin-live"));
   await styleRow(page).locator("a", { hasText: "Modals" }).click();
   await page.waitForFunction(() => location.hash === "#modals");
+  await landed(page);
   await page.evaluate(() => window.scrollBy({ top: -300, behavior: "instant" }));
   const held = await page.evaluate(() => window.scrollY);
   await page.waitForTimeout(1800);
