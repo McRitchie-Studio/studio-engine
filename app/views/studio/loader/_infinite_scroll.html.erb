@@ -23,7 +23,7 @@
                          class: "studio-infinite-scroll-next", data: { infinite_scroll_next: "" }) do
         tag.div(class: "studio-infinite-scroll-more") do
           link_to(next_url, class: "btn btn-secondary", data: { infinite_scroll_more: "" }) do
-            safe_join([ tag.span(more_label), studio_loader_pending(style: :spinner, size: 16, class: "ml-2") ])
+            safe_join([ tag.span(more_label), studio_loader_pending(style: :spinner, size: 16) ])
           end
         end
       end)

@@ -2690,6 +2690,7 @@ body.modal-open { overflow: visible; }
     justify-content: center;
     padding-block: 1rem;
   }
+  .studio-infinite-scroll-more .studio-loader { margin-inline-start: 0.5rem; }
   .studio-infinite-scroll-end { margin: 0; font-size: 0.875rem; color: var(--color-text-secondary); }
   /* Turbo marks the frame aria-busy while it fetches: the button keeps its
      place and shows a spinner instead of its words. */
