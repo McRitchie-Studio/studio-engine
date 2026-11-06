@@ -172,6 +172,8 @@ class LoaderFamilyRenderTest < ActiveSupport::TestCase
     assert_match(/\.studio-loader\[data-loader-style="dots"\] \.loading-dots \{[^}]*--loading-dots-color: var\(--studio-loader-color\)/m, css)
     assert_match(/\.studio-loader\[data-loader-style="bar"\] \.progress-meter \{[^}]*--progress: calc\(var\(--studio-loader-percent, 0\) \* 1%\)/m, css)
     assert_equal 1, css.scan(/^\.spinner \{/).size, "one spinner rule"
+    assert_match(/:not\(\[data-loader-mono\]\) \{\s*--studio-loader-color: var\(--color-primary-ink, var\(--color-primary\)\);/, css,
+                 "plain styles draw in the contrast-checked primary ink")
     # A host counts the selectors that end in ".spinner{" to prove the motion layer
     # is imported once (turf-monster test/lib/tailwind_css_first_test.rb), so the
     # family never ends a selector in it.

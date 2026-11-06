@@ -160,8 +160,10 @@ shows all eight in its Loaders section.
 
 ### Plain styles: spinner, dots and bar
 
-They draw no icon, only the theme's colours (`--studio-loader-color`, the
-primary). They are styles of `studio_loader`, not new classes: each wraps the
+They draw no icon, only the theme's colours: `--studio-loader-color` is the
+primary ink (`--color-primary-ink`, the primary checked for contrast against the
+page), so a dark primary never sinks into a dark page. In a button they take the
+button's text colour. They are styles of `studio_loader`, not new classes: each wraps the
 engine's canonical motion rule (`.spinner`, `.loading-dots`, `.progress-meter`)
 and only sets its knobs. Those classes still work alone; a later adoption task
 moves the hub and Turf onto the helper. An app's own `config.loader` refuses a

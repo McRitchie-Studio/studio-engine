@@ -2489,6 +2489,13 @@ body.modal-open { overflow: visible; }
      spinner, dots and bar wrap the canonical .spinner, .loading-dots and
      .progress-meter rules (sections 2, 3 and 7 above) and only set their knobs,
      so the family and those classes stay one set of rules. */
+  /* Drawn on the page like ink, so in the theme's contrast-checked primary
+     ink (theme_resolver), not the raw primary, which can sink into a dark
+     page. A mono loader keeps currentColor. */
+  .studio-loader:is([data-loader-style="spinner"], [data-loader-style="dots"], [data-loader-style="bar"]):not([data-loader-mono]) {
+    --studio-loader-color: var(--color-primary-ink, var(--color-primary));
+  }
+
   /* :where() keeps the family's selectors from ending in the bare spinner class: a host
      counts that one rule to prove the motion layer is imported once
      (turf-monster test/lib/tailwind_css_first_test.rb). */
@@ -2724,7 +2731,7 @@ body.modal-open { overflow: visible; }
     border-radius: 9999px;
     background: var(--color-surface);
     box-shadow: 0 2px 10px color-mix(in srgb, var(--color-text) 18%, transparent);
-    color: var(--color-primary);
+    color: var(--color-primary-ink, var(--color-primary));
     opacity: min(1, calc(var(--studio-pull) * 1.4));
     transform: translate(-50%, calc(var(--studio-pull) * 4.5rem - 3rem)) rotate(calc(var(--studio-pull) * 270deg));
     pointer-events: none;
