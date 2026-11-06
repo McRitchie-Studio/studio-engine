@@ -380,9 +380,9 @@ test("a click on a back link turns its visit around, and an ordinary link or a r
 
 // The first half plays the way the click asked; the second half, Turbo's replace to the
 // final address, draws nothing whichever way that was. (An `if (!redirected)` guard once
-// kept `back` across the second half. Turbo follows a redirect with willRender: false, so
-// no render reads it before turbo:load, and the guard was dead: it is gone, and this
-// test pins what it claimed to protect.)
+// kept `back` across the second half. Turbo's replace still fires turbo:before-render, but
+// `from` is the final address by then, so planVisit plays STILL either way; the guard was
+// dead. Drop `if (redirected) from = target` and this goes red.)
 test("a redirect plays its first half's way once, and its second half draws nothing", async () => {
   for (const [backLink, way] of [[true, "slide-right"], [false, "slide-left"]]) {
     const { on, root } = await installed("/a", { motion: true })
