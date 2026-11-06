@@ -15,6 +15,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   reduced motion and never writes the status line. A pause button (`.carousel-autoplay`,
   "Pause slideshow" / "Play slideshow") meets WCAG 2.2.2. Both default off, so every
   existing carousel is unchanged (task `carousel-autoplay-and-loop`).
+- **The engine ships a standard sign-in card.** Alex McRitchie, on the style guide's
+  Email field specimen: "this should use the standard auth component with Google and
+  Email." `studio/auth/_sign_in_card` (a page) and `studio/auth/_sign_in_modal` (a
+  modal host's template) render Google, then "or", then the email magic link; Send
+  flips the card to a link-sent step with the shared resend footer. Locals: `heading`,
+  `subheading` (default "Sign in to" the app name), `return_to` (a plain in-app path
+  only; it rides the magic-link POST and the Google request URL), `preamble` and
+  `extras` slots for an age attestation or extra providers, and `demo`. Real use
+  posts Google to `/auth/google_oauth2` (`button_to` POST, Turbo off) and the email to
+  `POST /magic_link`, and reads the `503 delivery_failed` answer. `demo: true` posts
+  nothing. `/admin/style` > Modals > Auth is now one "Sign in" specimen that opens
+  the card in demo mode; the separate Email field and Resend footer specimens are
+  gone, and both partials stay. `studio/modals/auth/_resend_footer` takes
+  `close: false` for a host that is not a modal. The hub and turf-monster still
+  render their own cards; adoption is follow-up work. This reverses the 2026-09-09
+  call (PR #319) that the engine ships only the fragments, not a card. Docs: `docs/SIGN_IN_CARD.md`
+  (task `engine-ships-sign-in-card`).
 
 ## 0.132.0 — 2026-11-06
 

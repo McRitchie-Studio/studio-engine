@@ -10,6 +10,9 @@
 
   Locals:
     modal_store — Alpine store name backing close(). Default "modals".
+    close       — default true. false drops the Close button, for a host that
+                  is not a modal (studio/auth/_sign_in_card on a page), where
+                  there is no store to close.
 
   ERROR INK, not a static red. The error paragraph is text-danger-ink, the
   per-theme red Studio::ThemeResolver derives to a 4.5:1 target. It replaced
@@ -38,6 +41,7 @@
   # IDENTIFIER position ($store.<name>) — VALIDATED, never escaped: Studio::JsIdentifier.
   modal_store = Studio::JsIdentifier.validate!(
                 local_assigns.fetch(:modal_store, "modals"), local: :modal_store)
+  show_close = local_assigns.fetch(:close, true)
 %>
 <button @click="resendMagicLink()" :disabled="props.submitting === 'magic-link' || (props.resendCooldown || 0) > 0"
         class="block mx-auto text-sm text-primary hover:text-primary-300 underline underline-offset-2 disabled:opacity-50 disabled:no-underline">
@@ -48,4 +52,6 @@
   </span>
 </button>
 <p role="alert" x-show="props.resendError" x-cloak class="text-xs text-danger-ink mt-3 text-center" x-text="props.resendError"></p>
+<% if show_close %>
 <button @click="$store.<%= modal_store %>.close()" class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">Close</button>
+<% end %>

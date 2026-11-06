@@ -14,8 +14,8 @@
      card behind ours. So this section owns a tiny, self-contained store + overlay
      and registers all specimen content itself.
 
-     Groups: Auth (the engine-owned FRAGMENTS an app's own sign-in card is built
-     from — the engine ships no auth card), Eligibility and entry (the
+     Groups: Auth (the engine's standard sign-in card, studio/auth/_sign_in_modal,
+     in demo mode), Eligibility and entry (the
      app-supplied-policy age-gate DOB primitive, gated by Studio.feature?(:age_gate)),
      Profile (crop / upload, opened
      through studio/cropper_assets), Web3 (wallet-connect and web3-step-up now
@@ -97,7 +97,8 @@
   # THE AUTH METHOD-TOGGLE DEFAULTS USED TO LIVE HERE (ml_default / g_default /
   # w_default / auth_toggles) and are gone with the card they configured. They
   # belonged to style/modals/_auth, a MIRROR of turf-monster's sign-in modal,
-  # retired on 2026-09-09. The engine ships no auth card to configure.
+  # retired on 2026-09-09. The engine's own card (studio/auth/_sign_in_modal,
+  # 2026-11-06) has no toggles: its specimen runs it in demo mode as shipped.
   #
   # The rule they were built to enforce OUTLIVES them and is worth keeping: a
   # TRIGGER must carry at least the gate its target's REGISTRATION carries, or
@@ -202,17 +203,15 @@
       <div class="bg-surface rounded-xl border border-subtle shadow-2xl p-6 w-full"
            :class="$store.dsModals.cardClasses()">
 
-        <%# --- Auth fragments --- %>
-        <%# NOT an auth card. The engine owns no sign-in modal — each app cards
-            its own on its own host section (turf-monster: style/host/_modals).
-            These two register the PIECES every app's auth card is built from,
-            which had no specimen until style/modals/_auth, a mirror of turf's
-            card, was retired on 2026-09-09 and took their only render with it. %>
-        <template x-if="$store.dsModals.current().id === 'ds-email-field'">
-          <div><%= render "style/modals/ds_email_field" %></div>
-        </template>
-        <template x-if="$store.dsModals.current().id === 'ds-resend-footer'">
-          <div><%= render "style/modals/ds_resend_footer" %></div>
+        <%# --- Auth --- %>
+        <%# The engine's standard sign-in card (studio/auth/_sign_in_modal), the
+            REAL partial in demo mode: Google and Send post nothing, and the
+            link-sent step and resend cooldown play. It folds in the two pieces
+            that used to be carded alone here, studio/modals/shared/_email_field
+            and studio/modals/auth/_resend_footer (Alex McRitchie, 2026-11-06:
+            "this should use the standard auth component with Google and Email"). %>
+        <template x-if="$store.dsModals.current().id === 'ds-sign-in'">
+          <div><%= render "studio/auth/sign_in_modal", modal_store: "dsModals", demo: true %></div>
         </template>
 
         <%# --- Onboarding step (its card now lives in Profile) --- %>
@@ -452,36 +451,27 @@
   <section id="modals-auth" class="space-y-5">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Auth</h3>
-      <p class="text-muted text-sm">The engine ships no sign-in card, only these pieces.</p>
+      <p class="text-muted text-sm">The engine's standard sign-in card: Google, or, email magic link.</p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%# email field — the one piece every app's auth card renders. %>
       <%= render layout: "style/modal_specimen", locals: {
-            label:     "Email field",
-            reference: %(the modal family's email input (studio/modals/shared/_email_field) — a themed <input type="email"> that either posts through its own `name` or feeds an enclosing x-model, with locals name/id/value/placeholder/required/autocomplete/autofocus/input_class/x_model/x_ref/disabled_expr/validator. THE `validator` LOCAL IS A FORK, NOT A FLAG: off, the partial is self-contained and the SERVER stays the only boundary; on, it wraps itself in x-data="emailValidator()" and paints a right-edge spinner/check/X that only works if the CONSUMER ships that factory, so passing it without one yields an Alpine scope error and a dead indicator. The specimen draws both faces side by side; this guide ships no emailValidator, which is why the second indicator stays blank. Open with $store.dsModals.open('ds-email-field')),
-            open_expr: "$store.dsModals.open('ds-email-field')",
-            glow_when: ds_glow.call("ds-email-field") } do %>
+            label:     "Sign in",
+            reference: %(the engine's standard sign-in card as a modal (studio/auth/_sign_in_modal; the page form is studio/auth/_sign_in_card) — Google, then "or", then the email magic link, and on send the link-sent step with the shared resend footer (studio/modals/auth/_resend_footer) under the shared email field (studio/modals/shared/_email_field). Locals: heading, subheading (default "Sign in to" the app name), return_to (kept to an in-app path, rides both Google and the magic link), preamble and extras (partials above Google and after it, for age attestation or a Solana wallet button), google, magic_link, modal_store, demo. Real use posts Google to /auth/google_oauth2 (button_to POST, Turbo off) and the email to POST /magic_link. THIS SPECIMEN IS demo: true, SO NOTHING POSTS: Google is an inert button, Send waits on a timer, and the resend cooldown is 5s instead of 60s. Open with $store.dsModals.open('ds-sign-in')),
+            open_expr: "$store.dsModals.open('ds-sign-in')",
+            glow_when: ds_glow.call("ds-sign-in") } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
-          <span class="block h-1.5 w-12 rounded" style="background: var(--color-text); opacity: .18"></span>
-          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
-          <span class="flex items-center h-6 w-full rounded border px-1.5" style="border-color: var(--color-border-strong)">
-            <span class="block h-1.5 flex-1 rounded" style="background: var(--color-text); opacity: .12"></span>
-            <span class="block w-3 h-3 rounded-full ml-1" style="background: var(--color-success); opacity: .55"></span>
+          <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="flex items-center justify-center gap-1 h-6 w-full rounded border" style="border-color: var(--color-border-strong)">
+            <span class="block w-2.5 h-2.5 rounded-full" style="background: conic-gradient(#EA4335 0 25%, #FBBC05 0 50%, #34A853 0 75%, #4285F4 0)"></span>
+            <span class="block h-1.5 w-12 rounded" style="background: var(--color-text); opacity: .2"></span>
           </span>
-        </div>
-      <% end %>
-
-      <%# resend footer — the piece both link-sent steps share. %>
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Resend footer",
-            reference: %(the magic-link resend footer (studio/modals/auth/_resend_footer) — the resend link, its error line and the Close beneath it, shared by an auth card's magic-link-sent and magic-link-resent steps because the two are identical, which is why it was extracted. IT RESOLVES FROM AN ENCLOSING x-data, NOT A STORE: it reads props.submitting, props.resendCooldown and props.resendError and calls resendMagicLink(), so a scope supplying none of them fails SILENTLY — nothing errors, the link simply never enables and the cooldown never counts. The specimen supplies a stand-in host so all three states are reachable, and shortens the cooldown from production's 60s to 5s because the partial does not own the duration, the host does. Open with $store.dsModals.open('ds-resend-footer')),
-            open_expr: "$store.dsModals.open('ds-resend-footer')",
-            glow_when: ds_glow.call("ds-resend-footer") } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-          <div class="text-2xl leading-none">📬</div>
-          <span class="block h-1.5 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
-          <span class="block h-1.5 w-16 mx-auto rounded" style="background: var(--color-primary); opacity: .7"></span>
-          <span class="block h-1.5 w-10 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="flex items-center gap-1.5">
+            <span class="block h-px flex-1" style="background: var(--color-border-strong)"></span>
+            <span class="block h-1 w-2 rounded" style="background: var(--color-text); opacity: .25"></span>
+            <span class="block h-px flex-1" style="background: var(--color-border-strong)"></span>
+          </span>
+          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
+          <span class="block h-5 w-full rounded" style="background: var(--color-primary)"></span>
         </div>
       <% end %>
     </div>
