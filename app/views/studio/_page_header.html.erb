@@ -1,4 +1,4 @@
-<%# locals: (title:, crumbs: [], crumb_label: nil, meta: nil, meta_title: nil, label: nil, tabs: [], tabs_data: {}, actions_html: nil, links: [], links_label: "More links", data: {}, row_class: "-mx-4 px-4") %>
+<%# locals: (title:, crumbs: [], crumb_label: nil, meta: nil, meta_title: nil, label: nil, tabs: [], anchors: [], tabs_data: {}, menu: [], menu_label: "Links", action: nil, tools_html: nil, actions_html: nil, links: [], links_label: "More links", data: {}, row_class: "-mx-4 px-4") %>
 <%# THE PAGE HEADER: the second layer of the pinned stack (docs/PAGE_HEADER.md).
     navbar, then this row, then a section's header (studio/_section_header), then a
     table's sticky header, each below the last.
@@ -19,12 +19,25 @@
       meta          short text beside the title, such as the version. Hidden on a
                     phone, where the tabs need the width.
       meta_title    the meta's title attribute.
-      label         the tabs' nav's accessible name. A row with tabs needs it.
-      tabs          [{ label:, href:, current:, data: }]. `current` is the
-                    aria-current value ("page" or "true"), and blank on the others.
-      tabs_data     data attributes for the tabs' scroller.
-      actions_html  a control on the right, such as the page's one primary action.
-                    After the tabs, when the row has both.
+      label         the pill group's nav's accessible name. A row with tabs or
+                    anchors needs it.
+
+    THE FOUR KINDS OF CONTROL on the right (docs/PAGE_HEADER.md, "The four kinds of
+    control"), always in this order and at the one height of .btn-sm:
+
+      tabs          views of the same thing (Deployments | Triage), [{ label:, href:,
+                    current:, data: }]. One pill group with the gliding pill. `current`
+                    is the aria-current value ("page" or "true"), blank on the others.
+      anchors       sections of this page, [{ label:, href: "#id", current:, data: }].
+                    The same pill group; a same-page link scrolls, with no visit. A row
+                    takes tabs or anchors, never both: it has one pill group.
+      tabs_data     data attributes for the pill group's scroller.
+      menu          related pages elsewhere, [{ label:, href:, data: }]: one neutral
+                    button, menu_label ("Links"), that opens a list of them.
+      action        the page's one primary action, { label:, href:, data: }. Rightmost.
+      tools_html    local-only and dev controls, after the action, muted.
+      actions_html  DEPRECATED: free HTML after the pill group. It renders for one
+                    release and warns once per call site in development.
       links         the page's other links, [{ label:, href:, current: }], on a line of
                     their own at the foot of the row, so they stick with it.
       links_label   that line's accessible name.
@@ -79,13 +92,16 @@
       <p class="page-header-meta label-upper"<%= %( title="#{ERB::Util.h(meta_title)}").html_safe if meta_title.present? %>><%= meta %></p>
     <% end %>
   </div>
-  <% if tabs.any? %>
-    <%= tag.nav(class: "page-header-tabs", aria: { label: label.presence }, data: tabs_data) do %>
+  <% raise ArgumentError, "studio/_page_header takes tabs: or anchors:, not both (one pill group)" if tabs.any? && anchors.any? %>
+  <% raise ArgumentError, "studio/_page_header takes one action: a Hash { label:, href: }" unless action.nil? || action.is_a?(Hash) %>
+  <% pills, pill_kind = tabs.any? ? [tabs, "tabs"] : [anchors, "anchors"] %>
+  <% if pills.any? %>
+    <%= tag.nav(class: "page-header-tabs", aria: { label: label.presence }, data: { page_header_kind: pill_kind }.merge(tabs_data)) do %>
       <%# The glide: one pill, drawn once, that CSS anchors to the tab with aria-current and
           slides from tab to tab (engine.css, "The gliding pill"). Each tab keeps its own
           fill where the browser has no anchor positioning. %>
       <div class="page-header-track">
-        <% tabs.each do |tab| %>
+        <% pills.each do |tab| %>
           <%= link_to tab.fetch(:href),
                 class: "page-header-tab btn btn-sm #{tab[:current].present? ? 'btn-primary' : 'btn-neutral'}",
                 aria: { current: tab[:current].presence },
@@ -95,8 +111,44 @@
       </div>
     <% end %>
   <% end %>
-  <% if actions_html.present? %>
-    <div class="page-header-actions"><%= actions_html %></div>
+  <% if actions_html.present? && defined?(Studio::PageHeader) %>
+    <% site = caller_locations.find { |loc| loc.path.to_s.end_with?(".erb") && !loc.path.to_s.end_with?("_page_header.html.erb") } %>
+    <% Studio::PageHeader.deprecate_actions_html(site: site && "#{site.path}:#{site.lineno}") %>
+  <% end %>
+  <% if [actions_html, tools_html].any?(&:present?) || menu.any? || action.present? %>
+    <%# One cluster, in the fixed order: the old free HTML where it always stood, then
+        the menu, then the action, then the tools. Each control is .btn-sm, so all
+        four kinds share one height. %>
+    <div class="page-header-actions">
+      <%= actions_html if actions_html.present? %>
+      <% if menu.any? %>
+        <%# A disclosure, not role="menu": a list of links that Tab walks. The browser's
+            popover opens it from the button, closes it on Escape or a click outside,
+            and gives focus back to the button, with no script. The page-header
+            controller adds aria-expanded, and places the list where the browser has
+            no anchor positioning. %>
+        <% menu_id = "page-header-menu-#{SecureRandom.hex(4)}" %>
+        <div class="page-header-menu" data-page-header-kind="menu">
+          <button type="button" class="page-header-menu-button btn btn-sm btn-neutral"
+                  popovertarget="<%= menu_id %>" aria-controls="<%= menu_id %>"><%= menu_label %><span class="page-header-menu-caret" aria-hidden="true"></span></button>
+          <div id="<%= menu_id %>" class="page-header-menu-list" popover="auto">
+            <ul>
+              <% menu.each do |item| %>
+                <li><%= link_to item.fetch(:label), item.fetch(:href), class: "page-header-menu-item", data: item.fetch(:data, {}) %></li>
+              <% end %>
+            </ul>
+          </div>
+        </div>
+      <% end %>
+      <% if action.present? %>
+        <%= link_to action.fetch(:label), action.fetch(:href),
+              class: "page-header-action btn btn-sm btn-primary",
+              data: { page_header_kind: "action" }.merge(action.fetch(:data, {})) %>
+      <% end %>
+      <% if tools_html.present? %>
+        <div class="page-header-tools" data-page-header-kind="tools"><%= tools_html %></div>
+      <% end %>
+    </div>
   <% end %>
   <% if links.any? %>
     <nav class="page-header-links" aria-label="<%= links_label %>">
