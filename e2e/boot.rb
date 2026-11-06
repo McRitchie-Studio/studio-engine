@@ -363,7 +363,7 @@ Studio.agent_chat_token = "e2e-lab-agent-chat"
 # real host runs (load_defaults). The dummy turns it off in test, which once let a
 # take carry the chat form's own token: green here, InvalidAuthenticityToken on
 # every real app. e2e/agent_chat_voice.spec.js passes only against the real check.
-[AgentChatLabController, AgentChatVoiceLabController, Studio::AgentChatsController, Studio::VoiceTakesController].each do |controller|
+[AgentChatLabController, AgentChatVoiceLabController, TalkToAgentLabController, Studio::AgentChatsController, Studio::VoiceTakesController].each do |controller|
   controller.allow_forgery_protection = true
 end
 

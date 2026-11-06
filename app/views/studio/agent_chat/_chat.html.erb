@@ -1,4 +1,4 @@
-<%# locals: (soul:, name:, portrait: nil, role: nil, empty: nil, cards: nil, voice: false, voice_copy: nil) %>
+<%# locals: (soul:, name:, portrait: nil, role: nil, empty: nil, cards: nil, voice: false, voice_copy: nil, compact: false) %>
 <%#
   The shared agent chat (docs/AGENT_CHAT.md): one conversation with one agent,
   held by the hub, on any app's page.
@@ -19,6 +19,9 @@
             Studio.voice_chat_allowed lets talk; never to a signed-out visitor.
   voice_copy  the words: { privacy:, recorder:, chip: }, each optional, over the
             defaults (Studio::AgentChat.voice_copy).
+  compact   true for a chat inside a card (studio/agent_chat/_talk_modal): no
+            big portrait head (the card has its own), no page padding, and a
+            shorter thread.
 
   Top to bottom, as the hub's /build: the portrait and name, the card slot, the
   thread, the typing line, the offline notice and the composer. The thread is
@@ -32,19 +35,19 @@
 <% souls = Studio.agent_chat_soul_list %>
 <% raise ArgumentError, "studio/agent_chat/chat: soul #{soul.inspect} is not in Studio.agent_chat_souls (#{souls.inspect})" unless souls.include?(soul.to_s) %>
 <% if Studio.agent_chat_allowed?(studio_agent_chat_viewer) %>
-<section class="w-full max-w-3xl mx-auto px-4 pt-4 sm:pt-8 flex flex-col gap-6 min-w-0"
+<section class="<%= compact ? "w-full flex flex-col gap-3 min-w-0" : "w-full max-w-3xl mx-auto px-4 pt-4 sm:pt-8 flex flex-col gap-6 min-w-0" %>"
          data-studio-controller="agent-chat" data-test="agent-chat"
          data-agent-chat-soul="<%= soul %>" data-agent-chat-name="<%= name %>"
          data-agent-chat-messages-url="<%= studio_agent_chat_messages_path %>"
          data-agent-chat-turns-url="<%= studio_agent_chat_turns_path %>">
-  <%= render "studio/agent_chat/header", name: name, portrait: portrait, role: role %>
+  <%= render "studio/agent_chat/header", name: name, portrait: portrait, role: role unless compact %>
   <% if cards.present? %>
     <div class="flex flex-col gap-3 min-w-0" data-agent-chat-cards data-test="agent-chat-cards"><%= cards %></div>
   <% end %>
   <div class="flex flex-col gap-3 min-w-0">
     <%# relative: a turn's sr-only name is absolutely positioned. With no positioned ancestor it escapes this scroller, is not clipped by it, and stretches the document by the thread's whole scrolled height. %>
     <div role="log" aria-live="polite" aria-label="Conversation with <%= name %>"
-         class="relative flex flex-col gap-4 px-1 py-2 overflow-y-auto overscroll-contain max-h-[60vh] min-w-0"
+         class="relative flex flex-col gap-4 px-1 py-2 overflow-y-auto overscroll-contain <%= compact ? "min-h-24 max-h-[45vh]" : "max-h-[60vh]" %> min-w-0"
          data-agent-chat-log data-test="agent-chat-messages">
       <p class="hidden only:block text-center text-secondary text-sm py-6" data-test="agent-chat-empty"><%= empty.presence || "Say hello to #{name}." %></p>
     </div>

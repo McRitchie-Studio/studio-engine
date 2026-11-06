@@ -861,6 +861,54 @@ class AgentChatProxyTest < ActionDispatch::IntegrationTest
     assert_response :created
   end
 
+  # ── the talk-to-agent modal (studio/agent_chat/_talk_modal) ──
+
+  # CONTROL: drop the data-studio-talk-to-agent key from studio_talk_to_agent_link
+  # and the link asserts fail: the modal would never take the click.
+  def test_the_talk_modal_wraps_the_same_chat_and_its_links_keep_a_real_href
+    ActionController::Base.allow_forgery_protection = true
+    get "/talk_to_agent_lab"
+    assert_response :success
+
+    modal = css_select('[data-test="talk-to-agent"]')
+    assert_equal 1, modal.size
+    assert_equal "talk-to-agent", modal.first["data-studio-controller"]
+    assert_equal "alex", modal.first["data-talk-to-agent-soul"]
+    assert_equal "Alex", modal.first["data-talk-to-agent-name"]
+    assert modal.first.key?("x-data"), "the scoped host needs an Alpine scope above it"
+    assert_select '[data-test="talk-to-agent"] template[data-studio-controller="modal-host"][data-modal-host-store-value="studioTalkToAgent"]'
+    # The chat inside is the shared one, compact, one per page.
+    assert_select 'template[data-talk-to-agent-chat] [data-test="agent-chat"][data-studio-controller="agent-chat"][data-agent-chat-soul="alex"]', 1
+    assert_select 'template[data-talk-to-agent-chat] [data-test="agent-chat-header"]', 0
+    assert_select 'template[data-talk-to-agent-chat] form[data-test="agent-chat-form"] input[name="authenticity_token"]'
+
+    pro = css_select('a[data-test="talk-pro"]').first
+    assert_equal "/agent_chat_lab", pro["href"]
+    assert_equal "true", pro["data-studio-talk-to-agent"]
+    assert_equal "alex", pro["data-talk-soul"]
+    assert_equal "Pro", pro["data-talk-topic"]
+    assert_equal "Tell me about the Pro plan.", pro["data-talk-opener"]
+    assert_equal "dialog", pro["aria-haspopup"]
+    builder = css_select('a[data-test="talk-builder"]').first
+    assert_nil builder["data-talk-opener"], "no opener given: the script names the topic"
+    assert_empty @hub.requests, "rendering the page never calls the hub"
+  end
+
+  def test_a_refused_viewer_gets_no_modal_and_the_links_open_their_href
+    with_chat_hook(->(user) { user&.admin? }) do
+      get "/talk_to_agent_lab"
+      assert_response :success
+      assert_select '[data-test="talk-to-agent"]', 0
+      assert_select 'a[data-test="talk-pro"][href="/agent_chat_lab"]'
+    end
+  end
+
+  def test_the_talk_modal_refuses_a_soul_off_the_allow_list
+    Studio.agent_chat_souls = %w[ray]
+    error = assert_raises(ActionView::Template::Error) { get "/talk_to_agent_lab" }
+    assert_match(/talk_modal: soul "alex" is not in Studio.agent_chat_souls/, error.message)
+  end
+
   private
 
   def json_headers = { "Content-Type" => "application/json", "Accept" => "application/json" }
