@@ -2,13 +2,13 @@
      The primitives a public site ends with: the footer, its map, and the Google
      Calendar booking frame, popup and link (docs/SITE_FOOTER.md,
      docs/BOOKING.md). Each card
-     gives the helper to call; the preview below them is the real footer partial,
+     names its trick and the helper to call; the preview below them is the real footer partial,
      rendered with THIS app's facts when it has declared any and with a sample
      when it has not, so the group is never empty.
 
      The booking frame is DRAWN, not embedded: a style guide should not ask
      Google for a calendar every time an admin scrolls past. Its two states, whole
-     and cropped, are quarter-scale drawings of a made-up schedule (a 720px page
+     and cropped, share the Booking Frame card: quarter-scale drawings of a made-up schedule (a 720px page
      whose box runs from 200 to 600), cropped by the same arithmetic the real
      wrapper uses (Studio::Booking.crop). No real schedule's numbers are here. %>
 <%
@@ -47,16 +47,12 @@
   </div>
 
   <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-    <%= render layout: "style/specimen",
-          locals: { klass: "studio_site_footer",
-                    usage: %(studio_site_footer   # one line, at the end of the layout body) } do %>
+    <%= render layout: "style/specimen", locals: { trick: "site_footer" } do %>
       <p class="text-sm text-secondary text-center">Previewed below.</p>
     <% end %>
 
     <%= render layout: "style/specimen",
-          locals: { klass: "studio_booking_link",
-                    disabled: !booking, disabled_label: "no booking_url",
-                    usage: %(studio_booking_link "Schedule a call", class: "btn btn-primary") } do %>
+          locals: { trick: "booking_link", disabled: !booking, disabled_label: "no booking_url" } do %>
       <% if booking %>
         <%= studio_booking_link "Schedule a call", class: "btn btn-primary" %>
       <% else %>
@@ -64,16 +60,12 @@
       <% end %>
     <% end %>
 
-    <% [ [ "studio_booking_frame", nil, "whole",
-           %(studio_booking_frame   # whole at rest: the default, and crop: false),
-           "Whole at rest, the default." ],
-         [ "config.booking_crop", sample_crop, "cropped",
-           %(config.booking_crop = { top: 200, bottom: 600, frame_height: 720 }   # bin/booking-crop-measure prints yours),
-           "Cropped to the slot picker at rest." ]
-       ].each do |klass, crop, state, usage, caption| %>
-      <%= render layout: "style/specimen",
-            locals: { klass: klass, disabled: !booking, disabled_label: "no booking_url", usage: usage } do %>
-        <div class="w-full space-y-3" data-booking-specimen="<%= state %>">
+    <%= render layout: "style/specimen",
+          locals: { trick: "booking_frame", disabled: !booking, disabled_label: "no booking_url" } do %>
+      <% [ [ nil, "whole", "Whole at rest, the default." ],
+           [ sample_crop, "cropped", "Cropped to the slot picker at rest." ]
+         ].each do |crop, state, caption| %>
+        <div class="space-y-3" data-booking-specimen="<%= state %>">
           <div style="margin-inline: auto; width: 11rem; overflow: hidden; background: #fff; border-radius: .5rem; border: 1px solid rgb(127 127 127 / .35); height: <%= ((crop ? crop[:window] : 720) * scale).round %>px;">
             <div style="margin-top: -<%= ((crop ? crop[:offset] : 0) * scale).round %>px;">
               <% sample_page.each do |label, from, to, box| %>

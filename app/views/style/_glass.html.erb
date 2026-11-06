@@ -15,8 +15,7 @@
   </div>
   <div class="grid gap-4 md:grid-cols-2">
     <%= render layout: "style/specimen",
-          locals: { klass: "Studio.surface_style = :glass",
-                    usage: %(config.surface_style = :glass, and <html data-surface-style="glass">),
+          locals: { trick: "glass",
                     disabled: !surface_on, disabled_label: "surface style is off on this app" } do %>
       <div class="<%= glass_backing %> w-full space-y-2" data-test="style-glass-surfaces">
         <div class="card p-3 text-sm text-heading">.card, the dense tier: no blur</div>
@@ -24,8 +23,7 @@
       </div>
     <% end %>
     <%= render layout: "style/specimen",
-          locals: { klass: "Studio.sidebar_style = :glass",
-                    usage: %(config.sidebar_style = :glass),
+          locals: { trick: "glass_sidebar",
                     disabled: !sidebar_on, disabled_label: "glass sidebar is off on this app" } do %>
       <div class="<%= glass_backing %> w-full" data-test="style-glass-sidebar">
         <div class="flex flex-col" data-sidebar-glass-shell>
@@ -42,8 +40,7 @@
       <% end %>
     <% end %>
     <%= render layout: "style/specimen",
-          locals: { klass: "Lit from above, under surface_style = :glass",
-                    usage: %(.btn-primary, .btn-danger, .btn-neutral, .badge, .input-field),
+          locals: { trick: "glass", variant: "lit",
                     disabled: !surface_on, disabled_label: "surface style is off on this app" } do %>
       <div class="w-full overflow-x-auto" data-test="style-lit-states">
         <table class="text-xs text-muted">
@@ -68,8 +65,7 @@
       </div>
     <% end %>
     <%= render layout: "style/specimen",
-          locals: { klass: "studio_icon(name, size: 18)",
-                    usage: %(studio_icon("rocket", size: 22)) } do %>
+          locals: { trick: "icon" } do %>
       <ul class="grid grid-cols-4 gap-3 w-full text-heading" data-test="style-glass-icons">
         <% Studio::Icons.names.each do |name| %>
           <li class="flex flex-col items-center gap-1 min-w-0" title="<%= name %>">

@@ -1,0 +1,31 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# bin/tricks-doc — write docs/TRICKS.md from config/studio_tricks.yml.
+#
+#   bin/tricks-doc           # rewrite the doc
+#   bin/tricks-doc --check   # exit 1 when the doc is not what the registry writes
+#
+# The registry is the source of truth; the doc is its agent-facing glossary.
+# test/lib/tricks_registry_test.rb runs the same comparison on every PR.
+
+require_relative "../lib/studio/tricks"
+
+want = Studio::Tricks.markdown
+have = File.exist?(Studio::Tricks::DOC_PATH) ? File.read(Studio::Tricks::DOC_PATH) : nil
+
+case ARGV
+when ["--check"]
+  if have == want
+    puts "docs/TRICKS.md matches config/studio_tricks.yml"
+  else
+    warn "docs/TRICKS.md has drifted from config/studio_tricks.yml: run bin/tricks-doc"
+    exit 1
+  end
+when []
+  File.write(Studio::Tricks::DOC_PATH, want)
+  puts "wrote docs/TRICKS.md (#{Studio::Tricks.names.size} names)"
+else
+  warn "usage: bin/tricks-doc [--check]"
+  exit 64
+end

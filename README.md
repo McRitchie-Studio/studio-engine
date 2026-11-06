@@ -830,8 +830,11 @@ than assuming drop-in equivalence:
 ### Style guide — your app's own section
 
 `/admin/style` is the engine's living style guide, and every section on it is
-the engine's: Theme, Modals, Tricks, Tasks. An app grows a **fifth section, its
-own**, by defining one partial:
+the engine's: Theme, Modals, Tricks, Tasks. Each card under Tricks, Loaders and
+Tasks carries a short trick name ("Sheen", "Border Glow · clear") that you can say
+to an agent: [`docs/TRICKS.md`](./docs/TRICKS.md) maps every name to its class or
+helper, generated from `config/studio_tricks.yml` by `bin/tricks-doc`. An app grows a
+**fifth section, its own**, by defining one partial:
 
 A host may also define `app/views/style/host/_logos.html.erb`, which replaces the Theme section's
 default logo grid.

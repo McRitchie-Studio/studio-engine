@@ -17,22 +17,15 @@
 <%
   media_style = "background-image: repeating-linear-gradient(135deg, var(--color-primary) 0 18px, var(--color-accent) 18px 36px, var(--color-warning) 36px 54px, var(--color-success) 54px 72px)"
 
+  # Each specimen names its trick (config/studio_tricks.yml): Scrim, Tint, Shade, and
+  # the Scrim's soft and strong variants, which each keep a stage of their own so the
+  # lab can grade every wash on its own panel.
   specimens = [
-    { key: "theme",  tone: nil,           scrim: "scrim",
-      klass: ".scrim",
-      note:  "Theme-aware: a tint in light mode, a shade in dark." },
-    { key: "tint",   tone: "scrim-tint",  scrim: "scrim",
-      klass: ".scrim-tint .scrim",
-      note:  "Forced tint, in either theme. Dark ink." },
-    { key: "shade",  tone: "scrim-shade", scrim: "scrim",
-      klass: ".scrim-shade .scrim",
-      note:  "Forced shade, in either theme. Light ink." },
-    { key: "soft",   tone: nil,           scrim: "scrim scrim-soft",
-      klass: ".scrim .scrim-soft",
-      note:  "A lighter wash: more of the media shows." },
-    { key: "strong", tone: nil,           scrim: "scrim scrim-strong",
-      klass: ".scrim .scrim-strong",
-      note:  "A heavier wash, for long or small text." }
+    { key: "theme",  tone: nil,           scrim: "scrim",              trick: "scrim" },
+    { key: "tint",   tone: "scrim-tint",  scrim: "scrim",              trick: "tint" },
+    { key: "shade",  tone: "scrim-shade", scrim: "scrim",              trick: "shade" },
+    { key: "soft",   tone: nil,           scrim: "scrim scrim-soft",   trick: "scrim", variant: "soft" },
+    { key: "strong", tone: nil,           scrim: "scrim scrim-strong", trick: "scrim", variant: "strong" }
   ]
 %>
 <section id="scrims" class="space-y-5" data-scrim-group>
@@ -42,16 +35,13 @@
   </div>
   <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
     <% specimens.each do |s| %>
-      <% tone_attr = s[:tone] ? %( class="#{s[:tone]} relative ...") : %( class="relative ...") %>
-      <%= render layout: "style/specimen",
-            locals: { klass: s[:klass],
-                      usage: %(<section#{tone_attr}>\n  <img class="absolute inset-0 ..." src="...">\n  <div class="#{s[:scrim]} absolute inset-0"></div>\n  <div class="relative z-10">\n    <h2 class="scrim-ink">Headline</h2>\n    <p class="scrim-ink-muted">Subtitle</p>\n  </div>\n</section>) } do %>
+      <%= render layout: "style/specimen", locals: { trick: s[:trick], variant: s[:variant] } do %>
         <div class="relative w-full max-w-xs h-36 rounded-lg overflow-hidden <%= s[:tone] %>" data-scrim-specimen="<%= s[:key] %>">
           <div class="absolute inset-0" style="<%= media_style %>" aria-hidden="true"></div>
           <div class="<%= s[:scrim] %> absolute inset-0" data-scrim-wash></div>
           <div class="relative z-10 h-full flex flex-col items-center justify-center gap-1 px-4 text-center">
             <p class="scrim-ink text-lg font-extrabold" data-scrim-ink>Solutions For Business</p>
-            <p class="scrim-ink-muted text-sm" data-scrim-ink-muted><%= s[:note] %></p>
+            <p class="scrim-ink-muted text-sm" data-scrim-ink-muted><%= Studio::Tricks.fetch(s[:trick], s[:variant]).note %></p>
           </div>
         </div>
       <% end %>
