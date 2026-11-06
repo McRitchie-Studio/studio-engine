@@ -73,6 +73,24 @@ module Studio
       end
     end
 
+    # The map's page at `path`, or nil: for a page the engine draws (the style guide, the
+    # model pages), which cannot know the host's key for it. Only pages whose address
+    # needs no keywords can match.
+    def key_for_path(view, path)
+      wanted = path.to_s.chomp("/").presence || "/"
+      @pages.each_value do |page|
+        next if page.path.is_a?(Proc) && keywords(page.path, required: true).any?
+
+        address = begin
+          resolve(view, page.path, {}).to_s
+        rescue StandardError
+          next
+        end
+        return page.key if address.chomp("/").presence == wanted || (wanted == "/" && address == "/")
+      end
+      nil
+    end
+
     private
 
     def resolve(view, value, locals)
@@ -83,8 +101,9 @@ module Studio
       end
     end
 
-    def keywords(proc)
-      proc.parameters.filter_map { |kind, name| name if %i[key keyreq].include?(kind) }
+    def keywords(proc, required: false)
+      kinds = required ? %i[keyreq] : %i[key keyreq]
+      proc.parameters.filter_map { |kind, name| name if kinds.include?(kind) }
     end
 
     def route(view, name)

@@ -86,6 +86,10 @@ call. An unknown page raises `Studio::Crumbs::UnknownPage`, and a loop raises
 <%= render "studio/page_header", title: "Checks", crumbs: studio_crumbs(parent: :release, release: @release) %>
 ```
 
+**An engine page** (the style guide) cannot know the host's key for itself, so it calls
+`studio_crumbs_here`: the map's page whose address is this request's path, or no trail.
+A page whose address needs keywords never matches.
+
 **What it draws.**
 
 - From 40rem, the trail is on a line of its own above the title. Each ancestor is a muted

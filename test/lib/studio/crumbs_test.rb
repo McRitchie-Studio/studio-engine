@@ -2,6 +2,7 @@
 
 require "test_helper"
 require_relative "../../../lib/studio/crumbs"
+require_relative "../../../app/helpers/studio/crumbs_helper"
 
 # [unit] Studio::Crumbs: one parent map, and the trail builds itself up the chain.
 class StudioCrumbsTest < Minitest::Test
@@ -68,5 +69,29 @@ class StudioCrumbsTest < Minitest::Test
   def test_the_app_has_one_map
     assert_same Studio.crumbs, Studio.crumbs
     assert_kind_of Studio::Crumbs, Studio.crumbs
+  end
+
+  # An engine page (the style guide) cannot know the host's key for itself.
+  def test_a_page_is_found_by_its_address_and_a_lambda_that_needs_keywords_never_matches
+    assert_equal :deployments, @crumbs.key_for_path(@view, "/deployments")
+    assert_equal :deployments, @crumbs.key_for_path(@view, "/deployments/")
+    assert_equal :docs, @crumbs.key_for_path(@view, "/docs")
+    assert_nil @crumbs.key_for_path(@view, "/deployments/rel-1")
+    assert_nil @crumbs.key_for_path(@view, "/nowhere")
+  end
+
+  def test_studio_crumbs_here_reads_the_app_map_at_this_address_and_is_empty_off_it
+    view = View.new.extend(Studio::CrumbsHelper)
+    request = Struct.new(:path)
+    original = Studio.instance_variable_get(:@crumbs)
+    Studio.instance_variable_set(:@crumbs, @crumbs)
+    view.define_singleton_method(:request) { request.new("/deployments") }
+    assert_equal [{ label: "Admin", href: "/admin/dashboard" }], view.studio_crumbs_here
+    view.define_singleton_method(:request) { request.new("/admin/style") }
+    assert_equal [], view.studio_crumbs_here
+    view.define_singleton_method(:request) { nil }
+    assert_equal [], view.studio_crumbs_here
+  ensure
+    Studio.instance_variable_set(:@crumbs, original)
   end
 end
