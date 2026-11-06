@@ -19,16 +19,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   or a click moves `aria-current`. No script measures it. Reduced motion jumps. A browser
   without anchor positioning keeps each tab's own fill.
 
-### Changed
-
-- **Back plays the app's page move the other way.** Browser Back (a Turbo restore that Turbo
-  marks `back`, or a full load that traverses to an earlier entry) and a click on a link with
-  `data-page-transition-back` (every ancestor crumb and the phone's parent link) play the
-  reverse direction in the same style: a `:left` slide goes back as `slide-right`, an
-  `:unfold` with `:right` as `unfold-right`. Forward keeps the app's own direction. Detail:
-  `docs/PAGE_TRANSITIONS.md`, "Back".
-- **The page header's title is the type scale's h2 from 40rem** (30px, weight 800), Alex
-  McRitchie's "H2 header"; a phone keeps 1.5x the base. It is still the page's one `h1`.
 - **A carousel standard for the apps: `studio/_carousel`.** Render it as a layout, with
   `label:` and `items:`, and the block draws each slide, so a slide is any block content.
   The track is a native scroll-snap row: a swipe, a trackpad and a focused link move it with
@@ -44,6 +34,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   classes: `carousel`, `carousel-track`, `carousel-slide`, `carousel-controls`,
   `carousel-dots`, `carousel-dot`, `carousel-arrows` and `carousel-button`. `/admin/style`
   shows it under Tricks.
+
+### Changed
+
+- **Back plays the app's page move the other way.** Browser Back (a Turbo restore that Turbo
+  marks `back`, or a full load that traverses to an earlier entry) and a click on a link with
+  `data-page-transition-back` (every ancestor crumb and the phone's parent link) play the
+  reverse direction in the same style: a `:left` slide goes back as `slide-right`, an
+  `:unfold` with `:right` as `unfold-right`. Forward keeps the app's own direction. Detail:
+  `docs/PAGE_TRANSITIONS.md`, "Back".
+- **The page header's title is the type scale's h2 from 40rem** (30px, weight 800), Alex
+  McRitchie's "H2 header"; a phone keeps 1.5x the base. It is still the page's one `h1`.
 
 ## 0.130.0 — 2026-11-05
 
