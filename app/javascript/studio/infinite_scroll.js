@@ -12,7 +12,8 @@
 // THE BUTTON IS THE PRIMITIVE. "Load more" is an ordinary link inside the next
 // page's frame, so a click loads that frame with Turbo, and with no script at all
 // it opens the next page. This module only clicks it early: when the frame comes
-// within NEAR_PX of the viewport (IntersectionObserver), it points the frame at
+// within NEAR_PX of the viewport (IntersectionObserver, watching the button's
+// row, since the frame itself takes no box), it points the frame at
 // the link's URL. The button stays in view the whole time, for a keyboard, a
 // screen reader or a browser with no observer.
 //
@@ -50,6 +51,11 @@ export function waitingFrame(root) {
   return frames.find((frame) => !frame.hasAttribute("src") && !frame.hasAttribute("complete")) || null
 }
 
+// What the observer watches for a frame: its button row, else its link.
+export function sentinelOf(frame) {
+  return frame.querySelector(".studio-infinite-scroll-more") || frame.querySelector(MORE)
+}
+
 // Points the frame at its link's URL, once. Answers whether it started a load.
 export function loadNext(frame) {
   if (!frame || frame.hasAttribute("src")) return false
@@ -76,13 +82,16 @@ export function watchInfiniteScroll(root, win) {
   let watched = null
   let byKeyboard = false
 
+  // The frame takes no box (display: contents), and an observer sees only
+  // boxes, so the watch is on its sentinel: the button's row inside it.
   function arm() {
     const frame = waitingFrame(root)
-    if (frame === watched) return
+    const sentinel = frame && sentinelOf(frame)
+    if (sentinel === watched) return
     if (watcher && watched) watcher.unobserve(watched)
-    watched = frame
-    if (!frame || !watcher) return
-    watcher.observe(frame)
+    watched = sentinel
+    if (!sentinel || !watcher) return
+    watcher.observe(sentinel)
   }
 
   if (typeof win.IntersectionObserver === "function") {
@@ -91,7 +100,7 @@ export function watchInfiniteScroll(root, win) {
         if (!entry.isIntersecting) return
         watcher.unobserve(entry.target)
         byKeyboard = false
-        loadNext(entry.target)
+        loadNext(entry.target.closest(NEXT))
       })
     }, { rootMargin: `0px 0px ${NEAR_PX}px 0px` })
   }
