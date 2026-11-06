@@ -4,6 +4,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **The loader family: the eight ways a page says wait, in one place.** From the
+  reel Alex McRitchie shared (task `engine-loader-family`). `studio_loader` takes
+  three plain styles that draw no icon: `style: :spinner`, `style: :dots` and
+  `style: :bar` (a progressbar; `percent:` is its value, and with none it sweeps).
+  They wrap the canonical `.spinner`, `.loading-dots` and `.progress-meter` rules,
+  so there is one set of rules; an app's own `config.loader` still refuses them.
+  New: `studio_skeleton` (`:lines`, `:avatar`, `:card`, `:media`; aria-busy, shapes
+  hidden from assistive tech, a shimmer that stops under reduced motion),
+  `studio_infinite_scroll` (the next page loads in a Turbo frame as the list's end
+  nears, "Load more" stays visible, and a polite status line counts what came) and
+  `studio_pull_to_refresh` (phones with touch only). `/admin/style` has a Loaders
+  section with all eight, and a live infinite scroll from an admin-only demo feed
+  (`/admin/style/loaders_feed`). Busy buttons can show their busy words with
+  `data-loader-busy`. Docs: `docs/LOADER.md`, "The family".
+
 ## 0.130.0 — 2026-11-05
 
 ### Added
