@@ -4,6 +4,18 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **A carousel can loop and play itself: `loop:` and `autoplay:`.** Alex McRitchie wants
+  the hub's Portfolio spotlight "auto scrolling and in a loop". `loop: true` wraps the
+  arrows and keys (last to first, first to last) and keeps both arrows enabled, with no
+  cloned slides. `autoplay: <seconds>` moves one slide each interval in `:standard` and
+  `:spotlight`; it holds on hover over the slides, on keyboard focus, in a hidden tab, off
+  screen, and after any swipe or press until the reader is idle; it starts stopped under
+  reduced motion and never writes the status line. A pause button (`.carousel-autoplay`,
+  "Pause slideshow" / "Play slideshow") meets WCAG 2.2.2. Both default off, so every
+  existing carousel is unchanged (task `carousel-autoplay-and-loop`).
+
 ## 0.132.0 — 2026-11-06
 
 ## 0.131.0 — 2026-11-05

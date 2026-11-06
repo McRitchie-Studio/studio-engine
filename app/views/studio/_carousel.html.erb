@@ -96,7 +96,7 @@
       aria: { roledescription: "carousel", label: label },
       style: "--carousel-per-view: #{per_view}",
       data: { studio_controller: "carousel", studio_action: "keydown->carousel#key", carousel_start: (start_index.to_s if start_index.positive?),
-              carousel_autoplay: (autoplay.to_s if autoplay), carousel_loop: (true if loop) }.compact.merge(data)) do %>
+              carousel_autoplay: (autoplay.to_s if autoplay), carousel_loop: ("" if loop) }.compact.merge(data)) do %>
   <%# The track takes focus for the keys, so it carries a name: a group, since a
       bare div may not be named. %>
   <div id="<%= track_id %>" class="carousel-track" tabindex="0" role="group"

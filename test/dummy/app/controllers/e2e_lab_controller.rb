@@ -778,6 +778,10 @@ class E2eLabController < ActionController::Base
   # full size. e2e/carousel_spotlight.spec.js. A view, no inputs.
   def carousel_spotlight; end
 
+  # studio/_carousel with autoplay: and loop: on one-second intervals, both styles,
+  # plus a row that does not loop. e2e/carousel_autoplay.spec.js. A view, no inputs.
+  def carousel_autoplay; end
+
   # studio/_section_header under the real chrome, with a table inside a section.
   # ?timeline=1 puts the header on the scroll-driven collapse.
   def section_header
