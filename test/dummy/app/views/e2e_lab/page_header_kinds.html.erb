@@ -1,0 +1,20 @@
+<%# studio/_page_header's four kinds of control under the real chrome
+    (E2eLabController#page_header_kinds). The row is the engine's, rendered by name; the
+    sections around it are the host's. %>
+<%= render "studio/banners/stack", devnet: @lab_devnet %>
+<%= render "layouts/navbar", balance_html: nil %>
+<div class="max-w-7xl mx-auto px-4 pt-6 pb-8">
+  <%= render "studio/page_header",
+        title: "Deployments",
+        label: (@lab_pills == "anchors" ? "Sections" : "Views"),
+        tabs: (@lab_pills == "tabs" ? E2eLabController::PAGE_HEADER_KIND_TABS : []),
+        anchors: (@lab_pills == "anchors" ? E2eLabController::PAGE_HEADER_KIND_ANCHORS : []),
+        menu: E2eLabController::PAGE_HEADER_KIND_MENU,
+        action: E2eLabController::PAGE_HEADER_KIND_ACTION,
+        tools_html: tag.button("Seed", type: "button", class: "btn btn-sm btn-neutral", data: { lab: "tool" }) %>
+  <% %w[Colors Buttons Forms].each do |name| %>
+    <section id="<%= name.downcase %>" class="section-target" style="min-height: 900px">
+      <h2 class="type-h3 pt-4"><%= name %></h2>
+    </section>
+  <% end %>
+</div>

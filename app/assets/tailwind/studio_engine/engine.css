@@ -395,6 +395,14 @@ body.modal-open .studio-app-banner {
   }
 }
 
+/* ONE CONTROL HEIGHT. A .btn-neutral carries a 1px border and a .btn-primary none, so side
+   by side the neutral one stood 2px taller (30px to 28px, measured in the e2e lab). In the
+   row every small primary takes a clear border of the same width, so a tab, the menu, the
+   action and a tool all stand at one height. */
+.page-header .btn-sm.btn-primary {
+  border: 1px solid transparent;
+}
+
 /* THE QUICK-LINKS MENU: related pages elsewhere, behind one neutral "Links" button. The
    list is the browser's popover, so Escape, a click outside and the focus return need no
    script. Where the browser has anchor positioning, CSS hangs the list under the button's
