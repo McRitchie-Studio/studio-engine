@@ -4,20 +4,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
-### Fixed
-
-- **The talk modal's opener is never dropped.** A visitor who sent a message before the
-  thread first loaded lost the opener: `studio/agent_chat` marked it sent, then the
-  post returned early because the visitor's send was in flight. Now a send made
-  before the load posts the opener first, then the visitor's words; a send made while
-  the opener is in flight waits for it; and the tab remembers the opener only as its
-  POST starts, forgetting it if the POST fails. It is never sent twice.
-- **`e2e/talk_to_agent.spec.js`'s modified-click spec no longer flakes.** It waited for
-  the new tab a Ctrl+click opens, which on CI's headless Linux Chromium stayed at
-  `about:blank` (it read "blank", and a wait for its URL timed out), so it measured the
-  browser rather than the modal. It now asserts what the modal owes a modified click:
-  the click is not prevented (the browser follows the `href`) and no card opens.
-
 ### Added
 
 - **`.studio-border-glow--clear`.** The border glow on a clear button: no fill, only the
@@ -129,6 +115,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   longer names the unsaved user as its target: ErrorLog's `belongs_to` autosaved it, which ran the
   failing save again inside the logger. That second raise skipped the logged mark, so the
   catch-all wrote the same failure twice.
+- **The talk modal's opener is never dropped.** A visitor who sent a message before the
+  thread first loaded lost the opener: `studio/agent_chat` marked it sent, then the
+  post returned early because the visitor's send was in flight. Now a send made
+  before the load posts the opener first, then the visitor's words; a send made while
+  the opener is in flight waits for it; and the tab remembers the opener only as its
+  POST starts, forgetting it if the POST fails. It is never sent twice.
+- **`e2e/talk_to_agent.spec.js`'s modified-click spec no longer flakes.** It waited for
+  the new tab a Ctrl+click opens, which on CI's headless Linux Chromium stayed at
+  `about:blank` (it read "blank", and a wait for its URL timed out), so it measured the
+  browser rather than the modal. It now asserts what the modal owes a modified click:
+  the click is not prevented (the browser follows the `href`) and no card opens.
 
 ## 0.130.0 — 2026-11-05
 
