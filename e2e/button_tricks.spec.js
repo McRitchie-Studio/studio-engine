@@ -44,6 +44,7 @@ test("Tricks opens with Buttons, then Button tricks", async ({ page }) => {
   expect(names).toEqual([
     expect.stringContaining(".edge-rotate-glow"),
     expect.stringContaining(".studio-border-glow"),
+    expect.stringContaining(".studio-border-glow--clear"),
     expect.stringContaining(".sheen"),
     expect.stringContaining(".pulse-cta"),
     expect.stringContaining(".fizz-stack"),
