@@ -23,6 +23,11 @@
 # The icon is drawn underneath as an image; the art is inlined over it. An art
 # file that is missing, outside public/, or has no marked layer falls back to
 # breathe, so a typo can never blank the loader.
+#
+# PLAIN styles draw no icon, only the theme's colours: spinner, dots and bar.
+# They are the small, everyday members of the same loader family, for a view to
+# name with studio_loader(style:). They are not an app's brand, so the app's own
+# config.loader refuses them.
 module Studio
   module Loader
     class InvalidConfig < ArgumentError; end
@@ -37,7 +42,20 @@ module Studio
     SETTING = "Studio.loader"
     GENERIC_STYLES = %i[breathe liquid orbit steel].freeze
     ART_STYLES = { weld_bead: "outline", sparkle: "spark" }.freeze
+    # The styles an app may declare as its loader: they draw its icon.
     STYLES = (GENERIC_STYLES + ART_STYLES.keys).freeze
+    # The styles a view may name that draw no icon (docs/LOADER.md, "The family").
+    PLAIN_STYLES = %i[spinner dots bar].freeze
+    # The size each style draws at when the caller names none: the icon styles at
+    # 96px, a spinner beside text, dots in a line, and a bar across its parent.
+    DEFAULT_SIZES = { spinner: 20, dots: 32, bar: "100%" }.freeze
+    DEFAULT_SIZE = 96
+    # The style guide's live infinite-scroll specimen: a demo feed of this many
+    # pages of this many items (style/_loaders_feed_page). Here, not on
+    # StyleController, so a view can read them without loading a controller that
+    # needs the host's ApplicationController.
+    DEMO_FEED_PAGES = 3
+    DEMO_FEED_PER_PAGE = 4
     DEFAULT_STYLE = :breathe
     KEYS = %i[style icon art].freeze
 
@@ -62,6 +80,10 @@ module Studio
       raise InvalidConfig, "#{SETTING} has unknown key :#{unknown.first} (takes #{KEYS.join(', ')})" if unknown.any?
 
       style = style!(config[:style] || DEFAULT_STYLE)
+      if PLAIN_STYLES.include?(style)
+        raise InvalidConfig, "#{SETTING} style :#{style} draws no icon, so it cannot be the app's loader " \
+                             "(one of #{STYLES.map(&:inspect).join(', ')}); a view names it with studio_loader(style: :#{style})"
+      end
       icon = path!(config[:icon], "#{SETTING}[:icon]")
       art = path!(config[:art], "#{SETTING}[:art]")
       if ART_STYLES.key?(style) && art.nil?
@@ -72,12 +94,18 @@ module Studio
       { style: style, icon: icon, art: art }.freeze
     end
 
+    # A style name as a Symbol, or InvalidConfig. Every style is a name a view may
+    # use; normalize refuses the plain ones for the app's own loader.
     def style!(value)
       style = value.to_s.strip.tr("-", "_").to_sym
-      return style if STYLES.include?(style)
+      return style if STYLES.include?(style) || PLAIN_STYLES.include?(style)
 
-      raise InvalidConfig, "#{SETTING} style must be one of #{STYLES.map(&:inspect).join(', ')} (got #{value.inspect})"
+      raise InvalidConfig, "#{SETTING} style must be one of #{(STYLES + PLAIN_STYLES).map(&:inspect).join(', ')} (got #{value.inspect})"
     end
+
+    def plain_style?(style) = PLAIN_STYLES.include?(style)
+
+    def default_size(style) = DEFAULT_SIZES.fetch(style, DEFAULT_SIZE)
 
     def path!(value, label)
       return nil if value.nil?
