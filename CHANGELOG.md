@@ -4,20 +4,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
-### Fixed
-
-- **The talk modal's opener is never dropped.** A visitor who sent a message before the
-  thread first loaded lost the opener: `studio/agent_chat` marked it sent, then the
-  post returned early because the visitor's send was in flight. Now a send made
-  before the load posts the opener first, then the visitor's words; a send made while
-  the opener is in flight waits for it; and the tab remembers the opener only as its
-  POST starts, forgetting it if the POST fails. It is never sent twice.
-- **`e2e/talk_to_agent.spec.js`'s modified-click spec no longer flakes.** It waited for
-  the new tab a Ctrl+click opens, which on CI's headless Linux Chromium stayed at
-  `about:blank` (it read "blank", and a wait for its URL timed out), so it measured the
-  browser rather than the modal. It now asserts what the modal owes a modified click:
-  the click is not prevented (the browser follows the `href`) and no card opens.
-
 ### Added
 
 - **The loader family: the eight ways a page says wait, in one place.** From the
@@ -93,6 +79,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **The talk modal's opener is never dropped.** A visitor who sent a message before the
+  thread first loaded lost the opener: `studio/agent_chat` marked it sent, then the
+  post returned early because the visitor's send was in flight. Now a send made
+  before the load posts the opener first, then the visitor's words; a send made while
+  the opener is in flight waits for it; and the tab remembers the opener only as its
+  POST starts, forgetting it if the POST fails. It is never sent twice.
+- **`e2e/talk_to_agent.spec.js`'s modified-click spec no longer flakes.** It waited for
+  the new tab a Ctrl+click opens, which on CI's headless Linux Chromium stayed at
+  `about:blank` (it read "blank", and a wait for its URL timed out), so it measured the
+  browser rather than the modal. It now asserts what the modal owes a modified click:
+  the click is not prevented (the browser follows the `href`) and no card opens.
 - **A signup that cannot send its email no longer fails silently.** `RegistrationsController#create`
   ended in a `rescue StandardError` that logged nothing and rendered `registrations/new`. On a
   passwordless app `@user` was never set, so a failed link mint or mail raised `NoMethodError` on
