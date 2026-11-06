@@ -5,7 +5,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/pull_to_refresh.js", import.meta.url), "utf8")
-const { pullProgress, shouldRefresh, phoneTouch, watchPullToRefresh, THRESHOLD_PX, PHONE_QUERY } =
+const { pullProgress, shouldRefresh, phoneTouch, watchPullToRefresh, insideScroller, THRESHOLD_PX, PHONE_QUERY } =
   await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 test("the first half of the pull follows the finger, and past it the pull resists", () => {
@@ -28,4 +28,13 @@ test("it arms on a phone with touch and nowhere else", () => {
   assert.equal(phoneTouch(win(false)), false)
   assert.equal(phoneTouch({}), false)
   assert.equal(watchPullToRefresh({}, win(false), {}), null, "a desktop gets no listeners at all")
+})
+
+test("a drag inside a scrolled inner list scrolls it, and is no pull", () => {
+  const root = { scrollTop: 0, parentElement: null }
+  const list = { scrollTop: 0, parentElement: root }
+  const row = { scrollTop: 0, parentElement: list }
+  assert.equal(insideScroller(row, root), false)
+  list.scrollTop = 40
+  assert.equal(insideScroller(row, root), true)
 })

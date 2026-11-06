@@ -49,6 +49,13 @@ export function phoneTouch(win) {
   return !!(win && typeof win.matchMedia === "function" && win.matchMedia(PHONE_QUERY).matches)
 }
 
+// Whether a touch on `target` began inside a scroller below `root` that is not
+// at its top: that drag scrolls the scroller back up, so it is not a pull.
+export function insideScroller(target, root) {
+  for (let el = target; el && el !== root; el = el.parentElement) if (el.scrollTop > 0) return true
+  return false
+}
+
 // Wires one container. Answers a stop function, or null where it does not arm.
 export function watchPullToRefresh(root, win, doc) {
   win = win || window
@@ -98,7 +105,7 @@ export function watchPullToRefresh(root, win, doc) {
 
   function onStart(event) {
     if (root.getAttribute("data-pull-state") === "refreshing") return
-    if (event.touches.length !== 1 || (win.scrollY || 0) > 0) { startY = null; return }
+    if (event.touches.length !== 1 || (win.scrollY || 0) > 0 || insideScroller(event.target, root)) { startY = null; return }
     startY = event.touches[0].clientY
     root.setAttribute("data-pull-state", "pulling")
   }
