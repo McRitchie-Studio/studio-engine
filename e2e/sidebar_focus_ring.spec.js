@@ -18,7 +18,6 @@ const { blockOffsiteRequests } = require("./helpers");
 // and light, solid and glass, at 1.3 to 2.0:1.
 
 const MIN = 3;
-const PALETTES = ["engine-default", "turf-monster", "cyvasse", "mcritchie-industries", "moms-app"];
 
 const MEASURE = async ({ shot, target, inset, outline }) => {
   const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${shot}`)).blob());
@@ -93,21 +92,38 @@ async function grade(page, { palette, glass, dark }) {
   return rows;
 }
 
-test("the sidebar's focus ring clears 3:1 beside it, in dark, light and glass, on every palette", async ({ page }) => {
+// One palette per test, each a bare declaration (the lane's census counts them in
+// source): twenty page loads in one test overran the 30s timeout on CI.
+async function gradePalette(page, palette) {
   await page.setViewportSize({ width: 1280, height: 800 });
   await blockOffsiteRequests(page);
   const results = [];
-
-  for (const palette of PALETTES) {
-    for (const glass of [false, true]) {
-      for (const dark of [true, false]) {
-        const where = `${palette} ${glass ? "glass" : "solid"} ${dark ? "dark" : "light"}`;
-        for (const row of await grade(page, { palette, glass, dark })) results.push({ where, ...row });
-      }
+  for (const glass of [false, true]) {
+    for (const dark of [true, false]) {
+      const where = `${palette} ${glass ? "glass" : "solid"} ${dark ? "dark" : "light"}`;
+      for (const row of await grade(page, { palette, glass, dark })) results.push({ where, ...row });
     }
   }
-
   console.log(results.map((r) => `${r.where.padEnd(36)} ${r.name.padEnd(8)} ${String(r.ratio).padStart(5)}:1  ring ${r.ring} in ${r.inner} out ${r.outer}`).join("\n"));
-  const failing = results.filter((r) => !(r.ratio >= MIN));
-  expect(failing, "rings under 3:1").toEqual([]);
+  expect(results.filter((r) => !(r.ratio >= MIN)), "rings under 3:1").toEqual([]);
+}
+
+test("the sidebar's focus ring clears 3:1 beside it, dark, light and glass: engine default", async ({ page }) => {
+  await gradePalette(page, "engine-default");
+});
+
+test("the sidebar's focus ring clears 3:1 beside it, dark, light and glass: turf-monster", async ({ page }) => {
+  await gradePalette(page, "turf-monster");
+});
+
+test("the sidebar's focus ring clears 3:1 beside it, dark, light and glass: cyvasse", async ({ page }) => {
+  await gradePalette(page, "cyvasse");
+});
+
+test("the sidebar's focus ring clears 3:1 beside it, dark, light and glass: mcritchie-industries", async ({ page }) => {
+  await gradePalette(page, "mcritchie-industries");
+});
+
+test("the sidebar's focus ring clears 3:1 beside it, dark, light and glass: moms-app", async ({ page }) => {
+  await gradePalette(page, "moms-app");
 });
