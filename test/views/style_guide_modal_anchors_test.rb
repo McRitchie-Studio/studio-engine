@@ -37,6 +37,7 @@ class StyleGuideModalAnchorsTest < ActiveSupport::TestCase
     modals-contest-entry
     modals-system-status
     modals-templates
+    modals-agent-chat
     modals-rewards
     modals-motion-registry
     modals-stack-mechanics

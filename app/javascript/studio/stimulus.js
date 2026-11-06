@@ -65,6 +65,8 @@ export const schema = {
 // says recording did not load (data-studio-controller-failed="voice-recorder").
 // So is the chat's mic: a mic whose controller failed says voice did not load,
 // and the box still types (data-studio-controller-failed="agent-chat-voice").
+// So is the talk-to-agent modal: its links are real links, and with its
+// controller failed each one opens its href (data-studio-controller-failed="talk-to-agent").
 // So is copy-text: a colour whose controller failed still shows its hex to select.
 // So is the page header: its tabs are links, and a row whose controller failed
 // keeps its bar at all times (data-studio-controller-failed="page-header").
@@ -84,6 +86,7 @@ export const LAZY = {
   "knowledge-transcript": () => import("studio/controllers/knowledge_transcript_controller"),
   "agent-chat": () => import("studio/controllers/agent_chat_controller"),
   "agent-chat-voice": () => import("studio/controllers/agent_chat_voice_controller"),
+  "talk-to-agent": () => import("studio/controllers/talk_to_agent_controller"),
   "voice-profile": () => import("studio/controllers/voice_profile_controller"),
   "microphone-chip": () => import("studio/controllers/microphone_chip_controller"),
   "voice-recorder": () => import("studio/controllers/voice_recorder_controller"),
