@@ -1,0 +1,115 @@
+<%#  Loaders section of the living style guide (admin/style).
+
+     The eight ways a page says "wait", one specimen each, in the order of the
+     reel Alex McRitchie shared (task engine-loader-family): spinner, skeleton,
+     progress bar, pulsing dots, button loader, full-screen loader, pull to
+     refresh, infinite scroll. Every specimen is the engine's own helper
+     (Studio::LoaderHelper, docs/LOADER.md), so what is on this page is what a
+     view gets. The branded styles themselves are under Tricks.
+
+     The infinite-scroll specimen is live: its pages come from feed_path, the
+     admin-only demo feed (StyleController#loaders_feed) unless a caller names
+     another. Pull to refresh is drawn still: it arms only on a phone with touch,
+     at the top of a page. %>
+<%
+  feed_path = local_assigns[:feed_path] || admin_style_loaders_feed_path
+  erb = ->(code) { "<" + "%= " + code + " %" + ">" }
+  erb_end = "<" + "% end %" + ">"
+%>
+<section id="loaders" class="section-target space-y-6" data-style-loaders>
+  <%= render "studio/section_header", title: "Loaders" %>
+  <p class="text-muted text-sm max-w-2xl">Eight ways to say wait. Match the loader to the wait.</p>
+
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <%= render layout: "style/specimen",
+          locals: { klass: "studio_loader style: :spinner",
+                    note: "A small ring for a short wait beside text or in a control.",
+                    usage: erb.call("studio_loader style: :spinner") } do %>
+      <div data-loader-specimen="spinner" class="flex items-center gap-4">
+        <%= studio_loader style: :spinner %>
+        <%= studio_loader style: :spinner, size: 32 %>
+        <span class="inline-flex items-center gap-2 text-sm text-body"><%= studio_loader style: :spinner, size: 16, label: "Checking" %>Checking</span>
+      </div>
+    <% end %>
+
+    <%= render layout: "style/specimen",
+          locals: { klass: "studio_skeleton :avatar / :card / :lines / :media",
+                    note: "Grey shapes of the content to come, so the page keeps its layout.",
+                    usage: [erb.call("studio_skeleton :avatar, count: 3"), erb.call('studio_skeleton :card, count: 3, class: "sm:grid-cols-3"')].join("\n") } do %>
+      <div data-loader-specimen="skeleton" class="grid w-full gap-4">
+        <%= studio_skeleton :avatar, count: 2, label: "Loading people" %>
+        <%= studio_skeleton :lines, lines: 2, label: "Loading notes" %>
+      </div>
+    <% end %>
+
+    <%= render layout: "style/specimen",
+          locals: { klass: "studio_loader style: :bar, percent:",
+                    note: "A bar for a wait you can measure; with no percent it sweeps.",
+                    usage: [erb.call("studio_loader style: :bar, percent: 62"), erb.call("studio_loader style: :bar"), 'StudioLoader.setPercent(el, 80)'].join("\n") } do %>
+      <div data-loader-specimen="bar" class="grid w-full gap-4">
+        <%= studio_loader style: :bar, percent: 62, label: "Uploading" %>
+        <%= studio_loader style: :bar, label: "Importing" %>
+      </div>
+    <% end %>
+
+    <%= render layout: "style/specimen",
+          locals: { klass: "studio_loader style: :dots",
+                    note: "Three dots for a reply on its way, such as a chat answer.",
+                    usage: erb.call("studio_loader style: :dots") } do %>
+      <div data-loader-specimen="dots" class="flex items-center gap-6">
+        <%= studio_loader style: :dots %>
+        <span class="inline-flex items-center gap-2 rounded-2xl bg-inset px-3 py-2 text-sm text-body"><%= studio_loader style: :dots, size: 24, label: "Alex is typing" %></span>
+      </div>
+    <% end %>
+
+    <%= render layout: "style/specimen",
+          locals: { klass: "studio_loader_pending (inside a button)",
+                    note: "The button keeps its place and shows that it is working.",
+                    usage: ["<button class=\"btn btn-primary\">", "  <span data-loader-idle>Save</span>", "  #{erb.call('studio_loader_pending style: :spinner')}", "  <span data-loader-busy>Saving…</span>", "</button>"].join("\n") } do %>
+      <div data-loader-specimen="button" class="flex flex-wrap items-center gap-3" x-data="{ busy: false }">
+        <button type="button" class="btn btn-primary" x-bind:aria-busy="busy ? 'true' : 'false'" aria-busy="false"
+                x-on:click="busy = true; setTimeout(() => busy = false, 2000)" data-test="style-loader-save">
+          <span data-loader-idle>Save</span>
+          <%= studio_loader_pending style: :spinner %><span data-loader-busy>Saving…</span>
+        </button>
+        <button type="button" class="btn btn-secondary" aria-busy="true" tabindex="-1">
+          <%= studio_loader_pending %><span class="ml-2">Saving…</span>
+        </button>
+      </div>
+    <% end %>
+
+    <%= render layout: "style/specimen",
+          locals: { klass: "studio_loader_overlay (full screen)",
+                    note: "The branded overlay, for a page that takes longer than 350ms.",
+                    usage: ['window.StudioLoader.show("Caption")', "window.StudioLoader.hide()"].join("\n") } do %>
+      <div data-loader-specimen="overlay">
+        <button type="button" class="btn btn-secondary" data-test="style-loaders-overlay"
+                x-data x-on:click="window.StudioLoader && window.StudioLoader.show('Loading your page…'); setTimeout(() => window.StudioLoader && window.StudioLoader.hide(), 2000)">
+          Show it for 2 seconds
+        </button>
+      </div>
+    <% end %>
+
+    <%= render layout: "style/specimen",
+          locals: { klass: "studio_pull_to_refresh (phones only)",
+                    note: "On a phone, pull down from the top of the page to reload it.",
+                    usage: [erb.call('studio_pull_to_refresh frame: "feed" do'), "  ...", erb_end].join("\n") } do %>
+      <%# Drawn still, mid-refresh: this wrapper has no controller, so it never arms. %>
+      <div data-loader-specimen="pull" class="studio-pull-refresh w-40 h-32 overflow-hidden rounded-2xl border border-subtle bg-surface pt-14 px-3" data-pull-state="refreshing">
+        <span class="studio-pull-refresh-indicator" aria-hidden="true">
+          <span class="spinner" style="--spinner-size: 1.25rem; --spinner-color: currentColor; --spinner-track: color-mix(in srgb, currentColor 22%, transparent)"></span>
+        </span>
+        <%= studio_skeleton :lines, lines: 3, label: "" %>
+      </div>
+    <% end %>
+
+    <%= render layout: "style/specimen",
+          locals: { klass: "studio_infinite_scroll id:, page:, next_url:",
+                    note: "The next page loads as the list's end comes near, and Load more stays.",
+                    usage: [erb.call('studio_infinite_scroll id: "posts", page: @page, next_url: @next_url do'), "  ...one page of items...", erb_end].join("\n") } do %>
+      <div data-loader-specimen="infinite" class="w-full">
+        <%= render "style/loaders_feed_page", page: 1, feed_path: feed_path %>
+      </div>
+    <% end %>
+  </div>
+</section>

@@ -1,0 +1,7 @@
+<%# The Loaders section's demo feed, one page (StyleController#loaders_feed). A
+    whole page, so "Load more" opened with no script lands somewhere real; a
+    frame request takes just the frame it asked for out of it. %>
+<div class="max-w-xl mx-auto px-4 py-10 space-y-4">
+  <h1 class="type-h3 text-heading">Loaders demo feed</h1>
+  <%= render "style/loaders_feed_page", page: @page, feed_path: admin_style_loaders_feed_path %>
+</div>

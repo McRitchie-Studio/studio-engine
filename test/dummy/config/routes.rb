@@ -129,6 +129,12 @@ Rails.application.routes.draw do
   get "lab/geo", to: "geo_lab#open"
   get "lab/geo_locked", to: "geo_lab#locked"
 
+  # The loader family (LoaderLabController): the style guide's Loaders section,
+  # its demo feed, and pull to refresh.
+  get "lab/loaders", to: "loader_lab#loaders"
+  get "lab/loaders_feed", to: "loader_lab#loaders_feed"
+  get "lab/pull_to_refresh", to: "loader_lab#pull_to_refresh"
+
   # A host app's pages for the link-preview suite: plain, overridden, and heavy.
   get "lab/link_preview", to: "link_preview_lab#plain"
   get "lab/link_preview/override", to: "link_preview_lab#override"

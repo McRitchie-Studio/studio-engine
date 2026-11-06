@@ -2248,6 +2248,8 @@ module Studio
 
       # The living style guide (StyleController#index).
       get   "admin/style",            to: "style#index",               as: :admin_style
+      # One page of the Loaders section's demo feed (its live infinite scroll).
+      get   "admin/style/loaders_feed", to: "style#loaders_feed",      as: :admin_style_loaders_feed
 
       # The component gallery: Lookbook over the engine's ViewComponent previews.
       # The router refuses anyone but a signed-in admin, so a visitor and a

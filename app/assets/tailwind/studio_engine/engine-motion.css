@@ -2521,6 +2521,9 @@ body.modal-open { overflow: visible; }
   .studio-loader[data-loader-pending] { display: none; }
   :where(form, button)[aria-busy="true"] .studio-loader[data-loader-pending] { display: inline-grid; }
   :where(form, button)[aria-busy="true"] [data-loader-idle] { display: none; }
+  /* The words a busy button says instead ("Saving…"): shown only while busy. */
+  [data-loader-busy] { display: none; }
+  :where(form, button)[aria-busy="true"] [data-loader-busy] { display: inline; margin-inline-start: 0.5rem; }
   .studio-loader[data-loader-pending] .studio-loader-halo { display: none; }
   .studio-loader[data-loader-pending] .studio-loader-icon { width: 100%; height: 100%; animation-duration: 1.4s; }
 
