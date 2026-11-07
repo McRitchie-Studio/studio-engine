@@ -497,6 +497,14 @@ At 1m5s in parallel, the saving does not buy that risk. If the lane ever grows
 past the engine suite's wall time it becomes the critical path, and **that** is the
 moment to shard (`config/e2e_lane.yml` → `shards:`), not to start filtering.
 
+**That moment came on 2026-11-06** (task `ci-retry-killers`). The lane had grown to
+17m27s of specs on one runner, against 9m09s for the engine suite (run
+42299310246). It now runs as a three-shard matrix. Each shard writes its own
+receipt (`e2e-report-shard-N.json`), and `bin/e2e-executed-set-check` refuses a set
+of receipts unless one arrives from each shard and their shard total equals
+`shards:`. `test/lib/e2e_lane_contract_test.rb` pins the workflow matrix to the same
+number.
+
 ## No quarantine, deliberately
 
 The hub's contract carries `quarantined`, a `quarantine_tag`, a `--grep-invert`, and
