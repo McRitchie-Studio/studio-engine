@@ -16,7 +16,7 @@ production first.
 | `Studio::SiteIdentity` | One row per app: `title`, `description`, and an Active Storage `image`. Table `studio_site_identities`. |
 | `/admin/link_preview` | Admin page that edits all three beside a live card drawn the way an unfurl draws it (image, domain, title, description). The image is cropped to 1200 × 630 in the shared crop modal. |
 | `Studio.site_identity(base_url:)` · `studio_site_identity` | The resolved copy, `{ title:, description:, image_url: }`, for any reader: a meta description, share text, an email footer. |
-| `link_preview(image:, title:, description:)` | The one page override. Call it from any view. |
+| `link_preview(image:, title:, description:, url:)` | The one page override. Call it from any view. `url:` (a path or an absolute URL) replaces the page's og:url; the not-found page passes the app's home so a 404 never advertises the address it was asked for. |
 | `layouts/studio/_head` | Emits the og:/twitter: tags (`studio_link_preview_tags`). |
 | `Studio::LinkPreviewBots` | Controller concern: preview fetchers get a slim, head-only page. |
 | `bin/rails g studio:site_identity` | The adoption step: migration, drafted copy, bot concern. |

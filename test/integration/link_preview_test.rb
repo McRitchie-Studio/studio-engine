@@ -627,4 +627,19 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
     assert_nil response.headers["X-Studio-Link-Preview"]
     assert_equal ["slim exploded"], ErrorLog.pluck(:message)
   end
+
+  # The not-found page passes link_preview(url:) its home (task
+  # not-found-page-home-url): a 404 at a hidden route used to name that route in
+  # its og:url, because og:url was always the request's own address.
+  test "link_preview url: points og:url at the path given, not the address asked for" do
+    install_link_preview_table!
+    get "/lab/link_preview/url_override/lookbook-assets"
+
+    assert_equal "http://www.example.com/", meta("og:url")
+    refute_includes response.body, "lookbook", "the page names the address it was asked for"
+  end
+
+  test "link_preview takes url: among its keys" do
+    assert_includes Studio::LinkPreviewHelper::OVERRIDE_KEYS, :url
+  end
 end
