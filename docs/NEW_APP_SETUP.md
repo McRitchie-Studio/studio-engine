@@ -778,7 +778,9 @@ run their package jobs inside the hub's lane image,
 `ghcr.io/mcritchie-studio/ci-rails:24.04` (every package pre-installed; built weekly by
 the hub's `mirror-ci-images.yml`), and `test/lib/ci_lane_image_test.rb` guards that.
 An app on the hub's `reusable-ci.yml` gets the same image through its `lane-image`
-input. Prefer the image to an apt step: the apt mirror stalling was the largest single
+input. The image runs as the runner's user (uid 1001) with a reaping PID 1, and a
+Selenium system test there must pass Chrome `--no-sandbox` when `CI_LANE_IMAGE=1`
+(the hub's `test/application_system_test_case.rb` shows how). Prefer the image to an apt step: the apt mirror stalling was the largest single
 cause of a red-then-green CI run (task deterministic-ci).
 
 **If your app shells out to any other binary, add it to that step in EVERY job
