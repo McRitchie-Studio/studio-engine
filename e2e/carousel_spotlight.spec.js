@@ -332,3 +332,208 @@ test("without scroll-initial-target the controller opens the row on the middle s
   expect(await centredIndex(page)).toBe(3);
   await expect(defaultRegion(page).locator("[role='status']")).toHaveText("");
 });
+
+// THE LOOP (loop: true, "spot-loop": seven slides from the first, as the hub's
+// /websites row). The row is visually continuous: clones of the last slides sit
+// before the first and of the first after the last. Each read is the slide whose
+// box holds the row's centre and its two neighbours, by card number.
+//
+// CONTROLS, each run against this file with the lab server restarted (2026-11-07):
+//   - the controller's addClones() call removed: every loop spec red (no slide left
+//     of the first).
+//   - settle()'s jump removed: the seam spec red (the row rests on a clone).
+//   - cloneOf()'s inert and aria-hidden removed: the screen-reader spec red.
+const loopRegion = (page, name = "spot-loop") => page.locator(`section[data-lab='${name}']`);
+const loopTrack = (page, name = "spot-loop") => loopRegion(page, name).locator("> .carousel-track");
+
+async function openLoop(page, viewport = DESKTOP, name = "spot-loop") {
+  const errors = await open(page, viewport);
+  await expect(loopRegion(page, name)).toHaveAttribute("data-carousel-ready", "");
+  await loopRegion(page, name).scrollIntoViewIfNeeded();
+  await settled(loopTrack(page, name));
+  return errors;
+}
+
+const loopRow = (page, name = "spot-loop") => loopTrack(page, name).evaluate((row) => {
+  const r = row.getBoundingClientRect();
+  const mid = r.left + row.clientWidth / 2;
+  const all = [...row.children];
+  const at = all.findIndex((s) => { const b = s.getBoundingClientRect(); return b.left <= mid && b.right >= mid; });
+  const read = (s) => {
+    if (!s) return null;
+    const body = s.querySelector(".carousel-spotlight-body");
+    const look = getComputedStyle(body);
+    const box = s.getBoundingClientRect();
+    const seen = body.getBoundingClientRect();
+    return {
+      card: s.querySelector("[data-lab-card]").dataset.labCard,
+      clone: s.hasAttribute("data-carousel-clone"),
+      current: s.hasAttribute("data-current"),
+      offset: Math.abs(box.left + box.width / 2 - mid),
+      width: Math.round(box.width),
+      shows: Math.min(seen.right, r.right) - Math.max(seen.left, r.left),
+      scale: look.scale === "none" ? 1 : parseFloat(look.scale),
+      grey: parseFloat((look.filter.match(/grayscale\(([\d.]+)\)/) || [0, 0])[1]) > 0.9
+    };
+  };
+  return { centre: read(all[at]), left: read(all[at - 1]), right: read(all[at + 1]) };
+});
+
+// Rest, then two reads of the look 350ms apart that agree.
+async function restingLoop(page, name = "spot-loop") {
+  await settled(loopTrack(page, name));
+  let last = null;
+  await expect.poll(async () => {
+    const now = JSON.stringify(await loopRow(page, name));
+    const same = now === last;
+    last = now;
+    return same;
+  }, { intervals: [350, 350, 350, 350] }).toBe(true);
+  return JSON.parse(last);
+}
+
+function expectFirstWithLastBeside(row, last = "7") {
+  expect(row.centre).toMatchObject({ card: "1", clone: false, current: true });
+  expect(row.centre.offset, "the first slide sits at the centre").toBeLessThan(3);
+  expect(row.left, "a slide sits left of the first").not.toBeNull();
+  expect(row.left.card, "and it shows the last slide").toBe(last);
+  expect(row.left.clone).toBe(true);
+  expect(row.left.width, "slide-shaped: as wide as a real slide").toBe(row.centre.width);
+  expect(row.left.shows, "and it is on screen").toBeGreaterThan(20);
+  expect(row.right).toMatchObject({ card: "2", clone: false });
+}
+
+test("a looping spotlight shows the last slide left of the first", async ({ page }) => {
+  const errors = await openLoop(page);
+  const row = await restingLoop(page);
+  expectFirstWithLastBeside(row);
+  // The clone wears the neighbour look the real neighbour on the right wears.
+  expect(row.left.scale).toBeLessThan(0.8);
+  expect(row.left.grey).toBe(true);
+  expect(Math.abs(row.left.scale - row.right.scale)).toBeLessThan(0.02);
+  await expect(loopRegion(page).getByRole("button", { name: "Previous slide", exact: true })).toHaveAttribute("aria-disabled", "false");
+  expect(errors).toEqual([]);
+});
+
+test("a looping spotlight on a phone shows the last slide left of the first", async ({ page }) => {
+  await openLoop(page, PHONE);
+  expectFirstWithLastBeside(await restingLoop(page));
+});
+
+test("fallback: a clone takes the neighbour look from the controller's mark", async ({ page }) => {
+  await openLoop(page);
+  await page.addStyleTag({ content: FALLBACK });
+  const row = await restingLoop(page);
+  expectFirstWithLastBeside(row);
+  expect(row.left.current).toBe(false);
+  expect(row.left.scale).toBeLessThan(0.8);
+  expect(row.left.grey).toBe(true);
+  expect(row.centre.scale).toBeGreaterThan(0.98);
+});
+
+// Every scroll event of the row: where it is and which card is at the centre.
+async function recordSeam(page) {
+  await loopTrack(page).evaluate((row) => {
+    window.__seam = [];
+    row.addEventListener("scroll", () => {
+      const mid = row.getBoundingClientRect().left + row.clientWidth / 2;
+      const slide = [...row.children].find((s) => { const b = s.getBoundingClientRect(); return b.left <= mid && b.right >= mid; });
+      window.__seam.push({ left: row.scrollLeft, card: slide?.querySelector("[data-lab-card]").dataset.labCard });
+    }, { passive: true });
+  });
+}
+
+test("Next at the last slide glides across the seam and rests on the first, the last beside it", async ({ page }) => {
+  await openLoop(page);
+  const spot = loopRegion(page);
+  await spot.getByRole("button", { name: "Previous slide", exact: true }).click();
+  await expect.poll(async () => (await loopRow(page)).centre).toMatchObject({ card: "7", clone: false, current: true });
+  await expect(spot.locator("[role='status']")).toHaveText("Slide 7 of 7");
+  await expect(spot.locator(".carousel-dot[aria-current='true']")).toHaveAttribute("data-carousel-index", "6");
+  await restingLoop(page);
+
+  await recordSeam(page);
+  await spot.getByRole("button", { name: "Next slide", exact: true }).click();
+  await expect.poll(async () => (await loopRow(page)).centre).toMatchObject({ card: "1", clone: false, current: true });
+  expectFirstWithLastBeside(await restingLoop(page));
+  await expect(spot.locator("[role='status']")).toHaveText("Slide 1 of 7");
+  await expect(spot.locator(".carousel-dot[aria-current='true']")).toHaveAttribute("data-carousel-index", "0");
+
+  // A glide forward, then one silent jump home: the centre only ever shows the
+  // last slide and then the first, never the row running back across itself.
+  const seam = await page.evaluate(() => window.__seam);
+  const back = seam.map((s, i) => (i && s.left < seam[i - 1].left - 2 ? i : -1)).filter((i) => i >= 0);
+  expect(back, "one jump back, after the glide").toHaveLength(1);
+  const glide = seam.slice(0, back[0]);
+  expect(new Set(glide.map((s) => Math.round(s.left))).size, "it glided through several frames").toBeGreaterThan(2);
+  expect([...new Set(seam.map((s) => s.card))].sort()).toEqual(["1", "7"]);
+  expect(seam[back[0] - 1].card).toBe("1");
+  expect(seam[back[0]].card, "the jump shows the same card").toBe("1");
+});
+
+test("under reduced motion the seam is crossed with no glide", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await openLoop(page);
+  const spot = loopRegion(page);
+  await recordSeam(page);
+  await spot.getByRole("button", { name: "Previous slide", exact: true }).click();
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  expect((await loopRow(page)).centre).toMatchObject({ card: "7", clone: false, current: true });
+  const seam = await page.evaluate(() => window.__seam);
+  expect(new Set(seam.map((s) => Math.round(s.left))).size, "one step, straight to the real last slide").toBe(1);
+
+  await spot.getByRole("button", { name: "Next slide", exact: true }).click();
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  expect((await loopRow(page)).centre).toMatchObject({ card: "1", clone: false, current: true });
+  expect((await loopRow(page)).left.card).toBe("7");
+});
+
+test("a screen reader and Tab meet each real slide once, and the dots count real slides", async ({ page }) => {
+  await openLoop(page);
+  const spot = loopRegion(page);
+  const clones = spot.locator("[data-carousel-clone]");
+
+  await expect(spot.getByRole("group", { name: /^Loop \d$/ })).toHaveCount(7);
+  await expect(spot.getByRole("link", { name: "Open" })).toHaveCount(7);
+  await expect(clones).toHaveCount(8);
+  for (const clone of await clones.all()) {
+    await expect(clone).toHaveAttribute("aria-hidden", "true");
+    await expect(clone).toHaveAttribute("inert", "");
+  }
+  await expect(clones.locator("[id], [data-test], [data-carousel-target], [data-loop-link][name]")).toHaveCount(0);
+  await expect(page.locator("#loop-1")).toHaveCount(1);
+  await expect(page.locator("[data-test='loop-card']")).toHaveCount(7);
+  await expect(spot.locator(".carousel-dot:visible")).toHaveCount(7);
+
+  await loopTrack(page).focus();
+  const reached = [];
+  for (let i = 0; i < 7; i += 1) {
+    await page.keyboard.press("Tab");
+    reached.push(await page.evaluate(() => (document.activeElement.closest("[data-carousel-clone]") ? "clone" : document.activeElement.id)));
+  }
+  expect(reached).toEqual(["loop-1", "loop-2", "loop-3", "loop-4", "loop-5", "loop-6", "loop-7"]);
+});
+
+test("a #fragment link to a looping row's slide finds the real slide and brings it into view", async ({ page }) => {
+  await openLoop(page);
+  await page.evaluate(() => { window.location.hash = "#loop-5"; });
+  await restingLoop(page);
+  const target = page.locator("#loop-5");
+  await expect(target).toHaveCount(1);
+  const seen = await target.evaluate((link) => {
+    const row = link.closest(".carousel-track").getBoundingClientRect();
+    const box = link.getBoundingClientRect();
+    return { clone: !!link.closest("[data-carousel-clone]"), inRow: box.left >= row.left - 1 && box.right <= row.right + 1 };
+  });
+  expect(seen).toEqual({ clone: false, inRow: true });
+});
+
+test("a looping spotlight with no start opens on its first slide, the last on its left", async ({ page }) => {
+  const errors = await openLoop(page, DESKTOP, "spot-loop-default");
+  const spot = loopRegion(page, "spot-loop-default");
+  expectFirstWithLastBeside(await restingLoop(page, "spot-loop-default"), "5");
+  await expect(spot).not.toHaveAttribute("data-carousel-start", /.*/);
+  await expect(spot.locator(".carousel-dot[aria-current='true']")).toHaveAttribute("data-carousel-index", "0");
+  await expect(spot.locator("[role='status']")).toHaveText("");
+  expect(errors).toEqual([]);
+});

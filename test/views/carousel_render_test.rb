@@ -216,6 +216,25 @@ class CarouselRenderTest < Minitest::Test
     assert_equal "2", current_dot(doc)
   end
 
+  # A looping spotlight's wrap shows the last slide left of the first, so it opens on
+  # the host's first item; an explicit start: still wins, and a row of one slide,
+  # which does not wrap, keeps the middle (its only slide).
+  def test_a_looping_spotlight_opens_on_its_first_slide_by_default
+    doc = render_carousel(items: FOUR, style: :spotlight, loop: true)
+
+    assert_nil region(doc)["data-carousel-start"]
+    assert_empty doc.css("[data-carousel-start-slide]")
+    assert_equal ["1 of 4"], doc.css(".carousel-slide[data-current]").map { |s| s["aria-label"] }
+    assert_equal "0", current_dot(doc)
+    assert_equal ["false", nil], arrows(doc), "a looping row disables neither arrow"
+  end
+
+  def test_a_looping_spotlight_still_takes_an_explicit_start
+    assert_equal "2", region(render_carousel(items: FOUR, style: :spotlight, loop: true, start: :middle))["data-carousel-start"]
+    assert_equal "3", region(render_carousel(items: FOUR, style: :spotlight, loop: true, start: 3))["data-carousel-start"]
+    assert_equal "2", region(render_carousel(items: FOUR, style: :spotlight, loop: false))["data-carousel-start"], "no loop, the middle"
+  end
+
   def test_a_standard_row_opens_on_its_first_slide_by_default
     doc = render_carousel
 

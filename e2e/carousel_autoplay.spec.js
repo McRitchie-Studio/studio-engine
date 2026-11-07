@@ -12,6 +12,9 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 //   - autoplayRunning() made to ignore its reasons: 6 red (hover, pause button,
 //     keyboard focus, hidden tab, a press, reduced motion).
 //   - targetStop()'s two loop wraps removed: 1 red, the looping arrows.
+// A looping row of more than one slide is cloned round its seam (loop: true), so the
+// specs count its real slides, [data-carousel-target='slide'], and every real slide
+// of it is a stop. The loop's clones and seam are carousel_spotlight.spec.js's.
 
 const DESKTOP = { width: 1280, height: 900 };
 const LAB = "/lab/carousel_autoplay";
@@ -32,6 +35,12 @@ async function open(page, { reducedMotion = "no-preference" } = {}) {
   await expect(region(page, "auto")).toHaveAttribute("data-carousel-ready", "");
   return errors;
 }
+
+// Whether a standard row rests with real slide `index` at its start, not a clone.
+const restsOn = (page, name, index) => track(page, name).evaluate((el, i) => {
+  const slide = el.querySelectorAll("[data-carousel-target='slide']")[i];
+  return Math.abs(slide.offsetLeft - el.firstElementChild.offsetLeft - el.scrollLeft) <= 2;
+}, index);
 
 // Holds for `ms`: the open dot never leaves `index`.
 async function holds(page, name, index, ms = 2500) {
@@ -57,9 +66,14 @@ test("a looping spotlight wraps from its last slide to its first, and centres it
   await open(page);
   const spot = region(page, "auto-spot");
 
-  await expect(spot.locator(".carousel-slide").nth(4)).toHaveAttribute("data-current", "");
+  const real = spot.locator("[data-carousel-target='slide']");
+  await expect(real.nth(4)).toHaveAttribute("data-current", "");
   await expect.poll(() => openDot(page, "auto-spot"), { timeout: 4000 }).toBe(0);
-  await expect(spot.locator(".carousel-slide").nth(0)).toHaveAttribute("data-current", "");
+  await expect(real.nth(0)).toHaveAttribute("data-current", "");
+  // The slide left of the first is a clone of the last.
+  const before = await real.nth(0).evaluate((slide) => [slide.previousElementSibling?.hasAttribute("data-carousel-clone"), slide.previousElementSibling?.textContent.trim()]);
+  expect(before[0]).toBe(true);
+  expect(before[1]).toContain("Person 5");
   // Neither arrow is ever disabled on a looping row.
   await expect(spot.locator("[data-carousel-target='prev']")).toHaveAttribute("aria-disabled", "false");
   await expect(spot.locator("[data-carousel-target='next']")).toHaveAttribute("aria-disabled", "false");
@@ -127,8 +141,8 @@ test("a press holds the row until the reader leaves it alone", async ({ page }) 
   await next.click();
   await page.mouse.move(5, 5);
   await expect(region(page, "auto")).not.toHaveAttribute("data-carousel-playing", "");
-  // Next moves a page of three: from the first stop to the last, once it rests.
-  const at = (await region(page, "auto").locator(".carousel-dot:not([hidden])").count()) - 1;
+  // Next moves a page of three: from the first slide to the fourth, once it rests.
+  const at = 3;
   await expect.poll(() => openDot(page, "auto")).toBe(at);
   await holds(page, "auto", at, 3000);
   // idleDelay: five seconds for a one-second row, then it moves again.
@@ -166,16 +180,35 @@ test("a looping row's arrows wrap at both ends and are never disabled", async ({
   const row = region(page, "loop");
   const prev = row.locator("[data-carousel-target='prev']");
   const next = row.locator("[data-carousel-target='next']");
-  const last = (await row.locator(".carousel-dot:not([hidden])").count()) - 1;
+  const status = row.locator("[data-carousel-target='status']");
+  // Every real slide is a stop, and the dots count the real slides only.
+  await expect(row.locator(".carousel-dot:not([hidden])")).toHaveCount(6);
 
   await expect(prev).toHaveAttribute("aria-disabled", "false");
   await prev.click();
-  await expect.poll(() => openDot(page, "loop")).toBe(last);
+  await expect.poll(() => openDot(page, "loop")).toBe(3);
   await expect(next).toHaveAttribute("aria-disabled", "false");
-  await expect(row.locator("[data-carousel-target='status']")).toHaveText("Slides 4 to 6 of 6");
+  await expect(status).toHaveText("Slides 4 to 6 of 6");
+  // The glide ran to the clones before the first, then jumped home to the real fourth.
+  await expect.poll(() => restsOn(page, "loop", 3)).toBe(true);
 
+  // Next from the last page glides on across the seam, never back across the row.
+  await track(page, "loop").evaluate((el) => {
+    window.__lefts = [];
+    el.addEventListener("scroll", () => window.__lefts.push(el.scrollLeft), { passive: true });
+  });
   await next.click();
   await expect.poll(() => openDot(page, "loop")).toBe(0);
-  await expect(row.locator("[data-carousel-target='status']")).toHaveText("Slides 1 to 3 of 6");
+  await expect(status).toHaveText("Slides 1 to 3 of 6");
+  await expect.poll(() => restsOn(page, "loop", 0)).toBe(true);
+  const lefts = await page.evaluate(() => window.__lefts);
+  const back = lefts.findIndex((left, i) => i && left < lefts[i - 1] - 2);
+  expect(back, "one jump home, after the glide").toBeGreaterThan(1);
+  expect(lefts.slice(back + 1).every((left) => Math.abs(left - lefts[back]) <= 2), "and no glide after it").toBe(true);
+
+  // A dot takes the short way round: from the first, slide five is two back.
+  await row.getByRole("button", { name: "Go to slide 5" }).click();
+  await expect.poll(() => openDot(page, "loop")).toBe(4);
+  await expect(status).toHaveText("Slides 5 to 6 and 1 of 6");
   expect(await row.locator("[data-carousel-target='toggle']").count()).toBe(0);
 });
