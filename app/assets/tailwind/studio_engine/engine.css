@@ -1064,6 +1064,15 @@ body.modal-open .studio-app-banner {
     opacity: 0;
   }
 
+  /* A looping row's jump across the seam (data-carousel-wrapping, one frame): the
+     mark moves from a clone to the real slide it copies, in the same place, so
+     nothing may transition. A clone is a carousel-slide, so every other rule here
+     (the scroll-driven look, the mark) styles it as it styles a real slide. */
+  &[data-carousel-wrapping] .carousel-slide .carousel-spotlight-body,
+  &[data-carousel-wrapping] .carousel-slide .carousel-caption {
+    transition: none;
+  }
+
   /* A neighbour holding focus drops the neighbour look on every path, so its focus
      ring shows at full strength (WCAG 2.4.7). It outranks the animation and the mark. */
   & .carousel-slide:focus-within .carousel-spotlight-body,

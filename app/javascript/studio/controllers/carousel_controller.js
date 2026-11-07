@@ -26,10 +26,21 @@
 // and nothing in the status line. A row already moved (the browser's own start, a
 // restored scroll, a #fragment inside it) is left where it is.
 //
-// A LOOPING row (loop:, data-carousel-loop) wraps: Next at the last stop goes back
-// to the first, Previous at the first to the last, and neither arrow is ever
-// aria-disabled. There are no cloned slides, so a screen reader reads each once:
-// the row glides back across itself.
+// A LOOPING row (loop:, data-carousel-loop) of more than one slide is visually
+// continuous. connect() copies the last slides before the first and the first slides
+// after the last (cloneLayout), so the space beside either end shows the slides
+// round the seam. Next at the last slide glides on to the clone of the first;
+// once the row rests there (scrollend, or a short quiet spell where the browser has
+// no scrollend) it jumps, with no glide and no transition, to the real first slide,
+// whose neighbours look the same. Previous at the first does the same backwards, and
+// a swipe that rests on a clone too. Under reduced motion the row goes straight to
+// the real slide. Neither arrow is ever aria-disabled.
+//
+// A clone is aria-hidden and inert, keeps no id, name, test hook or Stimulus wiring
+// (CLONE_STRIP), and is no slide target, so a screen reader and Tab meet each real
+// slide once, a #fragment finds the real slide, and the dots and the status line
+// count real slides. A click on a clone moves the row to it. disconnect() removes
+// the clones, and connect() clears any a page snapshot kept.
 //
 // AUTOPLAY (autoplay: seconds, data-carousel-autoplay) moves the row one stop each
 // interval. It holds still while the pointer is over the slides, while keyboard focus
@@ -40,8 +51,9 @@
 // (APG: a rotating carousel does not announce). Without loop it stops at the end.
 import { Controller } from "@hotwired/stimulus"
 import {
-  TOLERANCE, autoplayRunning, autoplaySeconds, autoplayStop, centerStops, currentStop, hiddenEnds, idleDelay,
-  initialReasons, keyAction, ownsKey, perPage, positionText, startStop, stops, targetStop, toggleLabel, withReason
+  CLONE_STRIP, TOLERANCE, autoplayRunning, autoplaySeconds, autoplayStop, centerStops, cloneCount, cloneLayout,
+  currentStop, hiddenEnds, idleDelay, initialReasons, keyAction, loopPositionText, loopStop, nearestVirtual, ownsKey,
+  perPage, positionText, seamJump, startStop, stops, targetStop, toggleLabel, withReason, wrapIndex
 } from "studio/carousel"
 
 const REDUCE = "(prefers-reduced-motion: reduce)"
@@ -51,14 +63,22 @@ export default class extends Controller {
 
   connect() {
     this.schedule = this.schedule.bind(this)
+    this.settle = this.settle.bind(this)
+    this.clickClone = this.clickClone.bind(this)
     this.loop = this.element.hasAttribute("data-carousel-loop")
+    this.cloned = 0
+    this.removeClones()
+    this.scrollEnd = "onscrollend" in window
     this.trackTarget.addEventListener("scroll", this.schedule, { passive: true })
+    if (this.scrollEnd) this.trackTarget.addEventListener("scrollend", this.settle, { passive: true })
+    this.trackTarget.addEventListener("click", this.clickClone)
     if (typeof ResizeObserver === "function") {
       this.observer = new ResizeObserver(this.schedule)
       this.observer.observe(this.trackTarget)
     }
     this.element.setAttribute("data-carousel-ready", "")
     this.openAtStart()
+    this.addClones()
     this.sync()
     this.startAutoplay()
   }
@@ -82,10 +102,91 @@ export default class extends Controller {
 
   disconnect() {
     this.trackTarget.removeEventListener("scroll", this.schedule)
+    this.trackTarget.removeEventListener("scrollend", this.settle)
+    this.trackTarget.removeEventListener("click", this.clickClone)
     this.observer?.disconnect()
     if (this.frame) cancelAnimationFrame(this.frame)
     this.frame = null
+    clearTimeout(this.settleTimer)
+    this.settleTimer = null
     this.stopAutoplay()
+    this.removeClones()
+  }
+
+  // -- the loop's clones ------------------------------------------------------
+
+  // Copies the slides round the seam either side, and holds the row where it was:
+  // the scroll moves by the width the clones added before the first slide.
+  addClones() {
+    this.cloned = 0
+    if (!this.loop) return
+    const slides = this.slideTargets
+    const perView = parseFloat(getComputedStyle(this.element).getPropertyValue("--carousel-per-view"))
+    const { before, after } = cloneLayout(slides.length, cloneCount(perView, slides.length))
+    if (before.length === 0) return
+
+    const track = this.trackTarget
+    const first = slides[0]
+    const left = track.scrollLeft
+    const was = first.offsetLeft
+    first.before(...before.map((index) => this.cloneOf(slides[index])))
+    slides[slides.length - 1].after(...after.map((index) => this.cloneOf(slides[index])))
+    this.cloned = before.length
+    track.scrollTo({ left: left + first.offsetLeft - was, behavior: "instant" })
+  }
+
+  cloneOf(slide) {
+    const clone = slide.cloneNode(true)
+    for (const node of [clone, ...clone.querySelectorAll("*")]) {
+      for (const { name } of [...node.attributes]) if (CLONE_STRIP.test(name)) node.removeAttribute(name)
+    }
+    for (const name of ["role", "aria-roledescription", "aria-label"]) clone.removeAttribute(name)
+    clone.setAttribute("aria-hidden", "true")
+    clone.setAttribute("inert", "")
+    clone.setAttribute("data-carousel-clone", "")
+    return clone
+  }
+
+  removeClones() {
+    this.trackTarget.querySelectorAll(":scope > [data-carousel-clone]").forEach((clone) => clone.remove())
+    this.cloned = 0
+  }
+
+  // Every slide in row order, the clones included.
+  rowSlides() {
+    return this.cloned ? [...this.trackTarget.querySelectorAll(":scope > .carousel-slide")] : this.slideTargets
+  }
+
+  // The row came to rest. On a clone it jumps to the real slide the clone copies,
+  // at the same place in the row, so nothing on screen changes.
+  settle() {
+    this.settleTimer = null
+    if (!this.cloned) return
+    this.sync()
+    const real = seamJump(this.virtual, this.positions.length)
+    if (real === null) return
+    const at = this.full[this.virtual + this.cloned]
+    if (Math.abs(this.trackTarget.scrollLeft - at) > TOLERANCE) return
+    this.element.setAttribute("data-carousel-wrapping", "")
+    this.trackTarget.scrollTo({ left: this.positions[real], behavior: "instant" })
+    this.sync()
+    void this.trackTarget.offsetWidth
+    requestAnimationFrame(() => this.element.removeAttribute("data-carousel-wrapping"))
+  }
+
+  // An inert clone takes no click, so the click lands on the track: a click on a
+  // clone's box moves the row to it.
+  clickClone(event) {
+    if (!this.cloned || event.target !== this.trackTarget) return
+    const index = this.rowSlides().findIndex((slide) => {
+      if (!slide.hasAttribute("data-carousel-clone")) return false
+      const box = slide.getBoundingClientRect()
+      return event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom
+    })
+    if (index < 0) return
+    this.interacted()
+    this.sync()
+    this.scrollToStop(index - this.cloned)
   }
 
   // -- autoplay ---------------------------------------------------------------
@@ -183,7 +284,7 @@ export default class extends Controller {
     this.timer = null
     this.sync()
     const count = this.positions.length
-    const to = autoplayStop(this.current, count, this.loop)
+    const to = this.cloned ? loopStop("next", this.virtual, 1, count, this.cloned) : autoplayStop(this.current, count, this.loop)
     if (to === null && count > 1) {
       // The end of a row that does not loop: autoplay is done until Play.
       this.pause("stopped", true)
@@ -194,6 +295,10 @@ export default class extends Controller {
   }
 
   schedule() {
+    if (this.cloned && !this.scrollEnd) {
+      clearTimeout(this.settleTimer)
+      this.settleTimer = setTimeout(this.settle, 150)
+    }
     if (this.frame) return
     this.frame = requestAnimationFrame(() => {
       this.frame = null
@@ -201,9 +306,11 @@ export default class extends Controller {
     })
   }
 
+  // The stops of every slide in the row. A cloned row measures its clones too, and
+  // every slide of it is a stop: the row never ends.
   measure() {
     const track = this.trackTarget
-    const slides = this.slideTargets
+    const slides = this.rowSlides()
     if (this.element.classList.contains("carousel-spotlight")) {
       const max = Math.max(0, track.scrollWidth - track.clientWidth)
       const boxes = slides.map((slide) => ({ left: slide.offsetLeft, width: slide.offsetWidth }))
@@ -212,6 +319,12 @@ export default class extends Controller {
     const origin = slides[0]?.offsetLeft || 0
     const max = Math.max(0, track.scrollWidth - track.clientWidth)
     const gap = parseFloat(getComputedStyle(track).columnGap) || 0
+    if (this.cloned) {
+      return {
+        positions: slides.map((slide) => Math.min(max, Math.max(0, slide.offsetLeft - origin))),
+        page: perPage(track.clientWidth, slides[0]?.offsetWidth, gap)
+      }
+    }
     return {
       positions: stops(slides.map((slide) => slide.offsetLeft - origin), max),
       page: perPage(track.clientWidth, slides[0]?.offsetWidth, gap)
@@ -223,22 +336,35 @@ export default class extends Controller {
     const { positions, page } = this.measure()
     const ends = hiddenEnds(track)
 
-    this.positions = positions
     this.page = page
-    this.current = currentStop(track.scrollLeft, positions)
+    if (this.cloned) {
+      // positions holds every slide, clones included; this.positions the real ones.
+      const total = this.slideTargets.length
+      this.full = positions
+      this.virtual = currentStop(track.scrollLeft, positions) - this.cloned
+      this.current = wrapIndex(this.virtual, total)
+      this.positions = positions.slice(this.cloned, this.cloned + total)
+    } else {
+      this.full = null
+      this.positions = positions
+      this.current = currentStop(track.scrollLeft, positions)
+      this.virtual = this.current
+    }
 
-    this.element.toggleAttribute("data-carousel-static", positions.length < 2)
+    this.element.toggleAttribute("data-carousel-static", this.positions.length < 2)
     track.toggleAttribute("data-fade-start", ends.start)
     track.toggleAttribute("data-fade-end", ends.end)
     // A looping row never disables an arrow: each end leads round to the other.
-    const wraps = this.loop && positions.length > 1
+    const wraps = this.loop && this.positions.length > 1
     if (this.hasPrevTarget) this.prevTarget.setAttribute("aria-disabled", String(!wraps && !ends.start))
     if (this.hasNextTarget) this.nextTarget.setAttribute("aria-disabled", String(!wraps && !ends.end))
     if (this.element.classList.contains("carousel-spotlight")) {
-      this.slideTargets.forEach((slide, index) => slide.toggleAttribute("data-current", index === this.current))
+      // A clone is marked as a real slide is, so the fallback scales it the same.
+      const at = this.virtual + this.cloned
+      this.rowSlides().forEach((slide, index) => slide.toggleAttribute("data-current", index === at))
     }
     this.dotTargets.forEach((dot, index) => {
-      dot.hidden = index >= positions.length
+      dot.hidden = index >= this.positions.length
       if (index === this.current) dot.setAttribute("aria-current", "true")
       else dot.removeAttribute("aria-current")
     })
@@ -251,7 +377,8 @@ export default class extends Controller {
   goTo(event) {
     this.interacted()
     this.sync()
-    this.scrollToStop(Number(event.currentTarget.dataset.carouselIndex))
+    const index = Number(event.currentTarget.dataset.carouselIndex)
+    this.scrollToStop(this.cloned ? nearestVirtual(index, this.virtual, this.positions.length, this.cloned) : index)
   }
 
   key(event) {
@@ -270,17 +397,35 @@ export default class extends Controller {
   move(action) {
     this.interacted()
     this.sync()
+    if (this.cloned) {
+      const to = loopStop(action, this.virtual, this.page, this.positions.length, this.cloned)
+      if (to === this.virtual) return
+      this.scrollToStop(to)
+      return
+    }
     const to = targetStop(action, this.current, this.page, this.positions.length, this.loop)
     if (to === this.current) return
     this.scrollToStop(to)
   }
 
-  // announce: false for autoplay, which moves the row without a word.
+  // announce: false for autoplay, which moves the row without a word. On a cloned
+  // row the index is virtual: a clone's place glides there and settle() jumps home,
+  // but under reduced motion the row goes straight to the real slide.
   scrollToStop(index, { announce = true } = {}) {
+    const reduce = window.matchMedia?.(REDUCE).matches
+    if (this.cloned) {
+      const total = this.positions.length
+      const real = wrapIndex(index, total)
+      const left = reduce ? this.positions[real] : this.full[index + this.cloned]
+      if (left === undefined) return
+      this.trackTarget.scrollTo({ left, behavior: reduce ? "auto" : "smooth" })
+      if (announce && this.hasStatusTarget) this.statusTarget.textContent = loopPositionText(real, this.page, total)
+      return
+    }
+
     const left = this.positions[index]
     if (left === undefined) return
 
-    const reduce = window.matchMedia?.(REDUCE).matches
     this.trackTarget.scrollTo({ left, behavior: reduce ? "auto" : "smooth" })
 
     if (!announce || !this.hasStatusTarget) return

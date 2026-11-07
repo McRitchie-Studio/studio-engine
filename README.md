@@ -344,15 +344,23 @@ keys move one slide. Where the browser has scroll-driven animations the look fol
 scroll; elsewhere the controller marks the centred slide (`data-current`) and CSS
 transitions it. Reduced motion only dims.
 
-`start:` is the slide the row opens on: an index from 0, or `:middle`. A spotlight opens
-on its middle slide by default, so neither half of the row is empty at load; a standard
-row opens on its first. The browser sets it before the first paint where it has
+`start:` is the slide the row opens on: an index from 0, or `:middle`. A spotlight that
+does not loop opens on its middle slide by default, so neither half of the row is empty at
+load; a standard row and a looping spotlight open on their first (a looping row's wrap
+already shows the last slide left of the first). An explicit `start:` wins. The browser sets it before the first paint where it has
 `scroll-initial-target`; elsewhere the controller jumps there when it connects, with no
 glide and nothing announced. A `#fragment` link to an element inside the row wins.
 
-`loop: true` wraps the row: Next at the last slide goes to the first, Previous at the first
-to the last, and neither arrow is ever disabled. No slide is cloned, so a screen reader reads
-each one once; the row glides back across itself.
+`loop: true` wraps the row, and a row of more than one slide is visually continuous: the
+controller copies the last slides before the first and the first slides after the last, so
+with the first slide centred the last one shows beside it. Next at the last slide glides on
+to the first and Previous at the first back to the last; once the row rests, it jumps with no
+glide onto the real slide, which looks the same. Under reduced motion it goes straight there.
+Neither arrow is ever disabled, and every slide of a looping row is a stop. A copy is
+`aria-hidden` and `inert`, and drops its ids, names, test hooks (`data-test`, `data-testid`)
+and Stimulus wiring, so a screen reader and Tab meet each slide once, a `#fragment` finds the
+real slide, and the dots and the status line count the real slides. A slide that a controller
+fills after load shows its server-rendered copy beside the seam.
 
 `autoplay:` is the seconds between moves (default `nil`, off). The row moves one slide each
 interval, in both styles. It holds still while the pointer is over the slides, while keyboard
