@@ -47,6 +47,7 @@ class CiLaneImageTest < Minitest::Test
         container = doc.dig("jobs", name, "container") || flunk("#{file} #{name} runs on the bare runner")
         assert_equal IMAGE, container["image"]
         assert_equal "${{ github.token }}", container.dig("credentials", "password")
+        assert_includes container["options"].to_s, "--init", "#{name} needs a PID 1 that reaps killed children"
       end
     end
   end
