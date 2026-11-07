@@ -1,7 +1,9 @@
 <%# studio/_carousel, style: :spotlight, rendered by name (E2eLabController#carousel_spotlight).
     Seven slides with a caption each: the centred one is full size and colour.
     "spot" opens on its first slide (start: 0), so its specs walk the row from an end;
-    "spot-default" takes the spotlight's default start, the middle slide. %>
+    "spot-default" takes the spotlight's default start, the middle slide;
+    "spot-loop" loops (loop: true) from its first slide, as the hub's /websites row
+    does, and each card carries an id, a link and a test hook its clones must drop. %>
 <main class="max-w-5xl mx-auto px-4 py-10 space-y-12">
   <%= render layout: "studio/carousel",
         locals: { label: "Team", items: (1..7).to_a, per_view: 3, style: :spotlight, start: 0,
@@ -19,6 +21,16 @@
     <div class="card h-full p-5 aspect-[4/5] flex items-end" data-lab-card="<%= n %>"
          style="background: linear-gradient(160deg, hsl(<%= n * 47 %> 70% 55%), hsl(<%= n * 47 + 60 %> 70% 35%))">
       <span class="font-semibold text-white">Crew <%= n %></span>
+    </div>
+  <% end %>
+  <%= render layout: "studio/carousel",
+        locals: { label: "Loop", items: (1..7).to_a, per_view: 3, style: :spotlight, start: 0, loop: true,
+                  slide_label: ->(n) { "Loop #{n}" }, caption: ->(n) { "Loop #{n}" },
+                  data: { lab: "spot-loop" } } do |n| %>
+    <div class="card h-full p-5 aspect-[4/5] flex items-end justify-between" data-lab-card="<%= n %>" data-test="loop-card"
+         style="background: linear-gradient(160deg, hsl(<%= n * 47 %> 70% 55%), hsl(<%= n * 47 + 60 %> 70% 35%))">
+      <span class="font-semibold text-white">Loop <%= n %></span>
+      <a id="loop-<%= n %>" href="#loop-<%= n %>" class="text-white underline" data-loop-link>Open</a>
     </div>
   <% end %>
 </main>
