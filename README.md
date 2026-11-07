@@ -2090,9 +2090,12 @@ in [`docs/RELEASE.md`](./docs/RELEASE.md).
 
 **Building an engine change?** Do **not** edit `lib/studio/version.rb`. The
 release owns the version, and McRitchie Studio's `bin/dor-check` refuses any PR
-that touches that file. Update [`CHANGELOG.md`](./CHANGELOG.md) under
-`Unreleased` (that is *not* gated), run `bin/release-check --build`, and open
-your PR into `accepted`. That is the whole of your part.
+that touches that file. Do not edit [`CHANGELOG.md`](./CHANGELOG.md): add a
+fragment, `changelog.d/<slug>.<kind>.md` (format in
+[`changelog.d/README.md`](./changelog.d/README.md)). Engine CI runs
+`bin/changelog-check`, which fails a PR that changes what the gem ships and adds no
+fragment, or that adds lines under `## Unreleased`. Run `bin/release-check --build`
+and open your PR into `accepted`. That is the whole of your part.
 
 **Conducting the release?** Run `bin/release prepare` from mcritchie-studio and
 let it allocate the version — it derives the bump, commits `lib/studio/version.rb`
@@ -2100,8 +2103,9 @@ with its `Gemfile.lock` onto **`origin/release`**, then publishes, tags, and bum
 each consumer's lock. **Do not set the version by hand.** A hand-set number makes
 the allocation read the current version as already past the last tag and skip, so
 the hand number silently wins over the derived one, and the skip rolls no
-changelog. **When it allocates, `prepare` also rolls
-[`CHANGELOG.md`](./CHANGELOG.md)** in the same commit: everything under
+changelog. **When it allocates, the release compiles the fragments
+(`bin/changelog-compile`) and `prepare` rolls [`CHANGELOG.md`](./CHANGELOG.md)** in
+the same commit: everything under
 `## Unreleased` moves beneath the new version's heading, written even when the
 bucket is empty, and `## Unreleased` stays first and empty. It refuses the sweep,
 with nothing published, when the roll would lie or it cannot read the file.

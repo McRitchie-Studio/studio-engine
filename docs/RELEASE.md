@@ -27,10 +27,11 @@ gem list -r studio-engine --all | head -1   # every published version, newest fi
 git tag --list 'v*' --sort=-v:refname | head -1   # what this repo last tagged
 ```
 
-- **What changed in a release** → `CHANGELOG.md`, which every engine PR updates
-  under `Unreleased` as it goes (the changelog is not gated by `dor-check`), and
-  which `bin/release prepare` rolls into the version heading when it allocates
-  the version (see **Rolling `Unreleased` into a version** below).
+- **What changed in a release** → `CHANGELOG.md`. An engine PR never edits it:
+  it adds a fragment, `changelog.d/<slug>.<kind>.md`. The release compiles the
+  fragments into `## Unreleased` and `bin/release prepare` rolls that into the
+  version heading when it allocates the version (see **Changelog fragments** and
+  **Rolling `Unreleased` into a version** below).
 - **What a given consumer resolves** → that app's `Gemfile.lock`, never its
   Gemfile pin.
 - **Why a consumer's floor is where it is** → its Gemfile pin COMMENT, which is
@@ -69,11 +70,10 @@ So the two audiences below are separate. Read the one you are.
 ### If you are building an engine change
 
 1. Confirm the diff is limited to the intended engine changes.
-2. **Do not touch `lib/studio/version.rb`.** Updating `CHANGELOG.md` under the
-   `Unreleased` heading is fine and encouraged — the changelog is *not* gated.
-   Write under `## Unreleased` and nowhere else, and never write a version
-   heading: `bin/release prepare` writes it when the release allocates your
-   version (see **Rolling `Unreleased` into a version** below).
+2. **Do not touch `lib/studio/version.rb` or `CHANGELOG.md`.** Add a changelog
+   fragment, `changelog.d/<slug>.<kind>.md`, for each change (see **Changelog
+   fragments** below). Never write a version heading: `bin/release prepare`
+   writes it when the release allocates your version.
 3. Run `bin/release-check` (or `bin/release-check --build` for a package sanity
    check).
 4. Open your PR into `accepted` like any other task. You are done; the release
@@ -129,6 +129,49 @@ decisions:
 
 None of them wants a hand-edit of `lib/studio/version.rb`. A SKIP or a REFUSE
 can want a hand-edit of `CHANGELOG.md`; the next section says when.
+
+#### Changelog fragments
+
+A PR adds `changelog.d/<slug>.<kind>.md` (kind `breaking`, `added`, `changed`,
+`deprecated`, `removed`, `fixed` or `security`; the body is the entry's list item, with no
+heading). It does not edit `CHANGELOG.md`. Format: `changelog.d/README.md`.
+
+**Why.** Measured 2026-11-06: 39 of the last 40 engine PRs edited `## Unreleased`,
+and 15 of the 40 needed a merge-forward. `.gitattributes` sets `merge=union` on
+`CHANGELOG.md`, but GitHub's mergeability check does not run merge drivers, so
+every pair of open PRs read as DIRTY. Two PRs that add two different files cannot
+conflict.
+
+**The PR check.** Engine CI runs `bin/changelog-check` on every pull request
+(`engine-suite` job). It fails when a `changelog.d/` file is not a well-formed
+fragment, when the PR adds lines under `## Unreleased`, or when the PR changes what
+the gem ships (`lib/`, `app/`, `config/`, `db/`, `studio-engine.gemspec`) and adds
+no fragment. A diff that sets `lib/studio/version.rb` is the release's version
+commit and passes the last two rules. Run it locally with
+`bin/changelog-check --base origin/accepted`.
+
+**The compile.** `bin/changelog-compile` folds every fragment into `## Unreleased`:
+one `### <Kind>` subsection per kind, in Keep a Changelog order led by Breaking
+(Breaking, Added, Changed, Deprecated, Removed, Fixed, Security), fragments in file-name order, after any
+entry already in that subsection. Then it deletes the fragments it compiled. It
+writes nothing when a fragment is invalid or the file has no single leading
+`## Unreleased`. `--dry-run` prints the compiled section and writes nothing;
+`--root DIR` runs it against another checkout, such as the release's ship workspace.
+
+**Where the release runs it.** The compile belongs in the `Release <version>`
+commit, before the roll, so the fragments land under the new version and leave the
+tree in one commit. That call lives in mcritchie-studio's `bin/release.rb`
+(`commit_gem_version!`, before `roll_changelog!`): run `bin/changelog-compile --root
+<workspace>` when the file exists, and stage `CHANGELOG.md` and `changelog.d/`.
+**Until the hub carries that call, the conductor compiles by hand** before
+`bin/release prepare`: on a docs PR into `accepted`, run `bin/changelog-compile`,
+commit `CHANGELOG.md` and the deleted fragments, and merge it. Prepare then rolls
+the compiled entries as it always has. A fragment left uncompiled is not lost: it
+stays in `changelog.d/` and compiles into the next release.
+
+**A fragment that merges after a roll** stays in `changelog.d/` and compiles into
+the next release, which is the version that ships it. The merge-across-a-roll
+misfile below cannot happen to a fragment.
 
 #### Rolling `Unreleased` into a version
 
