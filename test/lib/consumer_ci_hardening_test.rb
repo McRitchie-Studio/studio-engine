@@ -43,8 +43,9 @@ class ConsumerCiHardeningTest < Minitest::Test
   end
 
   def test_unit_the_workflow_token_is_read_only_contents
-    assert_equal({ "contents" => "read" }, workflow["permissions"],
-                 "top-level permissions: contents: read, so GITHUB_TOKEN cannot write anywhere")
+    # packages: read pulls the hub's lane image (test/lib/ci_lane_image_test.rb); still no write.
+    assert_equal({ "contents" => "read", "packages" => "read" }, workflow["permissions"],
+                 "top-level permissions: contents and packages read, so GITHUB_TOKEN cannot write anywhere")
   end
 
   def test_unit_no_job_widens_the_workflow_token_to_write

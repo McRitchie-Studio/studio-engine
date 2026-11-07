@@ -95,6 +95,7 @@ on:
 # Guard: test/lib/engine_ci_hardening_test.rb (held to consumer-ci.yml's settings).
 permissions:
   contents: read
+  packages: read # pulls the hub's lane image from ghcr.io (playwright)
 
 jobs:
   engine-suite:
@@ -173,6 +174,18 @@ jobs:
   playwright:
     name: browser lane (playwright)
     runs-on: ubuntu-24.04
+    # IN THE HUB'S LANE IMAGE (ghcr.io/mcritchie-studio/ci-rails, built weekly by the
+    # hub's mirror-ci-images.yml from .github/ci-image/Dockerfile): every apt package
+    # Chromium needs is pre-installed, so the job runs no apt step. The Ubuntu apt
+    # mirror stalling in "Install system packages" was this lane's top red-then-green
+    # cause (35 job-steps in two weeks, refactor-review-2026-11-06 lane-health 2f).
+    # The services are reached by their labels (postgres, redis) from inside it.
+    # Guard: test/lib/ci_lane_image_test.rb.
+    container:
+      image: ghcr.io/mcritchie-studio/ci-rails:24.04
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
     timeout-minutes: 45
 
     steps:
@@ -196,10 +209,8 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
-      # `--with-deps` installs the shared libraries headless chromium needs on a
-      # bare ubuntu runner. Without it the browser downloads fine and then fails to
-      # launch, which reads as a mysterious lane failure rather than a missing apt
-      # package.
+      # The shared libraries headless Chromium needs are in the lane image (this job's
+      # `container:`), so the install below fetches the browser only, never apt.
       # CACHE THE BROWSER — the saving this lane's own header asked for by name: "Note
       # where the minute goes: the SPECS are 4 seconds. The rest is npm ci and the chromium
       # download. If this ever needs to be cheaper, cache the browser — do not delete
@@ -218,10 +229,7 @@ jobs:
       #     iteration; the PR wait is /tasks/shard-consumer-ci-suites, which is blocked
       #     until the hub's sharding reaches the hub's DEFAULT branch.
       #
-      # `--with-deps` still runs on a HIT, deliberately: the cache holds the browser, not
-      # the apt libraries headless Chromium needs to launch, and a restored browser that
-      # cannot start reads as a mysterious lane failure rather than a missing package. A
-      # cache miss therefore degrades to exactly today's behaviour.
+      # A restored browser starts on a hit: its apt libraries are in the lane image.
       - name: Cache the Playwright browser
         uses: actions/cache@v4
         with:
@@ -230,24 +238,16 @@ jobs:
           restore-keys: |
             playwright-${{ runner.os }}-
 
-      # `--with-deps` runs its OWN apt-get update/install, outside consumer-ci's
-      # hardened loop, so apt's timeouts are set machine-wide for it: a silent
-      # socket drops in 30s and the file is re-fetched instead of hanging until
-      # the job bound (the 2026-10-26 mirror stall; guard:
-      # test/lib/ci_apt_install_hardening_test.rb).
-      - name: Harden apt fetches
-        run: printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' | sudo tee /etc/apt/apt.conf.d/80-retries
-
       - name: Install Playwright browser
         timeout-minutes: 15
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
 
       # No database service. test/dummy runs sqlite :memory: inside the server
       # process and the lab pages hold no rows — see e2e/boot.rb.
       - name: Run the browser lane
         env:
           RAILS_ENV: test
-          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/e2e-report.json
+          PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-report.json
         run: npx playwright test --reporter=list,json
 
       # `if: always()`, NOT `if: failure()`. A failing spec still RAN, and the
@@ -258,7 +258,7 @@ jobs:
         if: always()
         with:
           name: e2e-report
-          path: ${{ github.workspace }}/e2e-report.json
+          path: e2e-report.json
           if-no-files-found: error
 
       - name: Keep the Playwright report from a failed run
@@ -266,7 +266,7 @@ jobs:
         if: failure()
         with:
           name: playwright-report
-          path: ${{ github.workspace }}/playwright-report
+          path: playwright-report
           if-no-files-found: ignore
 
   # THE VERDICT GATE. The lane above can say its specs PASSED; it cannot say it RAN

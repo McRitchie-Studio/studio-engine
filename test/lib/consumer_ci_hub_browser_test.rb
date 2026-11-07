@@ -281,7 +281,7 @@ class ConsumerCiHubBrowserTest < Minitest::Test
   def test_unit_the_run_takes_exactly_the_resolved_list
     resolve = step("Resolve the hub spec subset")["run"]
     assert_includes resolve, "hub-e2e-subset paths studio/.github/hub-e2e-subset.txt"
-    assert_operator index("Resolve the hub spec subset"), :<, index("Install system packages"),
+    assert_operator index("Resolve the hub spec subset"), :<, index("Set up Ruby"),
                     "the list resolves before the slow setup, so a renamed spec fails in seconds"
 
     run = step("Run the hub browser subset")["run"]
@@ -331,13 +331,14 @@ class ConsumerCiHubBrowserTest < Minitest::Test
     # The raw expressions hold spaces; at run time each becomes one word (success, failure,
     # skipped, cancelled), which is what the helper splits on.
     handed = step("E2E_LANE triage").dig("env", "SETUP_OUTCOMES").to_s.scan(/(\S+)=(\$\{\{[^}]*\}\})/).to_h
-    assert_operator setup_steps.length, :>=, 8, "apt, ruby, bundle, node, npm, link, browser, migrations at least"
+    # No apt step: the job runs in the hub's lane image (test/lib/ci_lane_image_test.rb).
+    assert_operator setup_steps.length, :>=, 7, "ruby, bundle, node, npm, link, browser, migrations at least"
     setup_steps.each do |s|
       refute_nil s["id"], "setup step '#{s['name']}' has no id, so the triage line cannot name it when it goes red"
       assert_equal "${{ steps.#{s['id']}.outcome }}", handed[s["id"]],
                    "SETUP_OUTCOMES must hand over '#{s['name']}' as #{s['id']}=${{ steps.#{s['id']}.outcome }}"
     end
     assert_equal setup_steps.map { |s| s["id"] }, handed.keys, "in job order, so the first red is the one named"
-    %w[apt bundle node npm].each { |id| assert_includes handed.keys, id }
+    %w[ruby bundle node npm].each { |id| assert_includes handed.keys, id }
   end
 end
