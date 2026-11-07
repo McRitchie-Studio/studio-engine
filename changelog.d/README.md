@@ -7,7 +7,9 @@ changelog.d/<slug>.<kind>.md
 ```
 
 - `<slug>`: the task slug (lower-case letters, digits and hyphens).
-- `<kind>`: `added`, `changed`, `deprecated`, `removed`, `fixed` or `security`.
+- `<kind>`: `breaking`, `added`, `changed`, `deprecated`, `removed`, `fixed` or
+  `security`. A `breaking` fragment does not set the bump: say so on the task too
+  (`bin/task update <slug> --gem-bump major`).
 - The body: the entry as Markdown list item(s), in the form `CHANGELOG.md` already
   uses (`- **What changed.** Why, and what a consumer does.`). Write no `## ` or
   `### ` heading. The file name gives the kind, and the release gives the version.
@@ -24,7 +26,8 @@ cannot conflict.
 ## What happens at release
 
 `bin/changelog-compile` folds every fragment into `## Unreleased`, under its
-`### <Kind>` subsection (Added, Changed, Deprecated, Removed, Fixed, Security), in
+`### <Kind>` subsection (Breaking, Added, Changed, Deprecated, Removed, Fixed,
+Security), in
 file-name order, and deletes the fragments. `bin/release prepare` then rolls
 `## Unreleased` into the allocated version heading. Both ride the `Release <version>`
 commit. `bin/changelog-compile --dry-run` prints the compiled section and writes

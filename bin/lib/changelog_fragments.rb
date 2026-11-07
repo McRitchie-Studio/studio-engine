@@ -24,7 +24,7 @@
 #
 #   changelog.d/<slug>.<kind>.md
 #     <slug>  lower-case letters, digits and hyphens; use the task slug
-#     <kind>  added | changed | deprecated | removed | fixed | security
+#     <kind>  breaking | added | changed | deprecated | removed | fixed | security
 #     body    the entry, as Markdown list item(s) ("- **What.** Why."). No `## ` or
 #             `### ` heading: the file name carries the kind, the release the version.
 #
@@ -35,8 +35,9 @@
 module ChangelogFragments
   DIR = "changelog.d"
 
-  # Keep a Changelog's order. The compiled bucket lists subsections in this order.
-  KINDS = %w[Added Changed Deprecated Removed Fixed Security].freeze
+  # Keep a Changelog's order, led by Breaking (the subsection this file already uses
+  # for a change a consumer must act on). The compiled bucket lists them in this order.
+  KINDS = %w[Breaking Added Changed Deprecated Removed Fixed Security].freeze
 
   NAME = /\A(?<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.(?<kind>#{KINDS.map(&:downcase).join('|')})\.md\z/
 

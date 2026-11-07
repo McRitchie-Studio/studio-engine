@@ -132,8 +132,8 @@ can want a hand-edit of `CHANGELOG.md`; the next section says when.
 
 #### Changelog fragments
 
-A PR adds `changelog.d/<slug>.<kind>.md` (kind `added`, `changed`, `deprecated`,
-`removed`, `fixed` or `security`; the body is the entry's list item, with no
+A PR adds `changelog.d/<slug>.<kind>.md` (kind `breaking`, `added`, `changed`,
+`deprecated`, `removed`, `fixed` or `security`; the body is the entry's list item, with no
 heading). It does not edit `CHANGELOG.md`. Format: `changelog.d/README.md`.
 
 **Why.** Measured 2026-11-06: 39 of the last 40 engine PRs edited `## Unreleased`,
@@ -151,8 +151,8 @@ commit and passes the last two rules. Run it locally with
 `bin/changelog-check --base origin/accepted`.
 
 **The compile.** `bin/changelog-compile` folds every fragment into `## Unreleased`:
-one `### <Kind>` subsection per kind, in Keep a Changelog order (Added, Changed,
-Deprecated, Removed, Fixed, Security), fragments in file-name order, after any
+one `### <Kind>` subsection per kind, in Keep a Changelog order led by Breaking
+(Breaking, Added, Changed, Deprecated, Removed, Fixed, Security), fragments in file-name order, after any
 entry already in that subsection. Then it deletes the fragments it compiled. It
 writes nothing when a fragment is invalid or the file has no single leading
 `## Unreleased`. `--dry-run` prints the compiled section and writes nothing;

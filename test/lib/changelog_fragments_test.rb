@@ -49,6 +49,7 @@ class ChangelogFragmentsTest < Minitest::Test
   def test_unit_parse_name_reads_slug_and_kind
     assert_equal %w[my-task Added], F.parse_name("my-task.added.md")
     assert_equal %w[x1 Security], F.parse_name("x1.security.md")
+    assert_equal %w[x2 Breaking], F.parse_name("x2.breaking.md")
     assert_nil F.parse_name("my-task.fixd.md")
     assert_nil F.parse_name("My-Task.added.md")
     assert_nil F.parse_name("my-task.added.txt")
@@ -82,10 +83,14 @@ class ChangelogFragmentsTest < Minitest::Test
 
   def test_unit_compile_orders_subsections_by_kind_not_by_name
     out = F.compile(CHANGELOG, frags("aaa.fixed.md" => "- A fix.\n", "zzz.added.md" => "- A feature.\n",
-                                     "mmm.deprecated.md" => "- A deprecation.\n"))
+                                     "mmm.deprecated.md" => "- A deprecation.\n", "yyy.breaking.md" => "- A break.\n"))
     bucket = F.unreleased_section(out)
     assert_equal <<~MD, bucket
       ## Unreleased
+
+      ### Breaking
+
+      - A break.
 
       ### Added
 
