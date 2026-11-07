@@ -31,9 +31,17 @@
                    it has scroll-initial-target; elsewhere the controller sets it
                    when it connects, with no glide and nothing announced. A link
                    to an id inside the row (#fragment) wins over the start.
-      loop         true wraps the row: Next at the last slide goes to the first,
-                   Previous at the first to the last, and neither arrow is ever
-                   disabled. No slide is cloned, so a screen reader reads each once.
+      loop         true wraps the row, and a row of more than one slide is
+                   visually continuous: the controller copies the last slides
+                   before the first and the first after the last, so the first
+                   slide centred shows the last beside it. Next at the last slide
+                   glides on to the first, Previous at the first back to the last,
+                   then the row jumps silently onto the real slide (no glide under
+                   reduced motion), and neither arrow is ever disabled. A copy is
+                   aria-hidden and inert, with no id, name, test hook or controller,
+                   so a screen reader and Tab meet each slide once, a #fragment
+                   finds the real slide, and the dots and "slide N of M" count the
+                   real slides. Every slide of a looping row is a stop.
       autoplay     seconds between moves (a number above 0); nil, the default, is
                    off. The row moves one slide each interval and holds still while
                    the pointer is over the slides, while keyboard focus is in it,
