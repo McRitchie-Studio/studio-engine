@@ -4,6 +4,14 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.134.0 — 2026-11-07
+
+### Changed
+
+- **A looping carousel now wraps visually.** `studio/_carousel` with `loop: true` and more than one slide copies its last slides before the first and its first slides after the last, so a spotlight opening on its first slide shows the last one beside it (the hub's `/websites` row). Next at the last slide, Previous at the first and autoplay glide across the seam and then jump silently onto the real slide; reduced motion goes straight there. The copies are `aria-hidden` and `inert` and drop ids, names, `data-test` hooks and Stimulus wiring, so a screen reader and Tab meet each slide once and the dots count real slides. Every slide of a looping standard row is now a stop (six slides three to a view show six dots, not four). Rows without `loop:` are unchanged. Nothing to do in a host; a host spec that counts `.carousel-slide` in a looping row should count `[data-carousel-target='slide']`.
+- **A looping spotlight opens on its first slide.** With `style: :spotlight`, `loop: true`, more than one slide and no `start:`, the row now opens on slide 0, the host's first item, with the last slide showing on its left. It used to open on `:middle`. A spotlight that does not loop still opens on `:middle`, and an explicit `start:` still wins. A host that wants the old opening passes `start: :middle`.
+- **Footer social icons are lit like the buttons.** A linked `.ftr-social` disc in the site footer now wears the glass lit button's family in every app, glass surface or not: a top highlight, a bottom edge, a contact shadow and a soft glow in its own fill, with the dark-mode values in dark mode. Hover still lifts and now deepens (never brightens, so the white glyph keeps its contrast). A pending (dashed) icon stays flat. No consumer change: it arrives with the engine bump.
+
 ## 0.133.2 — 2026-11-06
 
 ### Changed
