@@ -170,3 +170,77 @@ export function startStop(start, count) {
   const index = Math.floor(Number(start)) || 0
   return Math.min(count - 1, Math.max(0, index))
 }
+
+// THE LOOP'S CLONES. A looping row (loop: true, more than one slide) is visually
+// continuous: the controller copies the last slides before the first and the first
+// slides after the last, so the space either side of an end shows the slides round
+// the seam. A clone is aria-hidden and inert, with no id and no test hook, so a
+// screen reader and Tab meet each slide once; the dots and the status line count the
+// real slides only.
+//
+// Each place in that longer row has a VIRTUAL index: the real slides are 0 to
+// total - 1, the clones before them -count to -1, the clones after total to
+// total + count - 1. A move across the seam glides to a clone, and once the row
+// rests there the controller jumps, with no glide, to the real slide it copies.
+
+// The index of a real slide from a virtual one.
+export function wrapIndex(index, total) {
+  if (!(total > 0)) return 0
+  return ((index % total) + total) % total
+}
+
+// How many clones each side: a wide row's slides plus one, enough to fill the view
+// beside either end in both styles. None for a row of one slide.
+export function cloneCount(perView, total) {
+  if (!(total > 1)) return 0
+  const view = Number(perView)
+  return Math.ceil(Number.isFinite(view) && view > 0 ? Math.min(view, 6) : 3) + 1
+}
+
+// The real slide each clone copies, in row order: `before` sits ahead of the first
+// slide, `after` behind the last. A short row repeats round itself.
+export function cloneLayout(total, count) {
+  if (!(total > 1) || !(count > 0)) return { before: [], after: [] }
+  const before = []
+  const after = []
+  for (let k = count; k >= 1; k -= 1) before.push(wrapIndex(-k, total))
+  for (let k = 0; k < count; k += 1) after.push(wrapIndex(k, total))
+  return { before, after }
+}
+
+// The virtual index an arrow, a key or autoplay takes a cloned row to: a page on
+// either way, round the seam with no end. Home and End go to the first and last
+// real slide. Held to the clones, so a press mid-glide never runs off the row.
+export function loopStop(action, current, page, total, count) {
+  const to = { prev: current - page, next: current + page, first: 0, last: total - 1 }[action]
+  if (to === undefined) return current
+  return Math.min(total - 1 + count, Math.max(-count, to))
+}
+
+// The virtual index nearest `current` that shows real slide `index`: a dot takes
+// the short way round the seam.
+export function nearestVirtual(index, current, total, count) {
+  const options = [index - total, index, index + total].filter((v) => v >= -count && v <= total - 1 + count)
+  return options.reduce((best, v) => (Math.abs(v - current) < Math.abs(best - current) ? v : best), index)
+}
+
+// The real slide a row resting on a clone jumps to, or null when it rests on a real one.
+export function seamJump(virtual, total) {
+  if (!(total > 0)) return null
+  return virtual < 0 || virtual >= total ? wrapIndex(virtual, total) : null
+}
+
+// The attributes a clone drops: ids and names (a clone must not answer a #fragment or
+// join a form), test hooks, and Stimulus wiring (a clone runs no controller and is
+// no one's target), and the carousel's own marks.
+export const CLONE_STRIP = /^(id|name|data-(test|testid|test-id|qa|cy)|data-(studio-)?(controller|action)|data-[\w-]+-target|data-carousel-start-slide|data-current)$/
+
+// The status line of a looping row, whose view may run round the seam:
+// "Slides 5 to 6 and 1 of 6".
+export function loopPositionText(first, shown, total) {
+  const count = Math.min(shown, total)
+  if (first + count <= total) return positionText(first, count, total)
+  const over = first + count - total
+  const head = first + 1 === total ? `Slides ${total}` : `Slides ${first + 1} to ${total}`
+  return `${head} and ${over === 1 ? "1" : `1 to ${over}`} of ${total}`
+}
