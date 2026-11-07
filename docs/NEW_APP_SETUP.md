@@ -773,9 +773,15 @@ a step before it, and bound it:
   run: npx playwright install --with-deps chromium
 ```
 
-The engine's own `.github/workflows/consumer-ci.yml` and `engine-ci.yml` are the
-reference (they also cache the `.deb` files), and
-`test/lib/ci_apt_install_hardening_test.rb` guards them.
+The engine's own CI no longer runs apt at all: `consumer-ci.yml` and `engine-ci.yml`
+run their package jobs inside the hub's lane image,
+`ghcr.io/mcritchie-studio/ci-rails:24.04` (every package pre-installed; built weekly by
+the hub's `mirror-ci-images.yml`), and `test/lib/ci_lane_image_test.rb` guards that.
+An app on the hub's `reusable-ci.yml` gets the same image through its `lane-image`
+input (its `system` lane stays on the bare runner: a Selenium Chrome would need
+`--no-sandbox` in the container). The image runs as the runner's user (uid 1001) with a
+reaping PID 1. Prefer the image to an apt step: the apt mirror stalling was the largest single
+cause of a red-then-green CI run (task deterministic-ci).
 
 **If your app shells out to any other binary, add it to that step in EVERY job
 that runs tests.** How many jobs that is depends on your Rails version, and this

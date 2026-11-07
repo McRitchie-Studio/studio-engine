@@ -69,6 +69,7 @@ on:
 # Guard: test/lib/consumer_ci_hardening_test.rb.
 permissions:
   contents: read
+  packages: read # pulls the hub's lane image from ghcr.io (consumer-tests, hub-browser)
 
 jobs:
   # ONE COMMIT PER CONSUMER FOR THE WHOLE RUN.
@@ -269,6 +270,23 @@ jobs:
             needs_tailwind_build: false
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    # IN THE HUB'S LANE IMAGE (ghcr.io/mcritchie-studio/ci-rails, built weekly by the
+    # hub's mirror-ci-images.yml from .github/ci-image/Dockerfile): every apt package
+    # these suites need is pre-installed, so the job runs no apt step. The Ubuntu apt
+    # mirror stalling in "Install system packages" was this lane's top red-then-green
+    # cause (35 job-steps in two weeks, refactor-review-2026-11-06 lane-health 2f).
+    # The services are reached by their labels (postgres, redis) from inside it.
+    # Guard: test/lib/ci_lane_image_test.rb.
+    container:
+      image: ghcr.io/mcritchie-studio/ci-rails:24.04
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+      # --init: a real PID 1 (tini) reaps killed children, as a VM does; without it a
+      # killed process stays a zombie and the process-group tests read it as alive.
+      # --shm-size: Chrome crashes in a container's default 64 MB /dev/shm.
+      # --user 1001: the hosted runner's own user, who owns the mounted workspace.
+      options: --init --shm-size=2g --user 1001
 
     services:
       postgres:
@@ -332,96 +350,6 @@ jobs:
           path: ${{ matrix.consumer }}
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
-
-      # Bounded AND retried, because an Ubuntu mirror that stops answering is the
-      # single most common way this lane dies. Measured on one PR (2026-08-19):
-      # three separate jobs hung here — twice for the full 45-minute job budget
-      # before the step bound existed, once for 10 after — while the other
-      # consumers passed on the identical commit.
-      #
-      # Measured again on 2026-10-26 (release 0.114.2, run 40380540695): apt-get
-      # update answered fine, then the ~41 MB download stalled MID-TRANSFER and
-      # `timeout 240` killed it on both attempts, six reruns running, with no test
-      # ever reached. So three layers now, cheapest first:
-      #
-      #   1. The .debs are CACHED (the restore step below): a warm run downloads
-      #      nothing from the mirror but the package index.
-      #   2. apt itself fails a silent connection in 30s and re-fetches it
-      #      (Acquire::*::Timeout, Acquire::Retries), so one stalled socket
-      #      costs half a minute, not the whole attempt.
-      #   3. Three outer attempts, each bounded by `timeout -k 10` (SIGTERM, then
-      #      SIGKILL for a wedged apt), with `dpkg --configure -a` between them so
-      #      a half-unpacked attempt cannot fail the next one.
-      #
-      # The archive dir lives under $HOME so actions/cache can read and write it;
-      # the EXIT trap hands the root-written files back to the runner before the save.
-      # librsvg2-bin: ImageMagick 6 reads SVG only through rsvg-convert, and the
-      # hub's test/lib/workspace_icon_render_test.rb (landed 2026-09-25) renders
-      # an SVG mark. The hub's own ci.yml installs it; without it here every
-      # engine PR fails the mcritchie_studio shard that runs that test.
-      # ffmpeg: the hub's test/lib/music_videos/stitcher_test.rb (landed on its
-      # main 2026-10-05) stitches video for real and refuses to skip without
-      # ffmpeg and ffprobe; the hub's ci.yml installs it for the same reason.
-      # Without it here every engine PR fails mcritchie_studio shard 4/4.
-      # ImageOS/ImageVersion are runner env vars, not the `env` context, so a
-      # step has to surface them before a cache key can name the image.
-      - name: Read runner image
-        id: runner-image
-        run: echo "id=${ImageOS}-${ImageVersion}" >> "$GITHUB_OUTPUT"
-
-      - name: Restore apt package cache
-        id: apt-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/apt-archives
-          # Runner image + the sorted package list. A new image week saves a
-          # fresh entry; restore-keys seeds it from the last one (or from a
-          # PARTIAL save, below), so only the .debs still missing are fetched.
-          key: apt-${{ steps.runner-image.outputs.id }}-ffmpeg-imagemagick-libpq-dev-librsvg2-bin-libvips-postgresql-client
-          restore-keys: |
-            apt-${{ steps.runner-image.outputs.id }}-
-            apt-ubuntu24-
-
-      - name: Install system packages
-        id: apt
-        # 3 x (120s index + 420s fetch) + pauses, inside the 45-minute job.
-        timeout-minutes: 30
-        run: |
-          mkdir -p "$HOME/apt-archives/partial"
-          # apt writes the .debs as root; hand them back to the runner on ANY exit
-          # so the save step below can read a failed attempt's progress too, and
-          # autoclean first, so a saved entry drops .debs the index no longer lists
-          # and the cache stops growing image week over image week.
-          trap 'sudo timeout 60 apt-get -o Dir::Cache::Archives="$HOME/apt-archives" autoclean || true
-                sudo chown -R "$(id -u):$(id -g)" "$HOME/apt-archives" || true' EXIT
-          APT_OPTS=(-o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
-                    -o Dir::Cache::Archives="$HOME/apt-archives" -o APT::Keep-Downloaded-Packages=true)
-          for attempt in 1 2 3; do
-            if sudo timeout -k 10 120 apt-get "${APT_OPTS[@]}" update && \
-               sudo timeout -k 10 420 apt-get "${APT_OPTS[@]}" install --no-install-recommends -y \
-                 ffmpeg imagemagick libpq-dev librsvg2-bin libvips postgresql-client; then
-              exit 0
-            fi
-            echo "::warning::apt attempt $attempt failed or hung; retrying"
-            sudo dpkg --configure -a || true
-            sleep 10
-          done
-          exit 1
-
-      # SAVED EVEN WHEN THE INSTALL FAILED. 2026-10-26, the first run of this
-      # step: azure.archive.ubuntu.com did not stall, it CRAWLED (~40 KB/s), so
-      # the 30s inactivity timeout never fired; three 420s attempts fetched 71 ->
-      # 58 -> 41 MB remaining and the job went red. The progress was real but
-      # actions/cache saves only on success, so a rerun would start from zero.
-      # Here a failed install saves what it got under a PARTIAL key (run-scoped,
-      # so it never claims the exact key a complete set owns), and the restore
-      # above picks it up by prefix: each rerun resumes instead of restarting.
-      - name: Save apt package cache
-        if: always() && steps.apt-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ~/apt-archives
-          key: ${{ steps.apt-cache.outputs.cache-primary-key }}${{ steps.apt.outcome != 'success' && format('-partial-{0}-{1}', github.run_id, github.run_attempt) || '' }}
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -487,19 +415,19 @@ jobs:
         working-directory: ${{ matrix.consumer }}
         env:
           RAILS_ENV: test
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432
+          DATABASE_URL: postgres://postgres:postgres@postgres:5432
         run: bundle exec rails tailwindcss:build
 
       - name: Prepare test DB + run tests
         working-directory: ${{ matrix.consumer }}
         env:
           RAILS_ENV: test
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432
-          REDIS_URL: redis://localhost:6379/0
+          DATABASE_URL: postgres://postgres:postgres@postgres:5432
+          REDIS_URL: redis://redis:6379/0
           MANAGED_WALLET_ENCRYPTION_KEY: ${{ matrix.managed_wallet_encryption_key }}
           # The consumer's own minitest plugin writes this; it is INERT when unset, so the
           # unsharded consumers below simply never produce one.
-          CI_RECEIPT_OUT: ${{ matrix.shard && format('{0}/rails-report-shard-{1}.json', github.workspace, matrix.shard) || '' }}
+          CI_RECEIPT_OUT: ${{ matrix.shard && format('../rails-report-shard-{0}.json', matrix.shard) || '' }}
           CI_RECEIPT_SHARD: ${{ matrix.shard }}
           CI_RECEIPT_SHARD_TOTAL: ${{ matrix.shards }}
         run: |
@@ -571,7 +499,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rails-report-shard-${{ matrix.shard }}
-          path: ${{ github.workspace }}/rails-report-shard-${{ matrix.shard }}.json
+          path: rails-report-shard-${{ matrix.shard }}.json
           if-no-files-found: error
 
   # THE EXECUTED-SET GATE for the sharded hub lane.
@@ -738,7 +666,7 @@ jobs:
   # on any red prints the one E2E_LANE triage line naming the specs at fault.
   #
   # The setup copies the hub's own `playwright` job (reusable-ci.yml): node 22 + npm ci, the
-  # browser cache, apt hardened machine-wide before `--with-deps`, and Playwright's webServer
+  # browser cache, the hub's lane image in place of every apt step, and Playwright's webServer
   # booting the test server (db:test:prepare, tailwind, e2e/seed.rb, rails server). The one
   # addition is consumer-tests' engine-migration install, and a schema dump after it, so the
   # webServer's db:test:prepare loads a schema that carries this engine's tables.
@@ -748,6 +676,23 @@ jobs:
     needs: consumer-refs
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    # IN THE HUB'S LANE IMAGE (ghcr.io/mcritchie-studio/ci-rails, built weekly by the
+    # hub's mirror-ci-images.yml from .github/ci-image/Dockerfile): every apt package
+    # these suites need is pre-installed, so the job runs no apt step. The Ubuntu apt
+    # mirror stalling in "Install system packages" was this lane's top red-then-green
+    # cause (35 job-steps in two weeks, refactor-review-2026-11-06 lane-health 2f).
+    # The services are reached by their labels (postgres, redis) from inside it.
+    # Guard: test/lib/ci_lane_image_test.rb.
+    container:
+      image: ghcr.io/mcritchie-studio/ci-rails:24.04
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+      # --init: a real PID 1 (tini) reaps killed children, as a VM does; without it a
+      # killed process stays a zombie and the process-group tests read it as alive.
+      # --shm-size: Chrome crashes in a container's default 64 MB /dev/shm.
+      # --user 1001: the hosted runner's own user, who owns the mounted workspace.
+      options: --init --shm-size=2g --user 1001
 
     services:
       postgres:
@@ -792,50 +737,6 @@ jobs:
       - name: Resolve the hub spec subset
         id: subset
         run: ruby studio/bin/hub-e2e-subset paths studio/.github/hub-e2e-subset.txt mcritchie_studio > hub-e2e-subset.list
-
-      # The consumer-tests install pattern (cache, inline Acquire timeouts, three bounded
-      # attempts, always-save), with the packages the hub's own playwright job installs.
-      - name: Read runner image
-        id: runner-image
-        run: echo "id=${ImageOS}-${ImageVersion}" >> "$GITHUB_OUTPUT"
-
-      - name: Restore apt package cache
-        id: apt-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/apt-archives
-          key: apt-${{ steps.runner-image.outputs.id }}-curl-imagemagick-libjemalloc2-libpq-dev-libvips-postgresql-client
-          restore-keys: |
-            apt-${{ steps.runner-image.outputs.id }}-
-            apt-ubuntu24-
-
-      - name: Install system packages
-        id: apt
-        timeout-minutes: 20
-        run: |
-          mkdir -p "$HOME/apt-archives/partial"
-          trap 'sudo timeout 60 apt-get -o Dir::Cache::Archives="$HOME/apt-archives" autoclean || true
-                sudo chown -R "$(id -u):$(id -g)" "$HOME/apt-archives" || true' EXIT
-          APT_OPTS=(-o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
-                    -o Dir::Cache::Archives="$HOME/apt-archives" -o APT::Keep-Downloaded-Packages=true)
-          for attempt in 1 2 3; do
-            if sudo timeout -k 10 120 apt-get "${APT_OPTS[@]}" update && \
-               sudo timeout -k 10 300 apt-get "${APT_OPTS[@]}" install --no-install-recommends -y \
-                 curl imagemagick libjemalloc2 libpq-dev libvips postgresql-client; then
-              exit 0
-            fi
-            echo "::warning::apt attempt $attempt failed or hung; retrying"
-            sudo dpkg --configure -a || true
-            sleep 10
-          done
-          exit 1
-
-      - name: Save apt package cache
-        if: always() && steps.apt-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ~/apt-archives
-          key: ${{ steps.apt-cache.outputs.cache-primary-key }}${{ steps.apt.outcome != 'success' && format('-partial-{0}-{1}', github.run_id, github.run_attempt) || '' }}
 
       - name: Set up Ruby
         id: ruby
@@ -890,17 +791,11 @@ jobs:
           restore-keys: |
             playwright-${{ runner.os }}-
 
-      # `--with-deps` runs its own apt-get outside the loop above, so apt's timeouts are
-      # set machine-wide for it (the hub's pattern, from ci-apt-install-survives-stalls).
-      - name: Harden apt fetches
-        id: apt-harden
-        run: printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' | sudo tee /etc/apt/apt.conf.d/80-retries
-
       - name: Install Playwright browser
         id: browser
         working-directory: mcritchie_studio
         timeout-minutes: 15
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
 
       # consumer-tests' reason, verbatim in effect: the engine here is ahead of the hub by
       # construction, so its new migrations are installed and migrated in. The dump then
@@ -911,7 +806,7 @@ jobs:
         working-directory: mcritchie_studio
         env:
           RAILS_ENV: test
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432
+          DATABASE_URL: postgres://postgres:postgres@postgres:5432
         run: |
           bundle exec rails studio_engine:install:migrations
           bundle exec rails db:test:prepare
@@ -926,8 +821,8 @@ jobs:
         working-directory: mcritchie_studio
         env:
           RAILS_ENV: test
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432
-          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/hub-e2e-report.json
+          DATABASE_URL: postgres://postgres:postgres@postgres:5432
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ../hub-e2e-report.json
         run: npx playwright test --grep-invert @quarantine --reporter=list,json $(cat ../hub-e2e-subset.list)
 
       # ALWAYS once the subset resolved: a red run still wrote a receipt, and a run that
@@ -953,16 +848,12 @@ jobs:
         if: failure()
         env:
           SETUP_OUTCOMES: >-
-            runner-image=${{ steps.runner-image.outcome }}
-            apt-cache=${{ steps.apt-cache.outcome }}
-            apt=${{ steps.apt.outcome }}
             ruby=${{ steps.ruby.outcome }}
             bundle=${{ steps.bundle.outcome }}
             node=${{ steps.node.outcome }}
             npm=${{ steps.npm.outcome }}
             node-tooling=${{ steps.node-tooling.outcome }}
             browser-cache=${{ steps.browser-cache.outcome }}
-            apt-harden=${{ steps.apt-harden.outcome }}
             browser=${{ steps.browser.outcome }}
             migrations=${{ steps.migrations.outcome }}
         run: ruby studio/bin/hub-e2e-subset triage studio/.github/hub-e2e-subset.txt hub-e2e-report.json mcritchie_studio
@@ -973,7 +864,7 @@ jobs:
         with:
           name: hub-browser-playwright-report
           path: |
-            ${{ github.workspace }}/hub-e2e-report.json
-            ${{ github.workspace }}/mcritchie_studio/playwright-report
-            ${{ github.workspace }}/mcritchie_studio/test-results
+            hub-e2e-report.json
+            mcritchie_studio/playwright-report
+            mcritchie_studio/test-results
           if-no-files-found: ignore

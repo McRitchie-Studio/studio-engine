@@ -40,7 +40,7 @@ class EngineCiHardeningTest < Minitest::Test
     refute_nil consumer["permissions"], "consumer-ci.yml lost its top-level permissions; this guard holds engine-ci to it"
     assert_equal consumer["permissions"], engine["permissions"],
                  "engine-ci.yml's top-level permissions must match consumer-ci.yml's (contents: read)"
-    assert_equal({ "contents" => "read" }, engine["permissions"])
+    assert_equal({ "contents" => "read", "packages" => "read" }, engine["permissions"])
   end
 
   def test_unit_no_engine_ci_job_widens_the_token
