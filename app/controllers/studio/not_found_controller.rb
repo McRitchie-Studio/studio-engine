@@ -42,6 +42,8 @@ module Studio
     def not_found_back_path
       referer = URI.parse(request.referer.to_s)
       return nil unless referer.host == request.host && referer.path.present?
+      # "//other.host/x" is a same-host path a browser reads as another site.
+      return nil if referer.path.start_with?("//")
       return nil if referer.path == request.env["action_dispatch.original_path"]
 
       [referer.path, referer.query].compact.join("?")

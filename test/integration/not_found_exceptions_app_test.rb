@@ -188,6 +188,9 @@ class NotFoundExceptionsAppTest < ActiveSupport::TestCase
 
     _, _, doc = request("/no-such-page", referer: "https://elsewhere.example/page")
     assert_nil doc.at_css("a[data-test='not-found-back']"), "no link back to another site"
+
+    _, _, doc = request("/no-such-page", referer: "http://example.org//elsewhere.example/page")
+    assert_nil doc.at_css("a[data-test='not-found-back']"), "no protocol-relative link off the app"
   end
 
   test "a host wall that redirects cannot turn the 404 into a redirect: the static page answers" do
