@@ -51,6 +51,8 @@ export function perPage(clientWidth, slideWidth, gap) {
 // A LOOPING row (loop: true) wraps instead: Next at the last stop goes to the
 // first, Previous at the first goes to the last. A page that would overshoot an
 // end still lands on that end first, so no slide is skipped on the way round.
+// The controller uses this wrap only for a looping row it has not cloned; a cloned
+// row (THE LOOP'S CLONES, below) moves by loopStop instead, round the seam.
 export function targetStop(action, current, page, count, loop = false) {
   const last = Math.max(0, count - 1)
   if (loop && last > 0) {
