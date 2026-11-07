@@ -19,5 +19,8 @@ class LinkPreviewLabController < ActionController::Base
 
   def override; end
 
+  # A page whose og:url is its home, as the not-found page sets it.
+  def url_override; end
+
   def heavy; end
 end

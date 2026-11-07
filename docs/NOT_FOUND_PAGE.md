@@ -92,3 +92,5 @@ end
 ```
 
 Then assert `assert_response :not_found` and the `[data-test='not-found']` page.
+
+**Its og:url is the app's home.** The page calls `link_preview(url: home)`, so a 404 at a hidden route (a component gallery's assets, say) never names that route in the link-preview tags its layout writes.

@@ -10,7 +10,7 @@ module Studio
   # reason Studio::GeoHelper gives: every helper module is included into every
   # view, so an unprefixed name would collide with a host's own helper.
   module LinkPreviewHelper
-    OVERRIDE_KEYS = %i[image title description image_alt].freeze
+    OVERRIDE_KEYS = %i[image title description image_alt url].freeze
 
     # THE PAGE OVERRIDE. Call it from any view (the layout renders later, so it
     # sees the call):
@@ -71,7 +71,7 @@ module Studio
         image_height: height,
         image_alt: (overrides[:image_alt].to_s.strip.presence || preview[:title] if preview[:image]),
         site_name: Studio.app_name.to_s,
-        url: studio_link_preview_page_url
+        url: studio_link_preview_page_url(overrides[:url])
       )
     end
 
@@ -127,8 +127,21 @@ module Studio
                                    request_base_url: (request.base_url if studio_link_preview_request?))
     end
 
-    def studio_link_preview_page_url
+    # The page's og:url: the request's own URL, or the `url:` a page passed to
+    # link_preview. A path is built on the same base as the request's; an
+    # absolute URL is used as is. The not-found page passes the app's home, so a
+    # 404 never advertises the broken address it was asked for (a 404 at a
+    # hidden route would otherwise name that route in its og:url).
+    def studio_link_preview_page_url(override = nil)
       return nil unless studio_link_preview_request?
+
+      override = override.to_s.strip
+      return override if override.match?(%r{\Ahttps?://}i)
+
+      if override.start_with?("/")
+        return Studio::LinkPreview.page_url(base_url: Studio.link_preview_base_url,
+                                            request_url: "#{request.base_url}#{override}", path: override)
+      end
 
       Studio::LinkPreview.page_url(base_url: Studio.link_preview_base_url,
                                    request_url: request.original_url, path: request.path)

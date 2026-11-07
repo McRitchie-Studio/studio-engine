@@ -143,6 +143,7 @@ Rails.application.routes.draw do
   # A host app's pages for the link-preview suite: plain, overridden, and heavy.
   get "lab/link_preview", to: "link_preview_lab#plain"
   get "lab/link_preview/override", to: "link_preview_lab#override"
+  get "lab/link_preview/url_override/lookbook-assets", to: "link_preview_lab#url_override"
   get "lab/link_preview/heavy", to: "link_preview_lab#heavy"
   # The same pages behind `allow_browser versions: :modern`: one host relying on
   # the engine alone, one still carrying the app-side `unless:` patch.

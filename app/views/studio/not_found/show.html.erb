@@ -1,3 +1,5 @@
 <%# Studio::NotFoundController#show: the not-found page in the app's layout. %>
 <% content_for(:title, "Page not found · #{Studio.app_name}") %>
+<%# A 404's og:url is the app's home, never the broken address it was asked for. %>
+<% link_preview(url: @studio_not_found[:home_path]) %>
 <%= render "studio/not_found", **@studio_not_found %>
