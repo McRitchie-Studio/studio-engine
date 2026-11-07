@@ -18,9 +18,9 @@
   <% if logo.present? %>
     <img src="<%= logo %>" alt="<%= app_name %>" width="64" height="64" class="mx-auto mb-6 h-16 w-16 object-contain" data-studio-not-found-logo>
   <% end %>
-  <p class="text-sm font-semibold uppercase tracking-wide text-primary-ink mb-2">404 &middot; Not found</p>
+  <p class="type-fine font-semibold uppercase tracking-wide text-primary-ink mb-2">404 &middot; Not found</p>
   <%= content_tag heading, "This page isn’t here", id: "studio-not-found-title", class: "type-h2 text-heading mb-3" %>
-  <p class="text-secondary mb-8">The address may be mistyped, or the page may have moved. Head back home and pick up from there.</p>
+  <p class="type-body text-secondary mb-8">The address may be mistyped, or the page may have moved. Head back home and pick up from there.</p>
   <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
     <a href="<%= home_path %>" class="btn btn-primary w-full sm:w-auto" data-test="not-found-home">Back to <%= app_name %></a>
     <% if back_path.present? %>
