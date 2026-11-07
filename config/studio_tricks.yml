@@ -462,6 +462,13 @@ booking_frame:
       note: "Cropped to the slot picker at rest; bin/booking-crop-measure prints yours."
       resolve: [config:booking_crop]
 
+not_found:
+  name: Not Found
+  group: Pages
+  token: "config.exceptions_app = Studio::ExceptionsApp.new"
+  note: "A lost visitor's 404 page, with the app's brand and a button home."
+  resolve: [partial:studio/not_found]
+
 board:
   name: Board
   group: Tasks

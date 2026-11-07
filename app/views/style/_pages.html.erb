@@ -1,0 +1,19 @@
+<%#  The Pages group of the Tricks board (admin/style): whole pages an app
+     adopts with one line. Not Found is the friendly 404 (docs/NOT_FOUND_PAGE.md),
+     drawn here with THIS app's name and brand mark; the Go back link shows as it
+     does when the visitor came from a page on this app. %>
+<section id="pages" class="section-subtarget space-y-5">
+  <div class="space-y-1">
+    <h3 class="type-h4 text-heading">Pages</h3>
+    <p class="text-muted text-sm">Whole pages an app adopts with one line in config/application.rb.</p>
+  </div>
+
+  <div class="grid gap-4 sm:grid-cols-2">
+    <%= render layout: "style/specimen", locals: { trick: "not_found" } do %>
+      <div class="card w-full">
+        <%= render "studio/not_found", app_name: Studio.app_name, logo: Studio.navbar_brand&.dig(:logo) || Studio.logo_for("Navbar Logo"),
+              home_path: "/", back_path: "#pages", heading: :h4 %>
+      </div>
+    <% end %>
+  </div>
+</section>
