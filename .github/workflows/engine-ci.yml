@@ -171,6 +171,15 @@ jobs:
   # If the lane ever grows past the engine suite's wall time it becomes the critical
   # path, and THAT is the moment to shard (config/e2e_lane.yml `shards:`) rather than
   # to start filtering.
+  #
+  # SHARDED 3 WAYS, 2026-11-06 (ci-retry-killers). That moment came: the lane grew to
+  # ~14-20 min against ~9.5 min for the suite (run 42299310246: 17m27s of specs, 2m13s
+  # of setup). Each shard is its own runner with its own test/dummy server, so nothing
+  # is shared and the serial `workers: 1` model holds inside a shard. The denominator is
+  # `strategy.job-total`, so the matrix list is the one place the count is written in
+  # this file; config/e2e_lane.yml `shards:` must equal it, and the executed-set gate
+  # refuses a receipt whose total disagrees. The figures above are from the lane's
+  # first run and are history, not the current cost.
   playwright:
     name: browser lane (playwright)
     runs-on: ubuntu-24.04
@@ -192,6 +201,12 @@ jobs:
       # --user 1001: the hosted runner's own user, who owns the mounted workspace.
       options: --init --shm-size=2g --user 1001
     timeout-minutes: 45
+    # fail-fast: false so one red shard does not cancel the others: a cancelled shard
+    # writes no receipt, and the gate would then report a dropped shard over a real red.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
 
     steps:
       - name: Checkout engine
@@ -252,25 +267,25 @@ jobs:
       - name: Run the browser lane
         env:
           RAILS_ENV: test
-          PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-report.json
-        run: npx playwright test --reporter=list,json
+          PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-report-shard-${{ matrix.shard }}.json
+        run: npx playwright test --shard=${{matrix.shard}}/${{strategy.job-total}} --reporter=list,json
 
       # `if: always()`, NOT `if: failure()`. A failing spec still RAN, and the
       # executed-set gate must count it — otherwise a red lane would also look like
       # a lane that executed nothing.
-      - name: Upload the executed-set receipt
+      - name: Upload this shard's executed-set receipt
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: e2e-report
-          path: e2e-report.json
+          name: e2e-report-shard-${{ matrix.shard }}
+          path: e2e-report-shard-${{ matrix.shard }}.json
           if-no-files-found: error
 
       - name: Keep the Playwright report from a failed run
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-shard-${{ matrix.shard }}
           path: playwright-report
           if-no-files-found: ignore
 
@@ -305,10 +320,10 @@ jobs:
           ruby-version: 3.3.11
           bundler-cache: false
 
-      - name: Download the receipt
+      - name: Download every shard's receipt
         uses: actions/download-artifact@v4
         with:
-          pattern: e2e-report
+          pattern: e2e-report-shard-*
           path: e2e-reports
           merge-multiple: true
 
