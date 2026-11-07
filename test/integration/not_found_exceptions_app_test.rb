@@ -142,7 +142,7 @@ class NotFoundExceptionsAppTest < ActiveSupport::TestCase
     assert doc.at_css("[data-test='host-navbar']"), "the host's navbar"
     assert doc.at_css("[data-test='host-footer']"), "the host's footer"
     assert_nil page["data-static"], "the page, not the static file"
-    assert_equal "Page not found", doc.at_css("title").text
+    assert_equal "Page not found · #{Studio.app_name}", doc.at_css("title").text
     home = page.at_css("a[data-test='not-found-home']")
     assert_equal "/", home["href"], "home is the app's root"
     assert_equal "Back to #{Studio.app_name}", home.text
