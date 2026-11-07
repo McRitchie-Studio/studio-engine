@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.133.1 — 2026-11-06
+
 ### Changed
 
 - **The browser lane runs as three shards.** It had grown to about 17 minutes of specs on
