@@ -156,6 +156,12 @@ lower-case word (`Border Glow · clear`). Every name is unique across the guide.
 | **Booking Frame** | `studio_booking_frame` | The booking calendar on a page, whole at rest. |
 | Booking Frame · cropped | `config.booking_crop = { top:, bottom:, frame_height: }` | Cropped to the slot picker at rest; bin/booking-crop-measure prints yours. |
 
+## Pages
+
+| Name | Write | What it does |
+|------|-------|--------------|
+| **Not Found** | `config.exceptions_app = Studio::ExceptionsApp.new` | A lost visitor's 404 page, with the app's brand and a button home. |
+
 ## Tasks
 
 | Name | Write | What it does |
