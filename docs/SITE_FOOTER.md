@@ -242,8 +242,9 @@ Rows may be tuples, as above, or hashes (`{ label:, href: }`, `{ heading:, links
   from 0.5 to 4; anything else is ignored. Without one, the first column is 1.5
   and the rest are 1 (the brand, from 1024px, is 1.7). Below 768px the two tracks
   are fixed at 1.2 and 1, and with more than four columns the hints are not used.
+- **A linked social icon is lit like the buttons**, in every app, light and dark: a top highlight, an edge and a soft shadow in `--color-primary`.
 - **A social profile with a `nil` URL** renders its icon unlinked, with a dashed
-  outline. The engine draws `:linkedin`, `:instagram`, `:x`, `:facebook` and
+  outline and no shading. The engine draws `:linkedin`, `:instagram`, `:x`, `:facebook` and
   `:youtube`; any other icon falls back to the label's first letter.
 
 ### The address and the map
