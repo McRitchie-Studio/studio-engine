@@ -215,6 +215,31 @@ class NotFoundExceptionsAppTest < ActiveSupport::TestCase
     assert doc.at_css("body[data-static]")
   end
 
+  test "a POST to an unknown address with forgery protection on still gets the page with 404" do
+    saved = ActionController::Base.allow_forgery_protection
+    ActionController::Base.allow_forgery_protection = true
+    inner = lambda do |env|
+      Rails.application.call(env)
+    ensure
+      env["action_dispatch.show_exceptions"] = :all
+      env["action_dispatch.show_detailed_exceptions"] = false
+    end
+    app = ActionDispatch::ShowExceptions.new(inner, Studio::ExceptionsApp.new(@public))
+    status, _, body = app.call(Rack::MockRequest.env_for("http://example.org/no-such-page", method: "POST", "HTTP_ACCEPT" => "text/html"))
+    html = +""
+    body.each { |chunk| html << chunk }
+
+    assert_equal 404, status
+    assert Nokogiri::HTML(html).at_css("main [data-test='not-found']"), "the page, not the static fallback"
+  ensure
+    ActionController::Base.allow_forgery_protection = saved
+  end
+
+  test "the page takes no forgery-protection skip" do
+    assert Studio::NotFoundController._process_action_callbacks.any? { |cb| cb.filter == :verify_authenticity_token },
+           "verify_authenticity_token still runs: the host's CSRF allow-list never has to name this page"
+  end
+
   test "other statuses keep Rails' public pages" do
     app = Studio::ExceptionsApp.new(@public)
     status, _, body = app.call(Rack::MockRequest.env_for("/500", "HTTP_ACCEPT" => "text/html"))

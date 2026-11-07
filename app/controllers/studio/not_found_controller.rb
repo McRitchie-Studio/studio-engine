@@ -13,9 +13,9 @@ module Studio
   # public/404.html, so a wall can cost the page its layout but never its status.
   class NotFoundController < ::ApplicationController
     skip_before_action :require_authentication, raise: false
-    # The exceptions app always calls this as a GET, but a GET never needs the
-    # token and the failed request may have been a POST with none.
-    skip_forgery_protection if respond_to?(:skip_forgery_protection)
+    # No forgery skip: Rails' ShowExceptions calls the exceptions app as a GET
+    # (request_method = "GET"), which never needs the token, so the host's CSRF
+    # allow-lists stay as they are.
 
     def show
       @studio_not_found = {
