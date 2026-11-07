@@ -6,6 +6,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## 0.135.0 — 2026-11-07
 
+### Fixed
+
+- The not-found page's og:url is the app's home, not the address it was asked for: `link_preview` takes `url:` (a path or an absolute URL), and a 404 at a hidden route no longer names that route in its link-preview tags.
+
 ### Added
 
 - **A friendly not-found page.** `config.exceptions_app = Studio::ExceptionsApp.new` in `config/application.rb` gives a lost visitor the app's name, brand mark, a short message and a button home, inside the app's own layout, for an unknown address and a missing record alike. The status stays 404. A JSON request still gets Rails' 404 JSON, and other statuses keep `public/<status>.html`. If the page cannot render, or the host answers anything but a 404, the static `public/404.html` answers instead, so it cannot loop or change the status. An app with its own wall lists `"studio/not_found" => %w[show]`. See `docs/NOT_FOUND_PAGE.md`.

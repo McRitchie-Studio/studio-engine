@@ -1,1 +1,0 @@
-- The not-found page's og:url is the app's home, not the address it was asked for: `link_preview` takes `url:` (a path or an absolute URL), and a 404 at a hidden route no longer names that route in its link-preview tags.
