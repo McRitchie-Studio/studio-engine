@@ -55,6 +55,13 @@ class NotFoundPageTest < ActiveSupport::TestCase
     assert_equal 1, section.css("a").size
   end
 
+  test "the title is the page's h1, and a lower level when the page is shown inside another" do
+    assert_equal "This page isn’t here", page.at_css("h1#studio-not-found-title").text
+    shown = page(heading: :h4)
+    assert_nil shown.at_css("h1")
+    assert_equal shown.at_css("h4")["id"], shown["aria-labelledby"]
+  end
+
   test "it uses the home path it is given, not a hard-coded slash" do
     assert_equal "/app/", page(home_path: "/app/").at_css("a[data-test='not-found-home']")["href"]
   end

@@ -12,7 +12,7 @@
     <%= render layout: "style/specimen", locals: { trick: "not_found" } do %>
       <div class="card w-full">
         <%= render "studio/not_found", app_name: Studio.app_name, logo: Studio.navbar_brand&.dig(:logo) || Studio.logo_for("Navbar Logo"),
-              home_path: "/", back_path: "#pages" %>
+              home_path: "/", back_path: "#pages", heading: :h4 %>
       </div>
     <% end %>
   </div>
