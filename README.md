@@ -343,9 +343,10 @@ keys move one slide. Where the browser has scroll-driven animations the look fol
 scroll; elsewhere the controller marks the centred slide (`data-current`) and CSS
 transitions it. Reduced motion only dims.
 
-`start:` is the slide the row opens on: an index from 0, or `:middle`. A spotlight opens
-on its middle slide by default, so neither half of the row is empty at load; a standard
-row opens on its first. The browser sets it before the first paint where it has
+`start:` is the slide the row opens on: an index from 0, or `:middle`. A spotlight that
+does not loop opens on its middle slide by default, so neither half of the row is empty at
+load; a standard row and a looping spotlight open on their first (a looping row's wrap
+already shows the last slide left of the first). An explicit `start:` wins. The browser sets it before the first paint where it has
 `scroll-initial-target`; elsewhere the controller jumps there when it connects, with no
 glide and nothing announced. A `#fragment` link to an element inside the row wins.
 

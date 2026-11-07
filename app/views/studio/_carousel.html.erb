@@ -25,9 +25,11 @@
                    standard row shows a small line under every slide; the
                    spotlight shows it under the centred slide only.
       start        the slide the row opens on: an index from 0, or :middle (the
-                   slide at items.size / 2). Defaults to :middle for the spotlight,
-                   so both halves of the row hold a slide at load, and to 0 for a
-                   standard row. The browser sets it before the first paint where
+                   slide at items.size / 2). Defaults to :middle for a spotlight
+                   that does not loop, so both halves of the row hold a slide at
+                   load, and to 0 for a standard row and for a looping spotlight
+                   (its wrap already shows the last slide left of the first, so it
+                   opens on the host's first item). An explicit start: wins. The browser sets it before the first paint where
                    it has scroll-initial-target; elsewhere the controller sets it
                    when it connects, with no glide and nothing announced. A link
                    to an id inside the row (#fragment) wins over the start.
@@ -83,7 +85,11 @@
               when "spotlight" then true
               else raise ArgumentError, "studio/carousel style: #{style.inspect} is not :standard or :spotlight"
               end
-  start = spotlight ? :middle : 0 if start.nil?
+  loop = loop ? true : false
+  wraps = loop && total > 1
+  # A looping spotlight has a left neighbour at its first slide (the clones), so it
+  # opens there; one that does not loop opens mid-row so neither half is empty.
+  start = spotlight && !wraps ? :middle : 0 if start.nil?
   start_index = case start
                 when :middle, "middle" then total / 2
                 when Integer then start.clamp(0, [total - 1, 0].max)
@@ -94,8 +100,6 @@
     raise ArgumentError, "studio/carousel autoplay: #{autoplay.inspect} is not a number of seconds above 0 or nil"
   end
   autoplay = autoplay.to_i if autoplay && autoplay == autoplay.floor
-  loop = loop ? true : false
-  wraps = loop && total > 1
   arrow_noun = spotlight ? "slide" : "slides"
   track_id = id.presence || "carousel-#{label.to_s.parameterize.presence || 'slides'}"
 %>

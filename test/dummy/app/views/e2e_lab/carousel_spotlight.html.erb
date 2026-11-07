@@ -3,7 +3,9 @@
     "spot" opens on its first slide (start: 0), so its specs walk the row from an end;
     "spot-default" takes the spotlight's default start, the middle slide;
     "spot-loop" loops (loop: true) from its first slide, as the hub's /websites row
-    does, and each card carries an id, a link and a test hook its clones must drop. %>
+    does, and each card carries an id, a link and a test hook its clones must drop;
+    "spot-loop-default" loops with no start:, so it takes a looping spotlight's
+    default, the first slide. %>
 <main class="max-w-5xl mx-auto px-4 py-10 space-y-12">
   <%= render layout: "studio/carousel",
         locals: { label: "Team", items: (1..7).to_a, per_view: 3, style: :spotlight, start: 0,
@@ -31,6 +33,15 @@
          style="background: linear-gradient(160deg, hsl(<%= n * 47 %> 70% 55%), hsl(<%= n * 47 + 60 %> 70% 35%))">
       <span class="font-semibold text-white">Loop <%= n %></span>
       <a id="loop-<%= n %>" href="#loop-<%= n %>" class="text-white underline" data-loop-link>Open</a>
+    </div>
+  <% end %>
+  <%= render layout: "studio/carousel",
+        locals: { label: "Wrap", items: (1..5).to_a, per_view: 3, style: :spotlight, loop: true,
+                  slide_label: ->(n) { "Wrap #{n}" }, caption: ->(n) { "Wrap #{n}" },
+                  data: { lab: "spot-loop-default" } } do |n| %>
+    <div class="card h-full p-5 aspect-[4/5] flex items-end" data-lab-card="<%= n %>"
+         style="background: linear-gradient(160deg, hsl(<%= n * 47 %> 70% 55%), hsl(<%= n * 47 + 60 %> 70% 35%))">
+      <span class="font-semibold text-white">Wrap <%= n %></span>
     </div>
   <% end %>
 </main>

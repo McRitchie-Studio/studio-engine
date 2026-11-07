@@ -343,18 +343,18 @@ test("without scroll-initial-target the controller opens the row on the middle s
 //     of the first).
 //   - settle()'s jump removed: the seam spec red (the row rests on a clone).
 //   - cloneOf()'s inert and aria-hidden removed: the screen-reader spec red.
-const loopRegion = (page) => page.locator("section[data-lab='spot-loop']");
-const loopTrack = (page) => loopRegion(page).locator("> .carousel-track");
+const loopRegion = (page, name = "spot-loop") => page.locator(`section[data-lab='${name}']`);
+const loopTrack = (page, name = "spot-loop") => loopRegion(page, name).locator("> .carousel-track");
 
-async function openLoop(page, viewport = DESKTOP) {
+async function openLoop(page, viewport = DESKTOP, name = "spot-loop") {
   const errors = await open(page, viewport);
-  await expect(loopRegion(page)).toHaveAttribute("data-carousel-ready", "");
-  await loopRegion(page).scrollIntoViewIfNeeded();
-  await settled(loopTrack(page));
+  await expect(loopRegion(page, name)).toHaveAttribute("data-carousel-ready", "");
+  await loopRegion(page, name).scrollIntoViewIfNeeded();
+  await settled(loopTrack(page, name));
   return errors;
 }
 
-const loopRow = (page) => loopTrack(page).evaluate((row) => {
+const loopRow = (page, name = "spot-loop") => loopTrack(page, name).evaluate((row) => {
   const r = row.getBoundingClientRect();
   const mid = r.left + row.clientWidth / 2;
   const all = [...row.children];
@@ -380,11 +380,11 @@ const loopRow = (page) => loopTrack(page).evaluate((row) => {
 });
 
 // Rest, then two reads of the look 350ms apart that agree.
-async function restingLoop(page) {
-  await settled(loopTrack(page));
+async function restingLoop(page, name = "spot-loop") {
+  await settled(loopTrack(page, name));
   let last = null;
   await expect.poll(async () => {
-    const now = JSON.stringify(await loopRow(page));
+    const now = JSON.stringify(await loopRow(page, name));
     const same = now === last;
     last = now;
     return same;
@@ -392,11 +392,11 @@ async function restingLoop(page) {
   return JSON.parse(last);
 }
 
-function expectFirstWithLastBeside(row) {
+function expectFirstWithLastBeside(row, last = "7") {
   expect(row.centre).toMatchObject({ card: "1", clone: false, current: true });
   expect(row.centre.offset, "the first slide sits at the centre").toBeLessThan(3);
   expect(row.left, "a slide sits left of the first").not.toBeNull();
-  expect(row.left.card, "and it shows the last slide").toBe("7");
+  expect(row.left.card, "and it shows the last slide").toBe(last);
   expect(row.left.clone).toBe(true);
   expect(row.left.width, "slide-shaped: as wide as a real slide").toBe(row.centre.width);
   expect(row.left.shows, "and it is on screen").toBeGreaterThan(20);
@@ -526,4 +526,14 @@ test("a #fragment link to a looping row's slide finds the real slide and brings 
     return { clone: !!link.closest("[data-carousel-clone]"), inRow: box.left >= row.left - 1 && box.right <= row.right + 1 };
   });
   expect(seen).toEqual({ clone: false, inRow: true });
+});
+
+test("a looping spotlight with no start opens on its first slide, the last on its left", async ({ page }) => {
+  const errors = await openLoop(page, DESKTOP, "spot-loop-default");
+  const spot = loopRegion(page, "spot-loop-default");
+  expectFirstWithLastBeside(await restingLoop(page, "spot-loop-default"), "5");
+  await expect(spot).not.toHaveAttribute("data-carousel-start", /.*/);
+  await expect(spot.locator(".carousel-dot[aria-current='true']")).toHaveAttribute("data-carousel-index", "0");
+  await expect(spot.locator("[role='status']")).toHaveText("");
+  expect(errors).toEqual([]);
 });
