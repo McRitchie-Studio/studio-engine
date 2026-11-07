@@ -11,6 +11,7 @@ node_modules
 /test-results/
 /playwright-report/
 /e2e-report.json
+/e2e-report-shard-*.json
 # e2e/boot.rb compiles Tailwind, copies Alpine, and copies the engine's own served
 # assets into here before serving the dummy lab. Regenerated on every boot.
 /test/dummy/public/

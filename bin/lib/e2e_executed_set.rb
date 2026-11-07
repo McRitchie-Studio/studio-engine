@@ -159,6 +159,13 @@ class E2eExecutedSet
 
   def ok? = failures.empty?
 
+  # The contract's `shards:` (config/e2e_lane.yml), or nil when the contract names none.
+  # It is the one number the tree cannot compute, so the gate binds the receipts to it.
+  def declared_shards
+    value = contract.is_a?(Hash) ? contract["shards"] : nil
+    value.is_a?(Integer) ? value : nil
+  end
+
   def summary
     "#{executed_tests.size} executed · #{skipped_tests.size} skipped · " \
       "#{reports.size} shard report(s) · census: #{expected_executed} committed"
@@ -196,11 +203,10 @@ class E2eExecutedSet
     end
   end
 
-  # KEPT EVEN THOUGH THE LANE RUNS ONE SHARD TODAY. `shards: 1` makes this check
-  # assert "exactly one report arrived", which is a real property: a webServer that
-  # died after the health probe, or an upload step that silently wrote nothing, both
-  # land here. And the day the suite grows enough to shard, the guard is already in
-  # place rather than being remembered.
+  # One receipt from each shard, every receipt agreeing on the total, and that total
+  # equal to the contract's `shards:`. A webServer that died after the health probe, an
+  # upload step that wrote nothing, or a matrix entry deleted all land here. The lane
+  # ran one shard until 2026-11-06; this guard was in place before it sharded.
   def shard_completeness_failures
     parsed = reports.reject { |report| report.doc.key?("__parse_error__") }
     return [] if parsed.empty?
@@ -214,6 +220,13 @@ class E2eExecutedSet
     end
 
     total = totals.first
+    declared = declared_shards
+    if declared && total != declared
+      return ["the receipts report #{total} shard(s), but config/e2e_lane.yml declares " \
+              "shards: #{declared}. The matrix and the contract disagree: change both together, " \
+              "or a dropped matrix entry with an edited denominator passes as a smaller lane."]
+    end
+
     seen = shards.map { |shard| shard[:current] }.sort
     want = (1..total).to_a
     return [] if seen == want

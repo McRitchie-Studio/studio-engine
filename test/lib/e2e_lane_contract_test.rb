@@ -104,6 +104,36 @@ class E2eLaneContractTest < Minitest::Test
   # THE CENSUS MUST READ THE TREE. A scan that stops matching would count zero, and a file
   # whose specs sit in a loop or a helper would count nothing. Either way this is red here,
   # with a message that names the file, before the gate is red with a bare difference.
+  # THE MATRIX AND THE CONTRACT ARE ONE NUMBER. The gate binds each receipt's shard
+  # total to `shards:`; this binds the matrix to it, so the PR that edits one without
+  # the other is red here rather than at the runtime gate.
+  def lane_job = @lane_job ||= YAML.safe_load(workflow_source).dig("jobs", "playwright")
+
+  def test_integration_the_shard_matrix_is_the_contract_count
+    shards = lane_job.dig("strategy", "matrix", "shard")
+    assert_equal (1..contract.fetch("shards")).to_a, shards,
+                 "the playwright matrix must list shards 1..#{contract.fetch("shards")} (config/e2e_lane.yml)"
+    assert_equal false, lane_job.dig("strategy", "fail-fast"),
+                 "fail-fast cancels the other shards on one red, and a cancelled shard writes no receipt"
+  end
+
+  def test_integration_each_shard_runs_its_slice_and_keeps_its_own_receipt
+    run = lane_job["steps"].find { |step| step["run"].to_s.include?("playwright test") }
+    assert_includes run["run"], "--shard=${{matrix.shard}}/${{strategy.job-total}}",
+                    "the denominator must come from the matrix itself, not a second hand-written number"
+    assert_includes run.dig("env", "PLAYWRIGHT_JSON_OUTPUT_NAME"), "${{ matrix.shard }}",
+                    "each shard must write its own receipt file"
+
+    upload = lane_job["steps"].find { |step| step["name"].to_s.include?("executed-set receipt") }
+    assert_includes upload.dig("with", "name"), "${{ matrix.shard }}",
+                    "one artifact name for every shard collides, and only one receipt survives"
+    download = YAML.safe_load(workflow_source).dig("jobs", "e2e_executed_set", "steps")
+                   .find { |step| step["uses"].to_s.start_with?("actions/download-artifact") }
+    assert File.fnmatch(download.dig("with", "pattern"), upload.dig("with", "name").sub("${{ matrix.shard }}", "1")),
+           "the verdict job's download pattern must match every shard's artifact"
+    assert_equal true, download.dig("with", "merge-multiple")
+  end
+
   def test_unit_the_census_sees_a_spec_in_every_committed_file
     refute_empty spec_paths, "no spec files found; the glob is broken"
 

@@ -4,6 +4,14 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **The browser lane runs as three shards.** It had grown to about 17 minutes of specs on
+  one runner, against about 9 minutes for the engine suite, so it was the long pole of
+  every engine PR. Each shard writes its own receipt, and `bin/e2e-executed-set-check`
+  now also refuses receipts whose shard total is not `shards:` in `config/e2e_lane.yml`.
+  Nothing changes for a consumer.
+
 ## 0.133.0 — 2026-11-06
 
 ### Deprecated

@@ -6,6 +6,7 @@ require "json"
 require "open3"
 require "rbconfig"
 require "tmpdir"
+require "yaml"
 require_relative "../../bin/lib/e2e_spec_census"
 
 # [unit] The census, and [integration] the two scripts that read it, run as processes
@@ -79,14 +80,24 @@ class E2eSpecCensusTest < Minitest::Test
 
   # ---- the runtime gate, as CI runs it ------------------------------------------
 
-  def report(executed:, skipped: 0)
+  def declared_shards = YAML.safe_load_file(File.join(ROOT, "config", "e2e_lane.yml")).fetch("shards")
+
+  # One receipt per declared shard, as the CI matrix writes them: the tests dealt
+  # round-robin, each receipt carrying its own `config.shard` block.
+  def report(executed:, skipped: 0, shards: declared_shards)
     tests = Array.new(executed) { |i| { "title" => "spec #{i}", "tests" => [{ "status" => "expected" }] } } +
             Array.new(skipped) { |i| { "title" => "gone #{i}", "tests" => [{ "status" => "skipped" }] } }
-    { "config" => {}, "stats" => { "expected" => executed, "skipped" => skipped },
-      "suites" => [{ "title" => "lab", "specs" => tests }] }
+    (1..shards).map do |current|
+      mine = tests.select.with_index { |_, i| (i % shards) + 1 == current }
+      stats = { "expected" => mine.count { |t| t["tests"][0]["status"] == "expected" },
+                "skipped" => mine.count { |t| t["tests"][0]["status"] == "skipped" } }
+      { "config" => { "shard" => { "current" => current, "total" => shards } }, "stats" => stats,
+        "suites" => [{ "title" => "lab", "specs" => mine }] }
+    end
   end
 
   def run_gate(*reports)
+    reports = reports.flatten
     Dir.mktmpdir do |dir|
       reports.each_with_index { |doc, i| File.write(File.join(dir, "#{i}.json"), JSON.generate(doc)) }
       out, status = Open3.capture2e(RbConfig.ruby, GATE, dir)
@@ -121,6 +132,36 @@ class E2eSpecCensusTest < Minitest::Test
 
     assert_equal 1, code, out
     assert_match(/SKIPPED AT RUNTIME/, out)
+  end
+
+  def test_integration_the_gate_refuses_a_dropped_shard
+    receipts = report(executed: real_total)
+    dropped = receipts.pop
+
+    code, out = run_gate(receipts)
+
+    assert_equal 1, code, out
+    assert_match(/expected one report from each of #{declared_shards} shard/, out)
+    refute_nil dropped
+  end
+
+  # THE DENOMINATOR AXIS. Delete a matrix entry AND edit the total to match, and every
+  # remaining receipt agrees with every other: only the contract can catch it.
+  def test_integration_the_gate_refuses_a_shard_total_the_contract_does_not_declare
+    code, out = run_gate(report(executed: real_total, shards: declared_shards - 1))
+
+    assert_equal 1, code, out
+    assert_match(/declares shards: #{declared_shards}/, out)
+  end
+
+  def test_integration_the_gate_refuses_an_unsharded_receipt_when_the_contract_shards
+    single = report(executed: real_total, shards: 1).first
+    single["config"] = {}
+
+    code, out = run_gate(single)
+
+    assert_equal 1, code, out
+    assert_match(/declares shards: #{declared_shards}/, out)
   end
 
   def test_integration_the_gate_refuses_no_receipt_at_all
