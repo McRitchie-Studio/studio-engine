@@ -492,3 +492,36 @@ test("with scripts off the map is a link to directions", async ({ browser, baseU
   await expect(fallback).toContainText("123 Example St, Washington, DC 20024");
   await context.close();
 });
+
+// The social discs wear the lit button's shading in every app, glass surface or
+// not (studio/site_footer/_assets, docs/SITE_FOOTER.md). The lab page sets no
+// data-surface-style, so this is the flat-surface case, where no --lit-* token is
+// defined and only the footer's own fallbacks can paint the light.
+// test/views/site_footer_social_shading_css_test.rb pins the declarations.
+test("a linked social icon is lit and lifts on hover; a pending one stays flat", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/site_footer");
+
+  const linked = page.locator("footer[data-site-footer] a.ftr-social[aria-label='LinkedIn']");
+  const pending = page.locator("footer[data-site-footer] .ftr-social[data-pending]");
+  await expect(linked).toHaveCount(1);
+  await expect(pending).toHaveCount(1);
+  expect(await page.evaluate(() => document.documentElement.hasAttribute("data-surface-style"))).toBe(false);
+
+  const shadow = (locator) => locator.evaluate((el) => getComputedStyle(el).boxShadow);
+  for (const dark of [true, false]) {
+    await page.evaluate((on) => document.documentElement.classList.toggle("dark", on), dark);
+    const lit = await shadow(linked);
+    expect(lit).not.toBe("none");
+    expect(lit).toContain("inset"); // the top highlight and the bottom edge
+    expect(await shadow(pending)).toBe("none");
+    expect(await pending.evaluate((el) => getComputedStyle(el).backgroundImage)).toBe("none");
+  }
+
+  // The glyph stays white on the disc.
+  expect(await linked.evaluate((el) => getComputedStyle(el).color)).toBe("rgb(255, 255, 255)");
+
+  // Hover lifts the disc (translateY(-2px) settles to this matrix).
+  await linked.hover();
+  await expect.poll(() => linked.evaluate((el) => getComputedStyle(el).transform)).toBe("matrix(1, 0, 0, 1, 0, -2)");
+});
