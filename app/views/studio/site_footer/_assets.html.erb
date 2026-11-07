@@ -81,9 +81,32 @@
   .ftr-kit { margin: .75rem 0 0; }
   .ftr-socials { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin: 2rem 0 0; padding: 0; list-style: none; }
   .ftr-social { display: inline-flex; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem;
-    border-radius: 9999px; background: var(--ftr-primary); color: #fff; transition: transform .15s ease, filter .15s ease; }
-  a.ftr-social:hover { transform: translateY(-2px); filter: brightness(1.12); }
-  .ftr-social[data-pending] { background: transparent; color: inherit; opacity: .5; border: 1px dashed currentColor; }
+    border-radius: 9999px; background: var(--ftr-primary); color: #fff;
+    transition: transform .15s ease, filter .15s ease, box-shadow .15s ease; }
+  /* LIT, LIKE THE BUTTONS, IN EVERY APP. A linked disc wears the glass lit button's
+     family (engine.css, html[data-surface-style="glass"] .btn-primary): a top
+     highlight, a bottom edge, a contact shadow and a soft glow in its own fill.
+     Each light reads the button's --lit-* token, which only a glass page defines,
+     and falls back to the button's own value, so a flat-surface app shades the
+     same way. The gradient runs from the fill DOWN only (never lighter than
+     --ftr-primary), so the white glyph never loses contrast; a browser without
+     relative oklch keeps the flat fill and the shadows. The glow is drawn from
+     --ftr-primary-rgb, which every browser reads. */
+  .ftr { --ftr-lit-top: var(--lit-top, inset 0 1px 0 rgb(255 255 255 / .35));
+    --ftr-lit-bottom: var(--lit-bottom, inset 0 -2px 0 rgb(0 0 0 / .2));
+    --ftr-lit-contact: var(--lit-contact, 0 1px 2px rgb(0 0 0 / .4)); --ftr-lit-glow-alpha: var(--lit-glow-alpha, .6); }
+  .dark .ftr { --ftr-lit-bottom: var(--lit-bottom, inset 0 -2px 0 rgb(0 0 0 / .3));
+    --ftr-lit-contact: var(--lit-contact, 0 1px 2px rgb(0 0 0 / .65)); --ftr-lit-glow-alpha: var(--lit-glow-alpha, .8); }
+  a.ftr-social { background-image: linear-gradient(var(--ftr-primary), oklch(from var(--ftr-primary) calc(l - .08) c h));
+    box-shadow: var(--ftr-lit-top), var(--ftr-lit-bottom), var(--ftr-lit-contact),
+      0 4px 12px -4px rgb(var(--ftr-primary-rgb) / var(--ftr-lit-glow-alpha)); }
+  /* Hover lifts and deepens, as the lit button darkens (brightness .94): never
+     brighter, which would fade the white glyph. */
+  a.ftr-social:hover { transform: translateY(-2px); filter: brightness(.94);
+    box-shadow: var(--ftr-lit-top), var(--ftr-lit-bottom), var(--ftr-lit-contact),
+      0 8px 16px -6px rgb(var(--ftr-primary-rgb) / var(--ftr-lit-glow-alpha)); }
+  /* A pending handle stays a flat dashed outline: no light, no shadow. */
+  .ftr-social[data-pending] { background: transparent; color: inherit; opacity: .5; border: 1px dashed currentColor; box-shadow: none; }
   .ftr-social-letter { font-weight: 700; font-size: .95rem; line-height: 1; }
   .ftr-heading { margin: 0 0 1rem; font-size: 1rem; font-weight: 700; color: var(--ftr-ink); }
   .ftr-list { display: grid; gap: 1rem; margin: 0; padding: 0; list-style: none; }
