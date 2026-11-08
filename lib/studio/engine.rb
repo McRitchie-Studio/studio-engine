@@ -311,6 +311,14 @@ module Studio
     # `(\A|\.)` also masks the JSON param wrapper's copy (profile.voice.embeddings).
     # POST /voice/takes carries voice[embedding] (one take's vector) and
     # voice[audio] (the take itself); both are masked the same way.
+    # The connections' log filter (Studio::Connections::LOG_FILTER): each
+    # provider's filter_keys by exact key, and the auth code on the connection
+    # controllers. One lambda that reads the registry when it runs, so a
+    # provider declared in a host initializer, after this, is covered.
+    initializer "studio.connections.filter_parameters" do |app|
+      app.config.filter_parameters += [Studio::Connections::LOG_FILTER]
+    end
+
     initializer "studio.voice_profile.filter_parameters" do |app|
       app.config.filter_parameters += [/(\A|\.)voice\.(embeddings|embedding|audio)\z/, /\Avoice_embedding\z/]
     end

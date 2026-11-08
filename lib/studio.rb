@@ -75,6 +75,7 @@ require "studio/email_smoke"
 require "studio/mail_transport"
 require "studio/redis"
 require "studio/cable"
+require "studio/connections"
 require "studio/survey"
 require "studio/survey/breakdown"
 require "studio/survey/export"
@@ -1198,6 +1199,60 @@ module Studio
   # Called once, after a response completes: ->(response) { ... }. A raise is
   # logged and swallowed — the respondent still lands on the thank-you screen.
   mattr_accessor :on_survey_completed, default: ->(_response) {}
+
+  # ---- Connections (docs/CONNECTIONS.md) ------------------------------------
+  #
+  # The generic OAuth 2.0 connection tooling. The engine names no provider: a
+  # host declares each in an initializer and draws its routes.
+  #
+  #   Studio.define_connection :files, label: "Acme Files", env: {...}, ...
+  #   # config/routes.rb
+  #   Studio.draw_connection_routes(self, :files, path: "admin/files", controller: "admin/files")
+  #
+  # Every option is documented on Studio::Connections::Provider#initialize.
+  def self.define_connection(key, **options)
+    Connections.define(key, **options)
+  end
+
+  def self.connection(key)
+    Connections.fetch(key)
+  end
+
+  # Who may connect, call back and disconnect: a method name on the connection
+  # controller (the host's ApplicationController, through Studio::ErrorHandling,
+  # answers :require_admin), or a callable taking the controller.
+  mattr_accessor :connection_admin_guard, default: :require_admin
+
+  # Draws one provider's connect, callback and disconnect into the host's
+  # routes, and records them for the log filter and the callback URL:
+  #
+  #   GET|POST  /<path>/connect               <as>_connect
+  #   GET       /<path>/callback              <as>_callback   (the redirect URI to register)
+  #   DELETE    /<path>/connections/:id       <as>_disconnect
+  #   GET       /<path>                       <as>            (only with show: true)
+  #
+  # controller: the host's own controller including Studio::ConnectionFlow
+  # (default: the engine's Studio::ConnectionsController). show: draws the
+  # page itself at <path> (default: true when the host names its controller).
+  # return_to: the allowlist return_to may name; its first path is the default
+  # (default: ["/<path>"]).
+  def self.draw_connection_routes(router, key, path: "admin/#{key}", controller: nil, as: nil, return_to: nil, show: nil)
+    provider = Connections.fetch(key)
+    path = path.to_s.delete_prefix("/").delete_suffix("/")
+    controller = (controller || "studio/connections").to_s.delete_prefix("/")
+    as = (as || path.tr("/-", "__")).to_s
+    show = controller != "studio/connections" if show.nil?
+    return_paths = Array(return_to || ["/#{path}"]).map(&:to_s)
+    Connections.record_route(Connections::Route.new(provider: provider.key, path:, as:, controller:, return_paths:))
+
+    defaults = { studio_connection: provider.key }
+    router.instance_exec do
+      get "#{path}", to: "#{controller}#show", as: as, defaults: defaults if show
+      match "#{path}/connect", to: "#{controller}#connect", as: "#{as}_connect", via: %i[get post], defaults: defaults
+      get "#{path}/callback", to: "#{controller}#callback", as: "#{as}_callback", defaults: defaults
+      delete "#{path}/connections/:id", to: "#{controller}#disconnect", as: "#{as}_disconnect", defaults: defaults
+    end
+  end
 
   # Define a survey in app code. See Studio::Survey for the DSL.
   def self.define_survey(slug, &block)
