@@ -7,7 +7,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/head_chrome.js", import.meta.url), "utf8")
-const { spinnerHideDelay, spinnerMinMs, successBursts, SUCCESS_COLORS } =
+const { spinnerHideDelay, spinnerMinMs, showNavSpinner, hideNavSpinner, successBursts, SUCCESS_COLORS } =
   await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 test("the spinner hides only after its minimum display time", () => {
@@ -29,4 +29,47 @@ test("the success confetti fires four bursts on the given palette", () => {
   for (const [, options] of bursts) assert.deepEqual(options.colors, ["#000"])
   assert.equal(bursts[0][1].particleCount, 150)
   assert.equal(SUCCESS_COLORS.length, 8)
+})
+
+// A stub document with one toggle icon and one spinner icon.
+function spinnerDoc() {
+  const toggle = { style: {} }
+  const spinner = { style: {} }
+  const icons = { ".nav-toggle-icon": [toggle], ".nav-spinner-icon": [spinner] }
+  return {
+    spinner,
+    querySelector: () => ({ getAttribute: () => "300" }),
+    querySelectorAll: (selector) => icons[selector] || []
+  }
+}
+
+test("a hide still waiting on the minimum never ends a later show", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"] })
+  const doc = spinnerDoc()
+  globalThis.document = doc
+  t.after(() => { delete globalThis.document })
+
+  showNavSpinner()
+  hideNavSpinner()               // the load's hide: waits out the 300ms minimum
+  t.mock.timers.tick(100)
+  showNavSpinner()               // a click raises the spinner again
+  t.mock.timers.tick(250)        // the first hide's timer fires here
+  assert.equal(doc.spinner.style.opacity, "1", "the stale hide must not reset the second show")
+
+  hideNavSpinner()               // the click's own hide still lands
+  t.mock.timers.tick(300)
+  assert.equal(doc.spinner.style.opacity, "0")
+})
+
+test("two hides of one show both stand, so the load's repeat hydrate still hides", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"] })
+  const doc = spinnerDoc()
+  globalThis.document = doc
+  t.after(() => { delete globalThis.document })
+
+  showNavSpinner()
+  hideNavSpinner()               // DOMContentLoaded's hydrate
+  hideNavSpinner()               // turbo:load's hydrate
+  t.mock.timers.tick(300)
+  assert.equal(doc.spinner.style.opacity, "0")
 })

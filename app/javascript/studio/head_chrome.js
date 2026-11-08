@@ -14,6 +14,8 @@
 // Minimum display time prevents quick flashes; per app via
 // Studio.nav_spinner_min_ms, which the head publishes as
 // <meta name="studio-nav-spinner-min-ms"> (smooth-load apps drop it to ~300).
+// A hide is bound to the show it ends: one still waiting out the minimum when a
+// later show starts does nothing, and that show's own hide takes the spinner down.
 
 // How long hide must still wait so the spinner shows for at least minMs.
 export function spinnerHideDelay(shownAt, now, minMs) {
@@ -27,6 +29,10 @@ export function spinnerMinMs(doc) {
 }
 
 var spinnerShownAt = 0
+// Each show starts a new generation. A hide captures the generation it ends and
+// hides only if no later show has started one, so a hide still waiting out the
+// minimum (the load's hydrate) never drops a spinner a later press raised.
+var spinnerGeneration = 0
 
 function showToggle(doc) {
   doc.querySelectorAll('.nav-toggle-icon').forEach(function (e) { e.style.opacity = '1'; e.style.transform = 'scale(1) rotate(0deg)' })
@@ -35,13 +41,15 @@ function showToggle(doc) {
 
 export function showNavSpinner() {
   spinnerShownAt = Date.now()
+  spinnerGeneration += 1
   document.querySelectorAll('.nav-toggle-icon').forEach(function (e) { e.style.opacity = '0'; e.style.transform = 'scale(0) rotate(90deg)' })
   document.querySelectorAll('.nav-spinner-icon').forEach(function (e) { e.style.opacity = '1'; e.style.transform = 'scale(1) rotate(0deg)' })
 }
 
 export function hideNavSpinner() {
+  var generation = spinnerGeneration
   var wait = spinnerHideDelay(spinnerShownAt, Date.now(), spinnerMinMs(document))
-  setTimeout(function () { showToggle(document) }, wait)
+  setTimeout(function () { if (generation === spinnerGeneration) showToggle(document) }, wait)
 }
 
 // Reset spinner state before Turbo caches the page. Installed once.
