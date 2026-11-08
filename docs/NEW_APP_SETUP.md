@@ -198,7 +198,9 @@ POST to `/auth/google_oauth2`, never redirect with GET.
 
 The engine's migrations also create `studio_user_sessions`, one small row per signed-in
 browser session. With it, `Studio::UserSession` records sessions by itself and the admin
-models page gains a standard Sessions tab.
+models page gains a standard Sessions tab. With its `sid` and `revoked_at` columns, a
+logout also ends that device's session on the server
+([`DEVICE_SESSIONS.md`](DEVICE_SESSIONS.md)).
 
 The engine ships its own migrations (the email outbox, `Studio::Link`,
 `Studio::Enumeral`, the geo settings table, and the three tables the engine's

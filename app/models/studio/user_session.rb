@@ -77,9 +77,11 @@ module Studio
       false
     end
 
-    # This app's mark in `store` (the session), as a string-keyed Hash.
+    # This app's mark in `store` (the session, or a plain Hash decoded from the
+    # cookie, as a cable connection reads it), as a string-keyed Hash.
     def self.mark_in(store)
       mark = store[cookie_key]
+      mark = store[cookie_key.to_s] if mark.nil? && store.is_a?(Hash)
       mark.respond_to?(:to_h) ? mark.to_h.transform_keys(&:to_s) : {}
     end
 

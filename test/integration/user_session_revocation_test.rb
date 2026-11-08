@@ -195,4 +195,14 @@ class UserSessionRevocationTest < ActiveSupport::TestCase
 
     assert_equal 1, Session.count
   end
+
+  test "a plain Hash decoded from the cookie (a cable connection's read) carries its sid" do
+    store = {}
+    Session.start!(store, member, now: now)
+    decoded = JSON.parse(store.to_json)
+
+    assert_equal :live, Session.verdict(decoded, now: now).first
+    Session.revoke!(store, now: now)
+    assert_equal :ended, Session.verdict(decoded, now: now).first
+  end
 end
