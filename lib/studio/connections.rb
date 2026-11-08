@@ -74,7 +74,13 @@ module Studio
     Route = Struct.new(:provider, :path, :as, :controller, :return_paths, keyword_init: true)
 
     class << self
-      def define(key, **options) = registry_lock.synchronize { registry[key.to_s] = Provider.new(key, **options) }
+      def define(key, **options)
+        provider = Provider.new(key, **options)
+        registry_lock.synchronize do
+          @filter_keys = nil
+          registry[provider.key] = provider
+        end
+      end
 
       def fetch(key)
         registry_lock.synchronize { registry[key.to_s] } or raise ArgumentError, "no connection provider is defined as #{key.to_s.inspect}"
@@ -88,6 +94,7 @@ module Studio
         registry_lock.synchronize do
           registry.clear
           routes.clear
+          @filter_keys = @controllers = nil
         end
       end
 
@@ -95,13 +102,19 @@ module Studio
       def routes = (@routes ||= {})
       def route(key) = registry_lock.synchronize { routes[key.to_s] }
 
-      def record_route(route) = registry_lock.synchronize { routes[route.provider] = route }
+      def record_route(route)
+        registry_lock.synchronize do
+          @controllers = nil
+          routes[route.provider] = route
+        end
+      end
 
       # The controllers that serve a callback, as params["controller"] names them.
-      def controllers = registry_lock.synchronize { routes.values.map(&:controller).to_set }
+      # Memoized: the log filter asks on every logged parameter.
+      def controllers = @controllers || registry_lock.synchronize { @controllers ||= routes.values.map(&:controller).to_set.freeze }
 
       # Every exact key a provider asked to keep out of the logs.
-      def filter_keys = registry_lock.synchronize { registry.values.flat_map(&:filter_keys).to_set }
+      def filter_keys = @filter_keys || registry_lock.synchronize { @filter_keys ||= registry.values.flat_map(&:filter_keys).to_set.freeze }
 
       # Can this app store a connection: are its Active Record encryption keys set?
       def encryption_ready?

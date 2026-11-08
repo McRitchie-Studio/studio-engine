@@ -362,6 +362,16 @@ class ConnectionsClientTest < ActiveSupport::TestCase
     assert_equal({ "my_account_id" => "x", "tenants" => "y" }, filter.filter("my_account_id" => "x", "tenants" => "y"), "exact keys only")
   end
 
+  test "[unit] a provider declared after boot is covered by the filter the engine already installed" do
+    filter = ActiveSupport::ParameterFilter.new(Rails.application.config.filter_parameters)
+    assert_equal "late-1", filter.filter("late_account" => "late-1")["late_account"]
+
+    Studio.define_connection :late, label: "Late", env: { client_id: "LATE_ID", client_secret: "LATE_SECRET" },
+                                    authorize_url: "https://late.example/a", token_url: "https://late.example/t",
+                                    account: :described, filter_keys: %w[late_account]
+    assert_equal "[FILTERED]", filter.filter("late_account" => "late-1")["late_account"]
+  end
+
   test "[unit] the Started GET line's URL loses the account and tenant, one pair at a time" do
     env = Rack::MockRequest.env_for("/admin/tenant/callback?tenant=#{ConnectionsHost::TENANT}&admin_consent=True&state=s1&account_id=4620")
     env["action_dispatch.parameter_filter"] = Rails.application.config.filter_parameters
