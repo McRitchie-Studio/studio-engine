@@ -100,6 +100,16 @@ class UserSessionRevocationTest < ActiveSupport::TestCase
     assert_equal :ended, Session.verdict(early_copy, now: now + 42.minutes).first
   end
 
+  test "a request in flight over a logout cannot write a live row for the revoked sid" do
+    store = {}
+    Session.start!(store, member, now: now)
+    _, row = Session.verdict(store, now: now + 40.minutes) # request A reads :live, past IDLE
+    Session.revoke!(store.deep_dup, now: now + 40.minutes)  # request B logs the device out
+    Session.track(store, member, now: now + 40.minutes, row: row) # A's after_action starts a row
+
+    assert_equal :ended, Session.verdict(store, now: now + 41.minutes).first
+  end
+
   test "a sid with no row (pruned, or forged) is ended" do
     store = { Session.cookie_key => { "id" => 1, "user" => 7, "at" => now.to_i, "sid" => "nope" } }
 

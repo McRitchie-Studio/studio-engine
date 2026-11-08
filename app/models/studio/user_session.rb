@@ -15,9 +15,9 @@ module Studio
   # browser's copy: a copy of the pre-logout cookie still signed in. Each signed-in
   # cookie now carries a random `sid` in its mark, and every row of that device
   # session carries the same sid. A logout stamps `revoked_at` on those rows, and
-  # every signed-in request reads the latest row for its sid (one indexed query):
-  # revoked, or no row at all, and the request is signed out. Other devices have
-  # other sids, so they stay signed in.
+  # every signed-in request reads its sid's rows (one indexed query): a revoked
+  # row ends the sid for good, and so does no row at all: the request is signed
+  # out. Other devices have other sids, so they stay signed in.
   #
   # Nil-safe, because the table and its columns come from migrations the host
   # runs: an app without them records nothing, checks nothing and serves as
@@ -91,7 +91,7 @@ module Studio
     # [verdict, row]:
     #
     #   :live    the sid names a row that is not revoked (row is that row)
-    #   :ended   the sid's latest row is revoked, or the sid has no row (pruned,
+    #   :ended   any row of the sid is revoked, or the sid has no row (pruned,
     #            or never written); also a sid-less cookie past legacy_grace_until
     #   :legacy  no sid, inside the grace: accepted, and track gives it one
     #   :off     nothing to check (not recording, or no columns)
@@ -105,7 +105,9 @@ module Studio
       sid = mark_in(store)["sid"].presence
       return [now < legacy_grace_until ? :legacy : :ended, nil] unless sid
 
-      row = where(sid: sid.to_s).order(id: :desc).first
+      # A revoked row sorts first: a row a request in flight wrote after the
+      # logout cannot bring the sid back.
+      row = where(sid: sid.to_s).order(Arel.sql("revoked_at IS NULL"), id: :desc).first
       return [:ended, nil] if row.nil? || row.revoked_at
 
       [:live, row]
