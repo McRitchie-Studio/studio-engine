@@ -32,6 +32,10 @@ module Studio
     RETENTION = 90.days
     PRUNE_EVERY = 1.hour
     PRUNE_BATCH = 1_000
+    # A failed verdict writes at most one ErrorLog row per this window per
+    # process: a database fault fails every request, and the log must not add a
+    # write to each of them.
+    CHECK_FAILURE_LOG_EVERY = 5.minutes
 
     belongs_to :user, class_name: "::User", optional: true
 
@@ -55,6 +59,10 @@ module Studio
 
     # When this process last pruned (prune_due!). Per process, so it costs nothing.
     cattr_accessor :pruned_at, default: nil
+
+    # When this process last wrote an ErrorLog row for a failed verdict
+    # (log_check_failure). Per process, like pruned_at.
+    cattr_accessor :check_failure_logged_at, default: nil
 
     def self.recording?
       !Rails.env.test? || record_in_test
@@ -113,20 +121,49 @@ module Studio
       [:live, row]
     rescue StandardError => e
       Rails.logger&.warn("[user_session] verdict #{e.class}: #{e.message}")
+      log_check_failure(e, now)
       [:off, nil]
+    end
+
+    # True when `store` names an ended device session (verdict :ended). The one
+    # check a host's ApplicationCable::Connection makes, since /cable reads the
+    # cookie outside the controller filter (docs/DEVICE_SESSIONS.md):
+    #
+    #   return nil if Studio::UserSession.respond_to?(:ended?) && Studio::UserSession.ended?(session)
+    #
+    # `store` is request.session or the Hash decoded from the cookie. :legacy and
+    # :off answer false, as they do for a page request. It never writes `store`.
+    def self.ended?(store, now: Time.current)
+      verdict(store, now: now).first == :ended
+    end
+
+    # Writes the verdict's failure to ErrorLog, at most once per
+    # CHECK_FAILURE_LOG_EVERY per process. The stamp is set before the write, so a
+    # write that fails too (the database is down) is not retried on every request.
+    # Never raises.
+    def self.log_check_failure(exception, now = Time.current)
+      return if check_failure_logged_at && check_failure_logged_at > now - CHECK_FAILURE_LOG_EVERY
+
+      self.check_failure_logged_at = now
+      ::ErrorLog.capture!(exception) if defined?(::ErrorLog) && ::ErrorLog.respond_to?(:capture!)
+    rescue StandardError => e
+      Rails.logger&.warn("[user_session] check failure not logged: #{e.class}: #{e.message}")
+      nil
     end
 
     # Starts this device's session at a sign-in (ErrorHandling#set_app_session):
     # writes its first row with a new sid and marks `store`, so the very next
     # request is checked. A sign-in by the same user over a live sid keeps it: a
-    # re-auth is the same device session. A different user gets a new sid; the old
-    # one is not revoked, since a sign-in is not a logout. Answers the row, or nil.
-    # It raises on a failed write, so the caller can log it.
+    # re-auth is the same device session. The sid is read again first (one indexed
+    # query): a revoked sid, or one with no row, is never reused, so a sign-in on
+    # a copied cookie cannot bring an ended session back. A different user gets a
+    # new sid; the old one is not revoked, since a sign-in is not a logout. Answers
+    # the row, or nil. It raises on a failed write, so the caller can log it.
     def self.start!(store, user, now: Time.current)
       return unless user && recording? && revocable?
 
       mark = mark_in(store)
-      return if mark["user"] == user.id && mark["sid"].present?
+      return if mark["user"] == user.id && live_sid?(mark["sid"], user)
 
       admin = user.respond_to?(:admin?) && user.admin?
       row = create!(sid: new_sid, user_id: user.id, admin: admin ? true : false, started_at: now, last_seen_at: now)
@@ -182,6 +219,16 @@ module Studio
       Rails.logger&.warn("[user_session] #{e.class}: #{e.message}")
       nil
     end
+
+    # True when `sid` has rows, all of them unrevoked, and the latest is `user`'s.
+    # One query on the sid index; a revoked row sorts first, as in verdict.
+    def self.live_sid?(sid, user)
+      return false if sid.blank?
+
+      row = where(sid: sid.to_s).order(Arel.sql("revoked_at IS NULL"), id: :desc).first
+      !row.nil? && row.revoked_at.nil? && row.user_id == user.id
+    end
+    private_class_method :live_sid?
 
     # The open row to move for this sid: the one verdict read, else the latest by
     # sid. Past IDLE nil, so a new row starts with the same sid.

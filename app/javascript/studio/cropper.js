@@ -17,8 +17,8 @@
 //   Alpine.store('modals').open('crop-photo',
 //     { imageUrl, aspectRatio: 3, maxWidth: 900, transparent: false })
 //
-// Cropper.js is the page's own global (studio/_cropper_assets loads it from
-// cdnjs on a page that can open the modal). A page where it never arrives says
+// Cropper.js is the page's own global (studio/_cropper_assets loads the
+// engine's vendored copy on a page that can open the modal). A page where it never arrives says
 // so in the modal's error line; the button never takes a press that does
 // nothing.
 //

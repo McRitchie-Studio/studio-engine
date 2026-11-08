@@ -1,0 +1,10 @@
+<%# One h1 per page (test/integration/navbar_one_h1_render_test.rb): the engine
+    navbar, drawn by the layout after the page, as a host's application layout
+    draws it. @navbar_locals carries an explicit brand_heading when a test passes one. %>
+<!DOCTYPE html>
+<html>
+  <body>
+    <%= render "layouts/navbar", **(@navbar_locals || {}) %>
+    <main><%= yield %></main>
+  </body>
+</html>

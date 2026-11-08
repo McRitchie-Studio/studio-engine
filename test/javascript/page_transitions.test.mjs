@@ -182,7 +182,7 @@ test("the style goes to the next document, and a refusal reads as a plain load",
 })
 
 // A module-level flag lets one document install once, so each case imports its own copy.
-async function installed(pathname = "/a", { motion = false } = {}) {
+async function installed(pathname = "/a", { motion = false, names = [] } = {}) {
   const { installPageTransitions: install } = await import(`data:text/javascript,${encodeURIComponent(`${source}\n// ${Math.random()}`)}`)
   const on = { doc: {}, win: {} }
   const store = new Map()
@@ -192,13 +192,20 @@ async function installed(pathname = "/a", { motion = false } = {}) {
     addEventListener: (name, handler) => { on.win[name] = handler },
     sessionStorage: { setItem: (key, value) => store.set(key, value), removeItem: (key) => store.delete(key) },
     matchMedia: () => ({ matches: false }),
+    // The response's names, read off the parsed page the way morphNames reads a document.
+    DOMParser: class {
+      parseFromString(html) {
+        const found = [...html.matchAll(/data-vt-morph="([^"]+)"/g)].map((match) => match[1])
+        return { querySelectorAll: () => found.map((name) => ({ getAttribute: () => name })) }
+      }
+    },
   }
   const doc = {
     ...(motion ? { startViewTransition() {} } : {}),
     defaultView: win,
     documentElement: root,
     querySelector: (selector) => (selector.startsWith("meta") ? { content: "left" } : null),
-    querySelectorAll: () => [],
+    querySelectorAll: () => names.map((name) => ({ getAttribute: () => name })),
     addEventListener: (name, handler) => { on.doc[name] = handler },
   }
   assert.equal(install(doc), true)
@@ -269,6 +276,47 @@ test("a Turbo visit answered by a reload stays still, and a real one is overwrit
   on.doc["turbo:reload"]({})
   assert.equal(root.dataset.pageTransition, STILL, "the transition Turbo opened must still draw nothing")
   assert.equal(root.dataset.pageTransitionVisit, undefined)
+})
+
+// Turbo starts its view transition one frame after its own read of the response resolves,
+// and the old page's picture is taken then. The morph's name is let through only once the
+// names are known, so Turbo must read the response through this module's read: the read
+// that resolves for Turbo is the one that already named the morph. Measured before this:
+// under an 8x CPU throttle, 2 of 6 visits started the transition with no name down, and
+// the chat head did not morph (e2e/page_transitions.spec.js, "a chat head on both pages").
+test("Turbo's read of a response resolves only after the morph is named", async () => {
+  const { on, root } = await installed("/a", { names: ["agent-portrait"] })
+  on.doc["turbo:visit"]({ detail: { url: "https://app.test/b", action: "advance" } })
+  assert.equal(root.dataset.pageTransitionMorph, undefined, "page b is unknown at the visit")
+  // Turbo's getter is response.clone().text(): each access is its own read of the body, and
+  // nothing orders one read before another. Here Turbo's (the second) finishes first.
+  const page = '<div data-vt-morph="agent-portrait"></div>'
+  const reads = []
+  const fetchResponse = {
+    response: { url: "https://app.test/b", redirected: false },
+    redirected: false,
+    get responseHTML() {
+      let done
+      const read = new Promise((resolve) => { done = resolve })
+      reads.push(() => done(page))
+      return read
+    },
+  }
+  on.doc["turbo:before-fetch-response"]({ target: null, detail: { fetchResponse } })
+  const turboRead = Promise.resolve(fetchResponse.responseHTML).then((html) => ({ html, named: root.dataset.pageTransitionMorph }))
+  reads.slice().reverse().forEach((finish) => finish())
+  const { html, named } = await turboRead
+  assert.equal(named, "", "the name was down when Turbo's read resolved")
+  assert.equal(html, '<div data-vt-morph="agent-portrait"></div>', "Turbo still reads the page itself")
+})
+
+test("Turbo's read of a response survives a page the module cannot parse", async () => {
+  const { on, win } = await installed("/a", { names: ["agent-portrait"] })
+  win.DOMParser = class { parseFromString() { throw new Error("parser gone") } }
+  on.doc["turbo:visit"]({ detail: { url: "https://app.test/b", action: "advance" } })
+  const fetchResponse = { response: { url: "https://app.test/b" }, responseHTML: Promise.resolve("<p>b</p>") }
+  on.doc["turbo:before-fetch-response"]({ target: null, detail: { fetchResponse } })
+  assert.equal(await fetchResponse.responseHTML, "<p>b</p>")
 })
 
 test("a visit that fails leaves no style at rest", async () => {

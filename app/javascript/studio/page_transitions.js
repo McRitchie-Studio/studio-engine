@@ -242,17 +242,37 @@ export function installPageTransitions(doc) {
 
   // A page never visited: read its names from the response, ahead of the old page's picture.
   // Only a page with names of its own can share one, so every other page skips the parse.
+  //
+  // TURBO READS THE PAGE THROUGH THIS READ. Turbo starts its view transition one frame after
+  // its own read of the response resolves, and the browser takes the old page's picture then:
+  // the morph's name must be down by that moment. Turbo's responseHTML getter is a fresh
+  // response.clone().text() on each access, and nothing orders this module's read before
+  // Turbo's, so this read is put in its place (studio/reload_visits does the same): the read
+  // Turbo awaits is the one that has already named the morph. Measured without it: under an
+  // 8x CPU throttle, 2 of 6 visits started the transition with no name, and nothing morphed.
   doc.addEventListener("turbo:before-fetch-response", (event) => {
     if (event.target && event.target.tagName === "TURBO-FRAME") return
     if (!morphNames(doc).size) return
     const { fetchResponse } = event.detail
-    Promise.resolve(fetchResponse.responseHTML).then((html) => {
-      if (!html) return
-      const names = morphNames(new win.DOMParser().parseFromString(html, "text/html"))
-      const path = new URL(fetchResponse.response.url).pathname
-      known.set(path, names)
-      if (target && (path === target || fetchResponse.redirected)) predict(names)
-    }).catch(() => {})
+    const named = Promise.resolve(fetchResponse.responseHTML).then((html) => {
+      try {
+        if (!html) return html
+        const names = morphNames(new win.DOMParser().parseFromString(html, "text/html"))
+        const path = new URL(fetchResponse.response.url).pathname
+        known.set(path, names)
+        if (target && (path === target || fetchResponse.redirected)) predict(names)
+      } catch {
+        // A page this module cannot read morphs nothing; Turbo still renders it.
+      }
+      return html
+    })
+    // A failed read rejects for Turbo exactly as its own would; this module needs no answer.
+    named.catch(() => {})
+    try {
+      Object.defineProperty(fetchResponse, "responseHTML", { configurable: true, value: named })
+    } catch {
+      // A response that refuses the swap keeps Turbo's own read, and the race this closes.
+    }
   })
 
   // In capture, so the hold is in place before any other listener takes Turbo's resume.

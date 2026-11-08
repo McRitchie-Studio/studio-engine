@@ -20,7 +20,7 @@ Tests: `test/integration/user_session_revocation_test.rb` (unit) and
 
 | Step | Where | What |
 |------|-------|------|
-| Sign-in | `set_app_session` | `Studio::UserSession.start!` writes a `studio_user_sessions` row with a random `sid` (24 bytes, URL-safe) and puts the sid in this app's mark (`session[:"<session_key>_session_mark"]`). A re-auth by the same user keeps the sid. |
+| Sign-in | `set_app_session` | `Studio::UserSession.start!` writes a `studio_user_sessions` row with a random `sid` (24 bytes, URL-safe) and puts the sid in this app's mark (`session[:"<session_key>_session_mark"]`). A re-auth by the same user keeps the sid only while the sid is live: `start!` reads it again first (one query), and a revoked sid, or one with no row, gets a new sid. |
 | Every signed-in request | `prepend_before_action :end_revoked_device_session` | `Studio::UserSession.verdict` reads the cookie's sid on the `sid` index: one query. Any revoked row of the sid, or no row: the request is signed out through the host's own `clear_app_session`, and runs as a visitor. |
 | Tracking | `after_action :track_user_session` | Reuses the row the check read, so it adds no read. At most one write per 5 minutes, as before. After 30 idle minutes a new row starts with the **same** sid. |
 | Logout | `clear_app_session` (the engine's `GET /logout`) and `reset_session` (Turf's logout, and a sign-in by a different identity) | `Studio::UserSession.revoke!` stamps `revoked_at` on every row of the sid and drops the mark. |
@@ -29,7 +29,9 @@ Tests: `test/integration/user_session_revocation_test.rb` (unit) and
 A failed revoke or start is written to `ErrorLog` and the logout or sign-in goes
 on. A database fault in the check answers "no verdict" and signs nobody out: the
 request's own user lookup needs the same database, and a copied cookie cannot
-cause the fault.
+cause the fault. The fault is written to `ErrorLog` too, at most once per
+`CHECK_FAILURE_LOG_EVERY` (5 minutes) per process, so an outage adds no write to
+every request.
 
 ## Cookies from before this change
 
@@ -61,17 +63,35 @@ the current SSO behaviour:
 
 - An app without the `sid` and `revoked_at` columns (it has not run
   `AddDeviceRevocationToStudioUserSessions`) checks nothing and tracks as before.
-  The release sweep installs the migration in every member.
+  The release sweep installs the migration in every member. The boot names the
+  gap: `Studio::HostSchema.device_session_check!` logs a warning, and a Sentry
+  warning, in every environment. It never raises, so a host's CI stays green until
+  the sweep adds the columns. `Studio.host_schema_check = false` turns it off.
 - Under test nothing is checked or written unless a test sets
   `Studio::UserSession.record_in_test = true`, so host query budgets hold.
 
-## Not covered: ActionCable
+## ActionCable
 
 `/cable` connections read the session cookie directly, outside the controller
 check. A host whose `ApplicationCable::Connection` authenticates from the session
-(hub, Turf, Cyvasse) can refuse an ended device session with one line in its
-session reader:
+refuses an ended device session with one line in its session reader:
 
 ```ruby
-return nil if Studio::UserSession.verdict(session).first == :ended
+return nil if Studio::UserSession.respond_to?(:ended?) && Studio::UserSession.ended?(session)
 ```
+
+`session` is `request.session` or the Hash decoded from the cookie. `ended?` is
+true only for the `:ended` verdict; a live, legacy or unchecked cookie connects as
+before. The `respond_to?` guard lets the line merge before the host's engine bump.
+
+| App | Cable connection | Status |
+|-----|------------------|--------|
+| Hub (`mcritchie-studio`) | session user, OPSEC-045 token | calls `ended?` |
+| Cyvasse | session user from the encrypted cookie | calls `ended?` |
+| Turf | bare: no user, chat streams are public-read and Turbo signs stream names | nothing to refuse; a signed-out socket hears what a signed-out page does |
+| Rolio | bare: no user | nothing to refuse |
+| mcritchie-industries, moms-app | none | nothing to do |
+
+A logout does not close a socket that is already open. The hub's
+`ApplicationCable::Connection.disconnect(user)` drops a user's sockets on sign-out,
+and the reconnect runs `connect` again, which now refuses the ended sid.
