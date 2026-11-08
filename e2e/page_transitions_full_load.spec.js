@@ -155,6 +155,32 @@ test("a Turbo visit answered by turbo-visit-control reload plays once", async ({
   expect(lines.filter((line) => line.startsWith("violation"))).toEqual([]);
 });
 
+// turf-monster's /wallet and /account (run 42447610386): Turbo used to open its view transition
+// for a response it would only reload, and the reload skipped that transition while `ready` was
+// pending. Turbo awaits only `finished`, so `ready` rejected unhandled: a "Transition was
+// skipped" pageerror. Holding the update callback open past Turbo's render keeps `ready`
+// pending until the reload's pageswap, which makes the race certain instead of rare.
+test("a Turbo visit answered by turbo-visit-control reload opens no view transition, so none is skipped", async ({ page }) => {
+  const errors = watchPageErrors(page);
+  await page.addInitScript(() => {
+    const start = Document.prototype.startViewTransition;
+    if (!start) return;
+    Document.prototype.startViewTransition = function (update) {
+      const held = typeof update === "function"
+        ? async () => { await update(); await new Promise((done) => setTimeout(done, 1000)); }
+        : update;
+      return start.call(this, held);
+    };
+  });
+  await open(page, "direction=left&control=reload&strict=1");
+  await page.locator('[data-test="other"]').click();
+  await settled(page, "b");
+  expect(errors).toEqual([]);
+  const lines = await logged(page);
+  expect(lines).not.toContain("startViewTransition");
+  expectOneMotion(lines, "pt-out-left", "pt-in-from-right");
+});
+
 test("a plain Turbo visit plays once, by Turbo, with no full load", async ({ page }) => {
   await open(page, "direction=left");
   const load = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
