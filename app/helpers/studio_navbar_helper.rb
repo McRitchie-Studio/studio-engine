@@ -37,6 +37,28 @@ module StudioNavbarHelper
       "@click": "$store.modals && ($event.preventDefault(), #{open})" }
   end
 
+  # Any h1 opening tag, as the page's own heading.
+  PAGE_H1 = /<h1[\s>]/i
+
+  # Records that this page draws its own h1 (studio/_page_header calls it).
+  # Views render before their layout, so the navbar reads the mark when the
+  # layout draws it. Call it from a view that draws its page h1 somewhere the
+  # navbar cannot see: a content_for block, or a fragment the layout renders.
+  def studio_page_h1!
+    content_for(:studio_page_h1, "1") unless content_for?(:studio_page_h1)
+  end
+
+  # Whether the page carries an h1 of its own, so the navbar draws the brand
+  # as a div and the page keeps one h1. True when a view recorded one
+  # (studio_page_h1!), or when the rendered page body (the layout's yield)
+  # holds an h1 tag: a hand-written heading, or a page header served from a
+  # fragment cache, which replays its HTML but not its content_for.
+  def studio_page_has_h1?
+    return true if content_for?(:studio_page_h1)
+
+    content_for?(:layout) && content_for(:layout).to_s.match?(PAGE_H1)
+  end
+
   # Studio.navbar_items as partial specs ({ partial:, locals: }), [] for none.
   # Resolved once per render pass: the desktop bar and the phone row both ask.
   def studio_navbar_items
