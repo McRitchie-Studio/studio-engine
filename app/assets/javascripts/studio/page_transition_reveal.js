@@ -53,6 +53,9 @@
     if (!transition) return
     var direction = document.querySelector('meta[name="page-transition-direction"]')
     if (!style || !direction) {
+      // The skip is chosen here, so its `ready` rejection is expected: handled, as in
+      // studio/page_transitions' skipOwnTransition. Chrome leaves it unhandled otherwise.
+      if (transition.ready && typeof transition.ready.catch === "function") transition.ready.catch(function () {})
       transition.skipTransition()
       return
     }
