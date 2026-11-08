@@ -60,3 +60,16 @@ test("a hide still waiting on the minimum never ends a later show", (t) => {
   t.mock.timers.tick(300)
   assert.equal(doc.spinner.style.opacity, "0")
 })
+
+test("two hides of one show both stand, so the load's repeat hydrate still hides", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"] })
+  const doc = spinnerDoc()
+  globalThis.document = doc
+  t.after(() => { delete globalThis.document })
+
+  showNavSpinner()
+  hideNavSpinner()               // DOMContentLoaded's hydrate
+  hideNavSpinner()               // turbo:load's hydrate
+  t.mock.timers.tick(300)
+  assert.equal(doc.spinner.style.opacity, "0")
+})

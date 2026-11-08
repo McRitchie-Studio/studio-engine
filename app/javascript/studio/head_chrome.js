@@ -14,6 +14,8 @@
 // Minimum display time prevents quick flashes; per app via
 // Studio.nav_spinner_min_ms, which the head publishes as
 // <meta name="studio-nav-spinner-min-ms"> (smooth-load apps drop it to ~300).
+// A hide is bound to the show it ends: one still waiting out the minimum when a
+// later show starts does nothing, and that show's own hide takes the spinner down.
 
 // How long hide must still wait so the spinner shows for at least minMs.
 export function spinnerHideDelay(shownAt, now, minMs) {
