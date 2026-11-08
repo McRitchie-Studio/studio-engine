@@ -29,9 +29,11 @@ class PageHeaderSelfStyledLabTest < ActionDispatch::IntegrationTest
     doc = page("/lab/plain_css/page_header")
 
     assert_equal 1, self_styled_sheets(doc).size
-    scripts = doc.css("script").select { |script| script.text.include?("studioPageHeaderSelfStyled") }
-    assert_equal 1, scripts.size, "the row's own script, with no import map on the page"
-    assert_empty doc.css("script[type=importmap], script[src]"), "the host loads no other script"
+    scripts = doc.css("script")
+    assert_equal 1, scripts.size, "the row's own module, and no other script on the page"
+    assert_equal "module", scripts.first["type"]
+    assert_match %r{studio/page_header_self_styled(-[0-9a-f]+)?\.js\z}, scripts.first["src"]
+    assert_empty doc.css("script[type=importmap]"), "the host has no import map, and the module needs none"
     sentinel = doc.at_css(".page-header-sentinel")
     assert_equal "page-header", sentinel["data-studio-controller"]
     assert_includes sentinel.next_element["class"].split, "page-header"
@@ -52,6 +54,7 @@ class PageHeaderSelfStyledLabTest < ActionDispatch::IntegrationTest
 
     assert doc.at_css(".page-header-sentinel + .page-header"), "the row rendered"
     assert_empty self_styled_sheets(doc)
-    refute_includes response.body, "studioPageHeaderSelfStyled"
+    # The import map pins every engine module, this one included; only a tag loads it.
+    assert_empty doc.css("script[src*='page_header_self_styled']")
   end
 end
