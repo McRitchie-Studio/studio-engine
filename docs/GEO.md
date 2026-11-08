@@ -64,7 +64,8 @@ end
 <%= render "components/geo_badge" %>
 ```
 
-Webhooks and health checks should skip detection — they have no visitor:
+Webhooks and health checks should skip detection — they have no visitor. The engine's
+not-found page (`Studio::NotFoundController`) already turns it off ([NOT_FOUND_PAGE.md](NOT_FOUND_PAGE.md#what-it-skips)):
 
 ```ruby
 skip_before_action :detect_geo_state

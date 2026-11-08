@@ -24,6 +24,9 @@ module Studio
   #
   #   skip_before_action :detect_geo_state
   #
+  # The engine's not-found page (Studio::NotFoundController) needs no skip: it
+  # overrides the method as a no-op, so an app's own skip there still works.
+  #
   # SESSION KEYS are the plain names an app already has in production
   # (:geo_state, :geo_country, :geo_ip, :geo_detected_at, :geo_override) so an
   # app adopting this concern keeps every live visitor's resolved location

@@ -13,6 +13,16 @@ module Studio
   # public/404.html, so a wall can cost the page its layout but never its status.
   class NotFoundController < ::ApplicationController
     skip_before_action :require_authentication, raise: false
+    # The page runs as the exceptions app, after the request has left the
+    # session and cookie middleware: nothing it writes to the session or a
+    # cookie is ever saved. A callback that throttles through the session never
+    # holds here, so it would pay its full cost on every 404. Two engine
+    # callbacks do that, and both are no-ops below (docs/NOT_FOUND_PAGE.md).
+    #
+    # Overridden, not skipped: the callbacks stay registered, so an app that
+    # already skips them itself with a raising skip_*_action (Turf did) still
+    # boots. A skip here would make that app's skip raise ArgumentError.
+
     # No forgery skip: Rails' ShowExceptions calls the exceptions app as a GET
     # (request_method = "GET"), which never needs the token, so the host's CSRF
     # allow-lists stay as they are.
@@ -28,6 +38,15 @@ module Studio
     end
 
     private
+
+    # Studio::ErrorHandling's after_action. It would add a Studio::UserSession
+    # row on every signed-in 404, because the throttle cookie is never saved.
+    def track_user_session; end
+
+    # Studio::GeoDetection's before_action, when the app includes it. It would
+    # pay an IP geo lookup (up to 3s) on every 404, because the session stamp is
+    # never saved. Harmless in an app without the concern: nothing calls it.
+    def detect_geo_state; end
 
     def not_found_logo
       Studio.navbar_brand&.dig(:logo) || Studio.logo_for("Navbar Logo")
