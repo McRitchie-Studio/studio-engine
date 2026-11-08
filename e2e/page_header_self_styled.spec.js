@@ -59,8 +59,9 @@ async function scrollPast(page) {
   await expect(row(page)).toHaveAttribute("data-stuck", "");
 }
 
-for (const scheme of ["light", "dark"]) {
-  test(`desktop, ${scheme}: the row is styled from the host's tokens and sticks under its masthead`, async ({ page }) => {
+// The census counts bare test( declarations, so each scheme is its own declaration below.
+async function desktopRow(page, scheme) {
+  {
     const errors = watchPageErrors(page);
     await page.emulateMedia({ colorScheme: scheme });
     await page.setViewportSize(DESKTOP);
@@ -128,8 +129,16 @@ for (const scheme of ["light", "dark"]) {
     await expect.poll(() => style(row(page), "backgroundColor")).toBe(tokens.surface);
 
     expect(errors).toEqual([]);
-  });
+  }
 }
+
+test("desktop, light: the row is styled from the host's tokens and sticks under its masthead", async ({ page }) => {
+  await desktopRow(page, "light");
+});
+
+test("desktop, dark: the row is styled from the host's tokens and sticks under its masthead", async ({ page }) => {
+  await desktopRow(page, "dark");
+});
 
 test("desktop: the Links menu opens under its button, keeps aria-expanded, and closes on Escape", async ({ page }) => {
   const errors = watchPageErrors(page);
@@ -161,8 +170,8 @@ test("desktop: the Links menu opens under its button, keeps aria-expanded, and c
   expect(errors).toEqual([]);
 });
 
-for (const scheme of ["light", "dark"]) {
-  test(`phone 390, ${scheme}: the row fits, the trail gives way to the parent, and it still sticks`, async ({ browser }) => {
+async function phoneRow(browser, scheme) {
+  {
     const context = await browser.newContext({ ...PHONE, colorScheme: scheme });
     const page = await context.newPage();
     const errors = watchPageErrors(page);
@@ -195,8 +204,16 @@ for (const scheme of ["light", "dark"]) {
     expect(Math.abs((await box(row(page))).top - masthead.bottom)).toBeLessThan(1);
     expect(errors).toEqual([]);
     await context.close();
-  });
+  }
 }
+
+test("phone 390, light: the row fits, the trail gives way to the parent, and it still sticks", async ({ browser }) => {
+  await phoneRow(browser, "light");
+});
+
+test("phone 390, dark: the row fits, the trail gives way to the parent, and it still sticks", async ({ browser }) => {
+  await phoneRow(browser, "dark");
+});
 
 test("the legal page: one h1 in the header, a readable column, and it fits a phone", async ({ page, browser }) => {
   const errors = watchPageErrors(page);
