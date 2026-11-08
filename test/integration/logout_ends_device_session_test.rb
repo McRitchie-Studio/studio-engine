@@ -212,6 +212,36 @@ class LogoutEndsDeviceSessionTest < ActionDispatch::IntegrationTest
     Studio::UserSession.singleton_class.remove_method(:revoke_before_fault!)
   end
 
+  test "a failed check signs nobody out and writes one ErrorLog row per window, not one per request" do
+    sign_in_on(self)
+    Studio::UserSession.check_failure_logged_at = nil
+    Studio::UserSession.define_singleton_method(:where) { |*| raise ActiveRecord::StatementInvalid, "db down" }
+
+    3.times do
+      get "/device_session/whoami"
+      assert_equal "user:#{@user.id}", response.body
+    end
+    assert_equal 1, ErrorLog.count
+    assert_match(/db down/, ErrorLog.last.message)
+  ensure
+    Studio::UserSession.singleton_class.remove_method(:where)
+    Studio::UserSession.check_failure_logged_at = nil
+  end
+
+  test "a sign-in on a logged-out device's copied cookie starts a new sid, and the copy stays ended" do
+    captured = sign_in_on(self)
+    old_sid = Studio::UserSession.where.not(sid: nil).pick(:sid)
+    get "/logout"
+
+    again = replay(captured)
+    again.post "/device_session/sign_in", params: { user_id: @user.id }
+    again.get "/device_session/whoami"
+    assert_equal "user:#{@user.id}", again.response.body
+    assert_equal 2, Studio::UserSession.distinct.count(:sid)
+    refute_nil Studio::UserSession.where(sid: old_sid).pick(:revoked_at)
+    assert_equal "visitor", replay(captured).response.body
+  end
+
   private
 
   def set_revocation_columns(on)
