@@ -310,11 +310,25 @@ class NotFoundExceptionsAppTest < ActiveSupport::TestCase
     assert_equal 1, ApplicationController.geo_lookups, "control: the host's pages do detect"
   end
 
-  test "the page skips the session-throttled callbacks, by name" do
-    filters = Studio::NotFoundController._process_action_callbacks.map(&:filter)
+  # An app may already skip these itself, raising on purpose so a rename fails at
+  # boot (Turf's config/initializers/not_found_page.rb did). The engine must leave
+  # the callbacks registered, as no-ops, or that app's skip raises ArgumentError
+  # and the app does not boot.
+  test "an app's own raising skip of either callback still boots" do
+    host_skips = Class.new(Studio::NotFoundController)
 
-    refute_includes filters, :track_user_session
+    host_skips.skip_before_action :detect_geo_state
+    host_skips.skip_after_action :track_user_session
+    filters = host_skips._process_action_callbacks.map(&:filter)
     refute_includes filters, :detect_geo_state
+    refute_includes filters, :track_user_session
+  end
+
+  test "the page keeps both callbacks registered and makes them do nothing" do
+    controller = Studio::NotFoundController.new
+    assert_nil controller.send(:track_user_session)
+    assert_nil controller.send(:detect_geo_state)
+    refute Studio::NotFoundController.action_methods.include?("detect_geo_state"), "never an action"
     assert_includes ApplicationController._process_action_callbacks.map(&:filter), :detect_geo_state,
                     "control: the host still detects"
   end
