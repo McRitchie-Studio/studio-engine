@@ -18,7 +18,7 @@ function installRecorder(context) {
     window.ptLog = log;
     // The state each side of a load was in, for the event log a red prints (afterEach below).
     // Lines start "swap-" and "reveal-", so the specs that count "page..." lines never see them.
-    window.__painted = 0;
+    window.__ticks = 0;
     window.__revealed = false;
     window.addEventListener("pageswap", (event) => {
       log(`pageswap ${event.viewTransition ? "transition" : "plain"}`);
@@ -27,7 +27,7 @@ function installRecorder(context) {
         to: event.activation && event.activation.entry ? new URL(event.activation.entry.url).pathname : null,
         visibility: document.visibilityState,
         revealed: window.__revealed,
-        painted: window.__painted,
+        frames: window.__ticks,
         ready: document.readyState,
         module: !!document.documentElement.dataset.pageTransitionDirection,
       })}`);
@@ -49,7 +49,7 @@ function installRecorder(context) {
     window.__seen = seen;
     window.__frames = [];
     const tick = () => {
-      window.__painted += 1;
+      window.__ticks += 1;
       for (const animation of document.getAnimations()) {
         const pseudo = animation.effect && animation.effect.pseudoElement;
         if (!pseudo || !pseudo.startsWith("::view-transition")) continue;
@@ -153,9 +153,7 @@ test("the motion outlives the new page's own turbo:load, then its marks go", asy
     setTimeout(() => window.ptLog(`after load ${document.documentElement.dataset.pageTransition}`), 0);
   }));
   await page.goto(`${LAB}?${STRICT}`);
-  // Turbo is a module of its own: it can be up before studio/page_transitions has run, and a
-  // click then gets the plain load (the "click before the old page's module" spec below).
-  await page.waitForFunction(() => window.Turbo && document.documentElement.dataset.pageTransitionDirection);
+  await page.waitForFunction(() => window.Turbo);
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
   await fullLoad(page);
   await settled(page, "b");

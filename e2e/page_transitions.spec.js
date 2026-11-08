@@ -51,10 +51,7 @@ async function open(page, query) {
   await page.route("**/e2e/img/pt-hung.png", () => {});
   await page.route("**/e2e/img/pt-failed.png", (route) => route.abort());
   await page.goto(`${LAB}?${query}`);
-  // Turbo is a module of its own and can be up before studio/page_transitions has run; a
-  // visit then plays nothing. The direction mark on <html> is the module's own, set as it
-  // installs, so a page with a direction waits for it too.
-  await page.waitForFunction((on) => window.Turbo && (!on || document.documentElement.dataset.pageTransitionDirection), query.includes("direction"));
+  await page.waitForFunction(() => window.Turbo);
 }
 
 // The share of pixels that differ, at quarter size, with where they start for a failure.
