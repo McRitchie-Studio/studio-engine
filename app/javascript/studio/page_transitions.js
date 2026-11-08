@@ -106,6 +106,15 @@ export function leaveStyle(win, style) {
   }
 }
 
+// A skip the engine chooses. Chrome rejects the skipped transition's `ready` with "Transition
+// was skipped" and leaves the rejection unhandled (measured: a pageerror whenever nothing
+// awaits `ready`). This skip is the engine's own decision, so that one rejection is expected
+// and handled here. A transition the engine did not skip is never touched.
+export function skipOwnTransition(transition) {
+  if (transition.ready && typeof transition.ready.catch === "function") transition.ready.catch(() => {})
+  transition.skipTransition()
+}
+
 // A slow image must not hold a click: past the cap the swap goes ahead.
 export function withCap(promise, ms, timer = setTimeout) {
   return Promise.race([promise, new Promise((done) => timer(done, ms))])
@@ -210,9 +219,11 @@ export function installPageTransitions(doc) {
 
   doc.addEventListener("turbo:visit", (event) => {
     root.dataset.pageTransitionVisit = ""
-    // Turbo opens its view transition before it reads turbo-visit-control. A response it will
-    // not render gets no turbo:before-render, so this stands, and that transition draws nothing.
-    // The full load after it plays the one motion. Left alone while a motion is still running.
+    // A response Turbo will not render gets no turbo:before-render, so this stands. Turbo
+    // opens no transition for it (studio/reload_visits takes the meta out of what it parses),
+    // and should one open on a path that guard does not see (a frame's reload visit), this
+    // makes it draw nothing. The full load after it plays the one motion. Left alone while a
+    // motion is still running.
     if (!root.dataset.pageTransition) root.dataset.pageTransition = STILL
     target = new URL(event.detail.url).pathname
     // A GET that redirects: Turbo renders the response, then replaces to the final address
@@ -305,7 +316,7 @@ export function installPageTransitions(doc) {
     const left = leaveStyle(win, style)
     if (!transition) return
     if (!left) {
-      transition.skipTransition()
+      skipOwnTransition(transition)
       return
     }
     markHeld(doc)

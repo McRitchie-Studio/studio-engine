@@ -79,7 +79,7 @@ class EngineImportmapPinsTest < ActiveSupport::TestCase
                     studio/hold_button studio/hold_button_hooks studio/identity_mini studio/image_upload studio/in_page_links
                     studio/lazy_controllers studio/leveling_activity studio/link_sidebar studio/loader studio/modal_countdown
                     studio/modal_host studio/nav_collapse studio/newsletter_modal studio/pinned_stack
-                    studio/profile_form studio/stimulus
+                    studio/profile_form studio/reload_visits studio/stimulus
                     studio/theme_editor studio/toast studio/transition_snapshot], boot_graph
     refute_includes boot_graph, "studio/local_path", "a module nothing in the boot imports is not preloaded"
     refute_includes boot_graph, "studio/controllers/board_controller",
