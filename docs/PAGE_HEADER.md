@@ -32,7 +32,7 @@ from the pinned stack ([`NAVBAR_SETUP.md`](NAVBAR_SETUP.md#reading-the-pinned-st
 
 | Local | What it does |
 |-------|--------------|
-| `title` | The page's one `h1`. Required. |
+| `title` | The page's one `h1`. Required. The row records it, so the navbar draws its brand as a div (docs/NAVBAR_SETUP.md, Brand Heading). |
 | `crumbs` | The trail above the title: the page's ancestors, root first, as `[{ label:, href: }]`. Build it with `studio_crumbs` (below). |
 | `crumb_label` | The page's own name at the end of the trail, when the title is too long for it. The default is the title. |
 | `meta`, `meta_title` | Short text beside the title, such as the version, and its `title` attribute. Hidden below 640px. |

@@ -136,13 +136,32 @@ The navbar uses `Studio.logo_for("Navbar Logo")`, auth views use `Studio.logo_fo
 
 ## Brand Heading
 
-The brand title is the page's `<h1>` by default. On a page that carries its own
-h1, pass `brand_heading: false` and the brand is drawn as a `<div>` with the same
-classes and contents, so the page's title is the outline's only h1:
+A page has one `<h1>`, and the engine picks it. The layout draws the navbar after
+the page has rendered, so the navbar knows whether the page has an h1 of its own
+(`studio_page_has_h1?`):
+
+- `studio/_page_header` records one (its title is the page's h1).
+- An `<h1>` tag in the page body (the layout's `yield`) counts too, so a
+  hand-written heading or a cached page header is seen.
+- A view that draws its page h1 where neither can see it (a `content_for` block
+  the layout renders) calls `studio_page_h1!`.
+
+With a page h1, the brand is drawn as a `<div>` with the same classes and
+contents. With none (the profile, the error logs), the brand stays the page's h1.
+A `preview: true` navbar keeps the h1.
+
+Select the brand by its class, `.nav-title` (or `.nav-wordmark-brand` for a
+lockup), never by `h1`: the tag follows the page.
+
+An explicit `brand_heading:` wins over the engine's choice:
 
 ```erb
 <%= render "layouts/navbar", brand_heading: false %>
 ```
+
+An app that passed `brand_heading: false` on every page, or computed it from the
+page body, can drop the local: the engine now does both. A forked
+`layouts/_navbar` gets none of this; it draws its own brand.
 
 ## Brand Wordmark (optional)
 
@@ -157,7 +176,7 @@ config.navbar_wordmark = { light: "/brand/navbar-light.svg",
 `light` is the file for a light page and `dark` the file for a dark page (the
 root's `dark` class). Both render; engine.css shows the matching one, so the
 theme toggle swaps them with no script. The lockup keeps the root link and the
-brand h1 (`brand_heading: false` still makes it a div), with `alt` set to
+brand h1 (a page h1 or `brand_heading: false` still makes it a div), with `alt` set to
 `Studio.app_name`. It is height-led: its height is the logo's collapse size
 (48px expanded, 32px collapsed on desktop, 40px on a phone) and its width is the
 artwork's own, scaled down inside the left column on a narrow phone. Crop the
@@ -245,7 +264,7 @@ A page's own title row joins the stack the same way: see
 
 These classes are available for preview CSS targeting:
 - `.nav-logo` — the logo image
-- `.nav-title` — the brand title (an h1, or a div when `brand_heading: false`)
+- `.nav-title` — the brand title (an h1, or a div when the page has its own h1 or `brand_heading: false`)
 - `.nav-logo-link` — the link wrapping logo + title
 - `.nav-wordmark-brand`, `.nav-wordmark`, `.nav-wordmark-light`, `.nav-wordmark-dark` — the brand lockup when `config.navbar_wordmark` is set
 - `.user-nav-col` — the right-side user nav column (fixed width, seats a balance)
