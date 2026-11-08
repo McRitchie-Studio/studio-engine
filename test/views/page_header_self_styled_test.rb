@@ -78,6 +78,22 @@ class PageHeaderSelfStyledTest < Minitest::Test
     refute_includes doc.text, "SCOPED CSS", "the partial's comment does not leak into the page"
   end
 
+  # A host with a strict CSP sets a nonce; the row's style and script carry it, so the
+  # browser runs them. Without one, neither carries the attribute.
+  def test_the_style_and_script_carry_the_requests_csp_nonce
+    Studio.page_header_self_styled = true
+    view = new_view
+    view.define_singleton_method(:content_security_policy_nonce) { "n0nce" }
+    doc = Nokogiri::HTML.fragment(render_row(view))
+
+    assert_equal "n0nce", doc.at_css("style")["nonce"]
+    assert_equal "n0nce", doc.at_css("script")["nonce"]
+    assert_equal "n0nce", Nokogiri::HTML.fragment(render_legal(new_view.tap { |v|
+      v.define_singleton_method(:content_security_policy_nonce) { "n0nce" }
+    })).at_css("style")["nonce"]
+    refute Nokogiri::HTML.fragment(render_row(new_view)).at_css("script").key?("nonce")
+  end
+
   def test_the_assets_render_once_however_many_rows_a_page_has
     Studio.page_header_self_styled = true
     view = new_view

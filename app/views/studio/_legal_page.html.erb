@@ -21,7 +21,7 @@
     The column has a 1rem gutter, which the row's default bleed fits. %>
 <% unless @_studio_legal_page_styled %>
 <% @_studio_legal_page_styled = true %>
-<style<%= tag.attributes(nonce: (content_security_policy_nonce if respond_to?(:content_security_policy_nonce))) %>>
+<style <%= tag.attributes(nonce: (content_security_policy_nonce if respond_to?(:content_security_policy_nonce))) %>>
   .legal-page { box-sizing: border-box; max-width: 46rem; margin-inline: auto; padding: 1.5rem 1rem 3rem; }
   .legal-page-updated { margin: .25rem 0 0; font-size: .875rem; line-height: 1.25rem;
     color: var(--color-text-muted, var(--color-text-secondary, currentColor)); }

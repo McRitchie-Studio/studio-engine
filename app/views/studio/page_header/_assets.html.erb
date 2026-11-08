@@ -23,7 +23,7 @@
     row sticks under the app's own masthead. Without the script the row keeps its
     bar at all times (the noscript rule), and every control is still a link or a
     popover. %>
-<style<%= tag.attributes(nonce: (content_security_policy_nonce if respond_to?(:content_security_policy_nonce))) %>>
+<style <%= tag.attributes(nonce: (content_security_policy_nonce if respond_to?(:content_security_policy_nonce))) %>>
   .page-header { --ph-ink: var(--color-text, currentColor); --ph-body: var(--color-text-body, currentColor);
     --ph-muted: var(--color-text-muted, var(--color-text-secondary, currentColor));
     --ph-surface: var(--color-surface, Canvas); --ph-surface-alt: var(--color-surface-alt, var(--color-surface, Canvas));
@@ -150,7 +150,7 @@
   }
 </style>
 <noscript><style>.page-header { background-color: var(--ph-surface); border-color: var(--ph-line); }</style></noscript>
-<script<%= tag.attributes(nonce: (content_security_policy_nonce if respond_to?(:content_security_policy_nonce))) %>>
+<script <%= tag.attributes(nonce: (content_security_policy_nonce if respond_to?(:content_security_policy_nonce))) %>>
   (function () {
     if (window.studioPageHeaderSelfStyled) { window.studioPageHeaderSelfStyled.scan(); return; }
 
