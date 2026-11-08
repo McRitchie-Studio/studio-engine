@@ -27,6 +27,10 @@ export function spinnerMinMs(doc) {
 }
 
 var spinnerShownAt = 0
+// Each show starts a new generation. A hide captures the generation it ends and
+// hides only if no later show has started one, so a hide still waiting out the
+// minimum (the load's hydrate) never drops a spinner a later press raised.
+var spinnerGeneration = 0
 
 function showToggle(doc) {
   doc.querySelectorAll('.nav-toggle-icon').forEach(function (e) { e.style.opacity = '1'; e.style.transform = 'scale(1) rotate(0deg)' })
@@ -35,13 +39,15 @@ function showToggle(doc) {
 
 export function showNavSpinner() {
   spinnerShownAt = Date.now()
+  spinnerGeneration += 1
   document.querySelectorAll('.nav-toggle-icon').forEach(function (e) { e.style.opacity = '0'; e.style.transform = 'scale(0) rotate(90deg)' })
   document.querySelectorAll('.nav-spinner-icon').forEach(function (e) { e.style.opacity = '1'; e.style.transform = 'scale(1) rotate(0deg)' })
 }
 
 export function hideNavSpinner() {
+  var generation = spinnerGeneration
   var wait = spinnerHideDelay(spinnerShownAt, Date.now(), spinnerMinMs(document))
-  setTimeout(function () { showToggle(document) }, wait)
+  setTimeout(function () { if (generation === spinnerGeneration) showToggle(document) }, wait)
 }
 
 // Reset spinner state before Turbo caches the page. Installed once.
