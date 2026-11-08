@@ -4,6 +4,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.135.2 — 2026-11-08
+
+### Fixed
+
+- **A nav-spinner hide no longer ends a later show.** `hideNavSpinner()` waits out the minimum display time before it hides, and a hide still waiting (the layout's load-time hydrate) used to land after a later `showNavSpinner()` and drop that spinner while its work was still running. Each show now starts a generation, and a hide fires only if no later show has started. Nothing to do in a host: it arrives with the engine bump.
+
 ## 0.135.1 — 2026-11-07
 
 ### Fixed
