@@ -89,6 +89,7 @@ before. The `respond_to?` guard lets the line merge before the host's engine bum
 | Hub (`mcritchie-studio`) | session user, OPSEC-045 token | calls `ended?` |
 | Cyvasse | session user from the encrypted cookie | calls `ended?` |
 | Turf | bare: no user, chat streams are public-read and Turbo signs stream names | nothing to refuse; a signed-out socket hears what a signed-out page does |
+| Rolio | bare: no user | nothing to refuse |
 | mcritchie-industries, moms-app | none | nothing to do |
 
 A logout does not close a socket that is already open. The hub's
