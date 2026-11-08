@@ -124,9 +124,17 @@ module Studio
         config.has_primary_key?.present? && config.has_key_derivation_salt?.present?
       end
 
-      # True on a production server, where the test seams are refused.
+      # True on a production server.
       def production?
         defined?(::Rails) && ::Rails.respond_to?(:env) && ::Rails.env.production?
+      end
+
+      # The test seams are allowed only in development and test (or with no
+      # Rails at all): a staging or QA environment refuses them as production does.
+      def seams_allowed?
+        return true unless defined?(::Rails) && ::Rails.respond_to?(:env)
+
+        ::Rails.env.development? || ::Rails.env.test?
       end
 
       private
@@ -171,12 +179,12 @@ module Studio
 
       # Stand-in for the provider's token and revoke endpoints:
       # (url, form, headers) -> [status, body]. nil means the provider itself.
-      # Tests, the e2e lane and a local demo only; refused in production.
+      # Tests, the e2e lane and a local demo only; refused outside development and test.
       attr_reader :http
 
       # Stand-in for the provider's sign-in page (authorize_url only), for the
       # e2e lane and a local demo: anything answering
-      # authorize_url(redirect_uri:, state:, account:). Refused in production.
+      # authorize_url(redirect_uri:, state:, account:). Refused outside development and test.
       # The code exchange and the refresh still run through .http.
       attr_reader :sign_in_stand_in
 
@@ -227,6 +235,8 @@ module Studio
         @revoked_pattern = revoked_pattern
         @rate_limited_statuses = Array(rate_limited_statuses).map(&:to_i)
         @filter_keys = Array(filter_keys).map(&:to_s)
+        # A private account's callback param is filtered whether or not the host listed it.
+        @filter_keys |= [@account_param] if @private_account && @account_source == :callback
         @revoke_note = revoke_note || "Remove this app's access in #{@label} to revoke it there."
         @callback_check = callback_check
         @describe = describe
@@ -235,12 +245,12 @@ module Studio
       end
 
       def http=(callable)
-        refuse_seam_in_production!("http") unless callable.nil?
+        refuse_seam_outside_dev_and_test!("http") unless callable.nil?
         @http = callable
       end
 
       def sign_in_stand_in=(stand_in)
-        refuse_seam_in_production!("sign_in_stand_in") unless stand_in.nil?
+        refuse_seam_outside_dev_and_test!("sign_in_stand_in") unless stand_in.nil?
         @sign_in_stand_in = stand_in
       end
 
@@ -360,8 +370,8 @@ module Studio
         raise ArgumentError, "#{@key}: #{name} is one of #{allowed.map(&:inspect).join(', ')}, not #{value.inspect}"
       end
 
-      def refuse_seam_in_production!(name)
-        raise Error, "#{label}: the #{name} stand-in is for tests, the e2e lane and a local demo, never production" if Connections.production?
+      def refuse_seam_outside_dev_and_test!(name)
+        raise Error, "#{label}: the #{name} stand-in is for tests, the e2e lane and a local demo (development and test only)" unless Connections.seams_allowed?
       end
 
       def ensure_configured!
@@ -425,7 +435,8 @@ module Studio
         end
         status, body = call(url, form, headers)
         json = parse(body)
-        return json if status == 200 && (allow_empty || json.any?)
+        # A revoke (allow_empty) is confirmed by any 2xx, a 204 included; a token answer must be a 200 with a body.
+        return json if allow_empty ? (200..299).cover?(status) : (status == 200 && json.any?)
 
         raise_for(status, json)
       end

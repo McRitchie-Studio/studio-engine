@@ -54,14 +54,20 @@ class ConnectionsClientTest < ActiveSupport::TestCase
     end
   end
 
-  test "[unit] the test seams are refused on a production server" do
-    Rails.env = "production"
-    assert Studio::Connections.production?
-    assert_raises(Studio::Connections::Error) { ledger.http = ->(*) {} }
-    assert_raises(Studio::Connections::Error) { ledger.sign_in_stand_in = Object.new }
-    ledger.http = nil # clearing one is always allowed
-    assert_nil ledger.http
+  test "[unit] the test seams are refused outside development and test, staging and production alike" do
+    %w[production staging qa].each do |env|
+      Rails.env = env
+      assert_not Studio::Connections.seams_allowed?, env
+      assert_raises(Studio::Connections::Error, env) { ledger.http = ->(*) {} }
+      assert_raises(Studio::Connections::Error, env) { ledger.sign_in_stand_in = Object.new }
+      ledger.http = nil # clearing one is always allowed
+      assert_nil ledger.http
+    end
+    Rails.env = "development"
+    ledger.http = ->(*) {}
+    assert ledger.http
   ensure
+    ledger.http = nil
     Rails.env = "test"
   end
 
@@ -302,6 +308,10 @@ class ConnectionsClientTest < ActiveSupport::TestCase
       assert_equal({ token: "r1", client_secret: "drive-secret" }, drive_requests.sole[:form], "the secret, but not the id")
 
       assert_nil tenant.revoke(store(:tenant, account: ConnectionsHost::TENANT))
+      stub_http(ledger, [204, ""])
+      assert_equal true, ledger.revoke(ledger_row), "a 204 confirms the revoke"
+      stub_http(ledger, [302, ""])
+      assert_raises(Studio::Connections::Error, "a redirect does not") { ledger.revoke(ledger_row) }
       stub_http(ledger, [400, { error: "invalid_token" }.to_json])
       assert_raises(Studio::Connections::Error) { ledger.revoke(ledger_row) }
     end
@@ -360,6 +370,17 @@ class ConnectionsClientTest < ActiveSupport::TestCase
     assert_equal({ "tenant" => "[FILTERED]" }, filter.filter("tenant" => ConnectionsHost::TENANT))
     assert_equal({ "tenant" => { "id" => "t-1" } }, filter.filter("tenant" => { "id" => "t-1" }), "a nested Hash is spared")
     assert_equal({ "my_account_id" => "x", "tenants" => "y" }, filter.filter("my_account_id" => "x", "tenants" => "y"), "exact keys only")
+  end
+
+  test "[unit] a private account's callback param is filtered even when filter_keys omits it" do
+    provider = Studio.define_connection :quiet, label: "Quiet", env: { client_id: "Q_ID", client_secret: "Q_SECRET" },
+                                                grant: :client_credentials, authorize_url: "https://q.example/a",
+                                                token_url: "https://q.example/t", account: :callback,
+                                                account_param: "org_ref", account_format: /\A\w+\z/, private_account: true
+    filter = ActiveSupport::ParameterFilter.new(Rails.application.config.filter_parameters)
+
+    assert_includes provider.filter_keys, "org_ref"
+    assert_equal "[FILTERED]", filter.filter("org_ref" => "org1")["org_ref"]
   end
 
   test "[unit] a provider declared after boot is covered by the filter the engine already installed" do

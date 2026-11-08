@@ -52,6 +52,23 @@ class ConnectionsFlowTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "a callable guard that answers false or nil refuses with 403; true lets the admin in" do
+    saved = Studio.connection_admin_guard
+    with_env do
+      sign_in
+      [false, nil].each do |answer|
+        Studio.connection_admin_guard = ->(_controller) { answer }
+        get "/admin/ledger/connect"
+        assert_response :forbidden, answer.inspect
+      end
+      Studio.connection_admin_guard = ->(controller) { controller.send(:current_user)&.admin? }
+      get "/admin/ledger/connect"
+      assert response.location.to_s.start_with?("https://auth.ledger.example/"), "an admin passes"
+    end
+  ensure
+    Studio.connection_admin_guard = saved
+  end
+
   test "the guard is the host's to name: a callable taking the controller" do
     saved = Studio.connection_admin_guard
     Studio.connection_admin_guard = ->(controller) { controller.head(:forbidden) }
@@ -204,6 +221,19 @@ class ConnectionsFlowTest < ActionDispatch::IntegrationTest
       assert connection.access_fresh?
       get "/admin/drive"
       assert_equal "drive page: acme.drive.example", response.body
+    end
+  end
+
+  test "a provider that takes the account at Connect is POST-only: a GET link cannot start a connection" do
+    with_env do
+      sign_in
+      assert_raises(ActionController::RoutingError) { get "/admin/drive/connect", params: { drive_domain: "attacker" } }
+      get "/admin/drive/connect_by_hand", params: { drive_domain: "attacker" }
+      assert_response :method_not_allowed
+      assert_nil session["studio_connection_drive_state"], "no state was started"
+
+      get "/admin/ledger/connect" # no account input: GET stays allowed
+      assert response.location.to_s.start_with?("https://auth.ledger.example/")
     end
   end
 

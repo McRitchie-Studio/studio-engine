@@ -1227,7 +1227,7 @@ module Studio
   # Draws one provider's connect, callback and disconnect into the host's
   # routes, and records them for the log filter and the callback URL:
   #
-  #   GET|POST  /<path>/connect               <as>_connect
+  #   POST      /<path>/connect               <as>_connect    (also GET when the provider takes no account at Connect)
   #   GET       /<path>/callback              <as>_callback   (the redirect URI to register)
   #   DELETE    /<path>/connections/:id       <as>_disconnect
   #   GET       /<path>                       <as>            (only with show: true)
@@ -1249,7 +1249,11 @@ module Studio
     defaults = { studio_connection: provider.key }
     router.instance_exec do
       get "#{path}", to: "#{controller}#show", as: as, defaults: defaults if show
-      match "#{path}/connect", to: "#{controller}#connect", as: "#{as}_connect", via: %i[get post], defaults: defaults
+      # POST-only when the admin names the account at Connect: a GET would skip
+      # the CSRF check, so a link carrying an attacker's account could start a
+      # connection to it in a signed-in admin's session.
+      connect_via = provider.account_source == :connect ? %i[post] : %i[get post]
+      match "#{path}/connect", to: "#{controller}#connect", as: "#{as}_connect", via: connect_via, defaults: defaults
       get "#{path}/callback", to: "#{controller}#callback", as: "#{as}_callback", defaults: defaults
       delete "#{path}/connections/:id", to: "#{controller}#disconnect", as: "#{as}_disconnect", defaults: defaults
     end

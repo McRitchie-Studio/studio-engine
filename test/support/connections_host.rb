@@ -166,6 +166,9 @@ module ConnectionsHost
       Studio.draw_connection_routes(self, :ledger, path: "admin/ledger", return_to: %w[/admin/ledger /integrations])
       Studio.draw_connection_routes(self, :drive, path: "admin/drive", controller: "admin/drive")
       Studio.draw_connection_routes(self, :tenant, path: "admin/tenant")
+      # A host that draws a GET connect by hand for a provider that takes the
+      # account at Connect: the action itself must refuse it.
+      get "admin/drive/connect_by_hand", to: "admin/drive#connect", defaults: { studio_connection: "drive" }
     end
     Rails.application.reload_routes!
   end

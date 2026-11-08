@@ -39,6 +39,10 @@ module Studio
 
     def connect
       provider = connection_provider
+      # An account typed at Connect is accepted only on a CSRF-checked POST,
+      # even when a host draws a GET route by hand.
+      return head(:method_not_allowed) if provider.account_source == :connect && !request.post?
+
       back = connection_return_to(params[:return_to])
       return redirect_to(back, alert: connection_encryption_message) unless Studio::Connections.encryption_ready?
 
@@ -132,9 +136,15 @@ module Studio
 
     def connection_route = Studio::Connections.route(connection_provider.key)
 
+    # A method guard refuses the way a before_action does: it renders or
+    # redirects. A callable guard may do the same, or answer: false or nil
+    # refuses with 403, so `->(c) { c.current_user&.admin? }` is safe.
     def require_connection_admin
       guard = Studio.connection_admin_guard
-      guard.respond_to?(:call) ? guard.call(self) : send(guard)
+      return send(guard) unless guard.respond_to?(:call)
+
+      allowed = guard.call(self)
+      head(:forbidden) unless allowed || performed?
     end
 
     # Who connected it, as connected_by records: the user's slug, else their id.

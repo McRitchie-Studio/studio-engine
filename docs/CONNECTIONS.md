@@ -70,12 +70,12 @@ stand-in is installed.
 | `scopes:` | `[]` | Space-joined on the authorize URL (code grant) and on the client-credentials request. |
 | `client_auth:` | `:form` | `:form` puts the id and secret in the form. `:basic` uses an HTTP Basic header. |
 | `revoke_auth:` | `client_auth` | Also `:secret_only` (the secret in the form, without the id). |
-| `revoke_format:` | `:form` | Or `:json`. The body is `{ token: <refresh token, else access token> }`. |
+| `revoke_format:` | `:form` | Or `:json`. The body is `{ token: <refresh token, else access token> }`. Any 2xx answer confirms the revoke. |
 | `account:` | `:callback` | Where the account comes from (see below). |
 | `account_param:` | | The form param (`:connect`) or callback query param (`:callback`) that names the account. |
 | `account_format:` | | A Regexp. The normalized account must match it. Required for `:connect` and `:callback`. |
-| `normalize_account:` | strip | A callable that turns what was typed or sent into the account. |
-| `private_account:` | `false` | The account is stored only encrypted. The row is unique by a keyed digest of it. |
+| `normalize_account:` | strip | A callable that turns what was typed or sent into the account. A provider whose ids are case-insensitive (a tenant GUID, a domain) should pass one that lowercases, so one account never makes two rows. |
+| `private_account:` | `false` | The account is stored only encrypted. The row is unique by a keyed digest of it (HMAC of `secret_key_base`). Its callback param is log-filtered even if `filter_keys:` omits it. If `secret_key_base` is rotated, a reconnect makes a second row; delete the old one. |
 | `authorize_params:`, `exchange_params:` | `{}` | Extra params on the authorize URL and on the code exchange. |
 | `rotation:` | `:required` for `:rotating`, else `:optional` | `:required` refuses a refresh answer that has no refresh token. `:optional` keeps the stored token. |
 | `refresh_expires_in_key:` | `nil` | The grant field with the refresh token's lifetime in seconds. It sets `refresh_expires_at`. |
@@ -118,7 +118,7 @@ Studio.draw_connection_routes(self, :files, path: "admin/files", controller: "ad
 
 | Route | Name |
 |-------|------|
-| `GET` and `POST /admin/files/connect` | `admin_files_connect` |
+| `POST /admin/files/connect` (also `GET` when the provider takes no account at Connect) | `admin_files_connect` |
 | `GET /admin/files/callback` | `admin_files_callback`. Register this URL at the provider as the redirect URI. |
 | `DELETE /admin/files/connections/:id` | `admin_files_disconnect` |
 | `GET /admin/files` (only with `show: true`) | `admin_files` |
@@ -146,9 +146,17 @@ The Connect button posts to `admin_files_connect_path` with `return_to` and, for
 
 ### Who may
 
-`Studio.connection_admin_guard` is the guard for all three actions. It is a method
-name on the controller (default `:require_admin`, from `Studio::ErrorHandling`) or a
-callable that takes the controller.
+`Studio.connection_admin_guard` is the guard for all three actions. It is one of two kinds:
+
+- A method name on the controller (default `:require_admin`, from `Studio::ErrorHandling`).
+  It refuses as a `before_action` does, by rendering or redirecting.
+- A callable that takes the controller. It may render or redirect, or it may answer.
+  An answer of `false` or `nil` refuses with a 403, so `->(c) { c.current_user&.admin? }` is safe.
+
+Connect is POST-only for a provider with `account: :connect`. A GET skips Rails'
+CSRF check, so a link that carries an attacker's account could otherwise start a
+connection to that account in a signed-in admin's session. The action also refuses a
+GET for such a provider (405) when a host draws its own route.
 
 ### What the flow does
 
@@ -195,7 +203,8 @@ The engine appends `Studio::Connections::LOG_FILTER` to `config.filter_parameter
 
 ## Tests, the e2e lane and a local demo
 
-Each provider has two seams. Both are refused on a production server.
+Each provider has two seams. Both are refused outside the development and test
+environments, so a staging or QA environment refuses them as production does.
 
 - `provider.http = ->(url, form, headers) { [status, body] }` stands in for the token and revoke endpoints.
 - `provider.sign_in_stand_in` stands in for the sign-in page (anything that answers `authorize_url(redirect_uri:, state:, account:)`).
