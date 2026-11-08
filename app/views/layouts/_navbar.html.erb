@@ -11,9 +11,12 @@
                         does. extra_icons_slot is rendered here, so the link
                         sidebar's trigger still follows it; like the user nav,
                         a slot wins over its legacy _html string.
-      brand_heading   — boolean, draw the brand title as the page's h1 (default: true).
-                        Pass false on a page that carries its own h1: the brand is
-                        drawn as a div with the same classes and contents.
+      brand_heading   — boolean, draw the brand title as the page's h1. Default:
+                        the engine decides. The brand is the h1 unless the page
+                        has its own (studio_page_has_h1?: studio/_page_header
+                        recorded one, or the page body holds an h1 tag); then it
+                        is a div with the same classes and contents. A preview
+                        keeps the h1. Pass true or false and it wins.
 %>
 <% show_user = local_assigns.fetch(:show_logged_in, logged_in?) %>
 <% is_preview = local_assigns.fetch(:preview, false) %>
@@ -35,7 +38,11 @@
 <% if extra_icons_slot.present? %>
   <% extra_icons_html = extra_icons_slot.is_a?(Hash) ? render(extra_icons_slot[:partial], **extra_icons_slot.fetch(:locals, {})) : render(extra_icons_slot.to_s) %>
 <% end %>
-<% brand_tag = local_assigns.fetch(:brand_heading, true) ? "h1" : "div" %>
+<%# One h1 per page: the brand is the h1 only where the page has none of its own.
+    The class (.nav-title, or .nav-wordmark-brand for a lockup) is the stable
+    selector; the tag is not. %>
+<% brand_heading = local_assigns.fetch(:brand_heading) { is_preview || !(respond_to?(:studio_page_has_h1?) && studio_page_has_h1?) } %>
+<% brand_tag = brand_heading ? "h1" : "div" %>
 <%# Out-of-the-box navigation (engine 0.30): when the host declares
     Studio.sidebar_sections, the navbar mounts the link-sidebar trigger in its
     icon rails and renders the slide-out panels after the header. With no

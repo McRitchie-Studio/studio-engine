@@ -421,6 +421,39 @@ test("a chat head on both pages morphs, and no style plays", async ({ page }) =>
   expect(names.filter((name) => name.includes(" pt-"))).toEqual([]);
 });
 
+// The morph's name must be down when Turbo starts the view transition, since the browser takes
+// the old page's picture then; the name is let through only once the new page's names are read
+// from the response. Turbo starts one frame after its read of the response resolves, so Turbo
+// reads it through the module's read (studio/page_transitions, turbo:before-fetch-response).
+// Here the module's own read of the response (the one whose caller is studio/page_transitions)
+// resolves 300ms late, far past a frame, while every other read, Turbo's included, is fast;
+// the name is still down at the start. Measured before the module
+// took Turbo's read: under an 8x CPU throttle 2 of 6 visits started with no name and nothing
+// morphed (this file's test above). studio/reload_visits, loaded first, hides that race in
+// this lab, so the revert this test bites on is the module's alone with that guard out.
+test("a response read that resolves late still names the morph before the old picture", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__morphAtStart = [];
+    const start = document.startViewTransition.bind(document);
+    document.startViewTransition = (update) => {
+      window.__morphAtStart.push(document.documentElement.hasAttribute("data-page-transition-morph"));
+      return start(update);
+    };
+    const text = Response.prototype.text;
+    Response.prototype.text = function () {
+      const read = text.call(this);
+      if (!(new Error().stack || "").includes("page_transitions")) return read;
+      return read.then((body) => new Promise((done) => setTimeout(() => done(body), 300)));
+    };
+  });
+  await open(page, "direction=left&morph=both");
+  await go(page);
+  expect(await page.evaluate(() => window.__morphAtStart)).toEqual([true]);
+  const names = await seen(page);
+  expect(names.some((name) => name.startsWith("::view-transition-group(agent-portrait)"))).toBe(true);
+  expect(names.filter((name) => name.includes(" pt-"))).toEqual([]);
+});
+
 // The launch panel's own visit: a new page at the address it already holds.
 async function visitHere(page, options) {
   const load = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
