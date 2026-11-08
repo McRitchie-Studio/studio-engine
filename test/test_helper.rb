@@ -89,6 +89,7 @@ module Studio
   mattr_accessor :wallet_address_method, default: nil
   mattr_accessor :theme_logos,         default: []
   mattr_accessor :sticky_table_headers, default: false
+  mattr_accessor :page_header_self_styled, default: false
   mattr_accessor :smooth_load,          default: false
   # Mirrors lib/studio.rb (whose writer validates; the mirror does not).
   mattr_accessor :page_transition_direction, default: nil
