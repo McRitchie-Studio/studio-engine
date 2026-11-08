@@ -42,6 +42,13 @@ ActiveRecord::Schema.define do
     t.bigint :parent_id
     t.timestamps
   end
+  create_table :studio_user_sessions, force: true do |t|
+    t.bigint :user_id, null: false
+    t.boolean :admin, null: false, default: false
+    t.datetime :started_at, null: false
+    t.datetime :last_seen_at, null: false
+    t.timestamps
+  end
 end
 
 class User < ApplicationRecord
@@ -51,6 +58,9 @@ end
 # The host's ApplicationController, with its own layout: navbar and footer stand-ins.
 class ApplicationController < ActionController::Base
   include Studio::ErrorHandling
+  # The host uses geo detection. The lookup is stubbed below: the tests count calls
+  # and never reach a provider.
+  include Studio::GeoDetection
 
   LAYOUTS = Dir.mktmpdir("studio-not-found-layouts")
   FileUtils.mkdir_p(File.join(LAYOUTS, "layouts"))
@@ -66,8 +76,14 @@ class ApplicationController < ActionController::Base
   before_action :host_wall
 
   class_attribute :wall, default: nil
+  class_attribute :geo_lookups, default: 0
 
   private
+
+  def geo_lookup(_ip)
+    ApplicationController.geo_lookups += 1 # not self.class: a subclass write stays on the subclass
+    nil
+  end
 
   def host_wall
     case self.class.wall
@@ -84,10 +100,25 @@ class NotFoundProbesController < ApplicationController
   def missing
     User.find(-1)
   end
+
+  # A signed-in visitor: the request signs in, then misses a record, so the page
+  # runs with that session loaded, as a returning visitor's cookie gives it.
+  def signed_in_missing
+    session[Studio.session_key] = User.find_by!(email: "member@example.org").id
+    User.find(-1)
+  end
+
+  # The control: the same signed-in visitor on a page that exists.
+  def signed_in_ok
+    session[Studio.session_key] = User.find_by!(email: "member@example.org").id
+    render plain: "ok"
+  end
 end
 
 Rails.application.routes.append do
   get "not_found_probe/missing", to: "not_found_probes#missing"
+  get "not_found_probe/signed_in_missing", to: "not_found_probes#signed_in_missing"
+  get "not_found_probe/signed_in_ok", to: "not_found_probes#signed_in_ok"
 end
 Rails.application.reload_routes!
 
@@ -101,12 +132,21 @@ class NotFoundExceptionsAppTest < ActiveSupport::TestCase
     ApplicationController.wall = nil
     ErrorLog.delete_all
     Studio.navbar_brand = nil
+    # Studio::UserSession writes nothing in test unless asked: without this, "no
+    # row" would pass with no fix.
+    Studio::UserSession.record_in_test = true
+    Studio::UserSession.delete_all
+    User.delete_all
+    User.create!(email: "member@example.org", role: "member")
+    ApplicationController.geo_lookups = 0
   end
 
   def teardown
     FileUtils.rm_rf(@public)
     ApplicationController.wall = nil
     Studio.navbar_brand = nil
+    Studio::UserSession.record_in_test = false
+    ApplicationController.geo_lookups = 0
   end
 
   # The dummy app inside ShowExceptions with this exceptions app, as a host's
@@ -241,6 +281,42 @@ class NotFoundExceptionsAppTest < ActiveSupport::TestCase
   test "the page takes no forgery-protection skip" do
     assert Studio::NotFoundController._process_action_callbacks.any? { |cb| cb.filter == :verify_authenticity_token },
            "verify_authenticity_token still runs: the host's CSRF allow-list never has to name this page"
+  end
+
+  # The page runs after the session middleware has gone, so the throttle cookie
+  # Studio::UserSession.track writes is never saved: every signed-in 404 would
+  # start a row. The control proves the probe signs in and the tracking records.
+  test "a signed-in 404 adds no Studio::UserSession row; a signed-in page does" do
+    status, _, doc = request("/not_found_probe/signed_in_missing")
+
+    assert_equal 404, status
+    assert doc.at_css("main [data-test='not-found']"), "the page, not the static fallback"
+    assert_equal 0, Studio::UserSession.count, "the not-found page tracks no session"
+
+    status, = request("/not_found_probe/signed_in_ok")
+    assert_equal 200, status
+    assert_equal 1, Studio::UserSession.count, "control: a signed-in page does track"
+  end
+
+  test "a 404 runs no geo lookup; a page that exists does" do
+    status, _, doc = request("/no-such-page")
+
+    assert_equal 404, status
+    assert doc.at_css("main [data-test='not-found']"), "the page, not the static fallback"
+    assert_equal 0, ApplicationController.geo_lookups, "the not-found page pays no IP lookup"
+
+    status, = request("/not_found_probe/signed_in_ok")
+    assert_equal 200, status
+    assert_equal 1, ApplicationController.geo_lookups, "control: the host's pages do detect"
+  end
+
+  test "the page skips the session-throttled callbacks, by name" do
+    filters = Studio::NotFoundController._process_action_callbacks.map(&:filter)
+
+    refute_includes filters, :track_user_session
+    refute_includes filters, :detect_geo_state
+    assert_includes ApplicationController._process_action_callbacks.map(&:filter), :detect_geo_state,
+                    "control: the host still detects"
   end
 
   test "other statuses keep Rails' public pages" do
