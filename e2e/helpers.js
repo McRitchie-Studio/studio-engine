@@ -112,7 +112,7 @@ async function sampleAcrossFrames(page, { perturb, read, frames = 30 }) {
 // spec to take one, and it could not have been written before.
 //
 // No off-origin file is pinned any more. Cropper.js was the one (cdnjs, with sha384
-// integrity, answered here with byte-exact copies); since engine-skipped-transition-fix
+// integrity, answered here with byte-exact copies); since engine-vendors-cropper-assets
 // the engine vendors it, so it arrives from the asset pipeline like Montserrat.
 async function blockOffsiteRequests(page) {
   await shared.blockOffsiteRequests(page);

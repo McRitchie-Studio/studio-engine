@@ -5,7 +5,7 @@ require "action_view"
 require "nokogiri"
 
 # [unit] studio/_cropper_assets loads Cropper.js 1.6.2 from the engine's own
-# assets, never a CDN. It was two cdnjs tags until engine-skipped-transition-fix,
+# assets, never a CDN. It was two cdnjs tags until engine-vendors-cropper-assets,
 # and a cdnjs connection that never answered held the load event of every page
 # that renders the partial (turf-monster's /account). Each tag keeps its pinned
 # sha384 Subresource Integrity and crossorigin="anonymous" (without CORS mode
