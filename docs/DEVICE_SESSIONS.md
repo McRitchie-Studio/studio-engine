@@ -21,7 +21,7 @@ Tests: `test/integration/user_session_revocation_test.rb` (unit) and
 | Step | Where | What |
 |------|-------|------|
 | Sign-in | `set_app_session` | `Studio::UserSession.start!` writes a `studio_user_sessions` row with a random `sid` (24 bytes, URL-safe) and puts the sid in this app's mark (`session[:"<session_key>_session_mark"]`). A re-auth by the same user keeps the sid. |
-| Every signed-in request | `prepend_before_action :end_revoked_device_session` | `Studio::UserSession.verdict` reads the latest row for the cookie's sid: one query on the `sid` index. Revoked, or no row: the request is signed out through the host's own `clear_app_session`, and runs as a visitor. |
+| Every signed-in request | `prepend_before_action :end_revoked_device_session` | `Studio::UserSession.verdict` reads the cookie's sid on the `sid` index: one query. Any revoked row of the sid, or no row: the request is signed out through the host's own `clear_app_session`, and runs as a visitor. |
 | Tracking | `after_action :track_user_session` | Reuses the row the check read, so it adds no read. At most one write per 5 minutes, as before. After 30 idle minutes a new row starts with the **same** sid. |
 | Logout | `clear_app_session` (the engine's `GET /logout`) and `reset_session` (Turf's logout, and a sign-in by a different identity) | `Studio::UserSession.revoke!` stamps `revoked_at` on every row of the sid and drops the mark. |
 | Pruning | `Studio::UserSession.prune_due!`, run when a row is created | Deletes up to 1,000 rows last seen more than 90 days ago, at most once an hour per process. No host job. |
