@@ -23,6 +23,9 @@ module Studio
       rescue_from "Sluggable::SlugRefused", with: :handle_slug_refused
       rescue_from ActionController::InvalidAuthenticityToken, with: :handle_invalid_authenticity_token
 
+      # First, ahead of every host filter: a revoked device session is signed out
+      # before anything reads current_user (docs/DEVICE_SESSIONS.md).
+      prepend_before_action :end_revoked_device_session
       before_action :require_authentication
       after_action :track_user_session
 
@@ -39,9 +42,61 @@ module Studio
       return unless session[Studio.session_key]
 
       user = respond_to?(:true_user, true) ? true_user : current_user
-      Studio::UserSession.track(session, user) if user
+      Studio::UserSession.track(session, user, row: @_studio_device_session_row) if user
     rescue StandardError => e
       Rails.logger&.warn("[user_session] #{e.class}: #{e.message}")
+    end
+
+    # A copy of a cookie whose device logged out still carries that device's sid,
+    # and the server row says it ended: sign this request out (this app's keys
+    # only, through the host's own clear_app_session), so it runs as a visitor.
+    # One indexed query when the cookie carries a sid; none when signed out.
+    def end_revoked_device_session
+      return unless session[Studio.session_key]
+
+      verdict, @_studio_device_session_row = Studio::UserSession.verdict(session)
+      return unless verdict == :ended
+
+      Rails.logger&.info("[user_session] ended device session presented; signing the request out")
+      session.delete(Studio::UserSession.cookie_key)
+      clear_app_session
+      remove_instance_variable(:@current_user) if instance_variable_defined?(:@current_user)
+    end
+
+    # Ends this device's session on the server: the row of its sid is revoked, so
+    # a copy of this cookie no longer signs in. Other devices are untouched. A
+    # failed write is logged to ErrorLog and the logout still goes on: the browser's
+    # copy is dropped either way, which is what logout did before.
+    def end_device_session
+      Studio::UserSession.revoke!(session)
+    rescue StandardError => e
+      log_device_session_failure(e)
+    end
+
+    # Starts the device session a sign-in opens (Studio::UserSession.start!). A
+    # failure is logged and the sign-in goes on; this request's track retries.
+    def start_device_session(user)
+      Studio::UserSession.start!(session, user)
+    rescue StandardError => e
+      log_device_session_failure(e, target: user)
+    end
+
+    # rescue_and_log's logging without its re-raise: the auth step this guards
+    # must finish even when the bookkeeping write fails.
+    def log_device_session_failure(exception, target: nil)
+      error_log = create_error_log(exception)
+      attach_error_context(error_log, :target, target)
+      error_log.save!
+    rescue StandardError => log_error
+      log_error_write_failed(log_error, exception)
+    end
+
+    # Rails' reset_session, ending the device session first. Hosts call it on
+    # logout (Turf) and before a sign-in by a different identity; both end the
+    # session this cookie held.
+    def reset_session
+      end_device_session if request
+      super
     end
 
     def current_user
@@ -52,6 +107,7 @@ module Studio
     def set_app_session(user)
       # App-specific session (only this app reads this key)
       session[Studio.session_key] = user.id
+      start_device_session(user)
 
       # OPSEC-045: bind a rotating per-user token into the cookie. The
       # verify_session_token filter compares it to user.session_token on every
@@ -86,6 +142,7 @@ module Studio
     end
 
     def clear_app_session
+      end_device_session
       session.delete(Studio.session_key)
       session.delete(:session_token)
       session.delete(:onchain)

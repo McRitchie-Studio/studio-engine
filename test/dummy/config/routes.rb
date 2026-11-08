@@ -96,6 +96,8 @@ Rails.application.routes.draw do
   get "lab/hero_button", to: "e2e_lab#hero_button"
   get "lab/page_header", to: "e2e_lab#page_header"
   get "lab/page_header_kinds", to: "e2e_lab#page_header_kinds"
+  get "lab/plain_css/page_header", to: "e2e_lab#plain_css_page_header"
+  get "lab/plain_css/legal", to: "e2e_lab#plain_css_legal"
   get "lab/carousel", to: "e2e_lab#carousel"
   get "lab/carousel_spotlight", to: "e2e_lab#carousel_spotlight"
   get "lab/carousel_autoplay", to: "e2e_lab#carousel_autoplay"

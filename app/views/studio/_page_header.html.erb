@@ -66,12 +66,18 @@
     parent's start, so the controller measures the row's place from the row. It
     carries the controller, so the row keeps its data-studio-controller for the
     page's own. So the row carries no top margin: the space above it belongs to its
-    container. %>
-<%# The page's one h1 is this row's title, so the navbar draws its brand as a div
-    (StudioNavbarHelper#studio_page_has_h1?). content_for, not the helper: a host
-    renders this partial from views that may not include the engine's helpers. %>
-<% content_for(:studio_page_h1, "1") unless content_for?(:studio_page_h1) %>
-<div class="page-header-sentinel" data-studio-controller="page-header" aria-hidden="true"></div>
+    container.
+
+    SELF-STYLED, IN A PLAIN-CSS APP. studio_page_header_assets renders the row's own
+    CSS and script once per page, only where config.page_header_self_styled asks
+    (Studio::PageHeaderHelper). Everywhere else it is nil, and it sits on the
+    sentinel's line, so a Tailwind app's row is the same to the byte.
+
+    THE PAGE'S ONE H1 is this row's title, so it records one, and the navbar draws its
+    brand as a div (StudioNavbarHelper#studio_page_has_h1?). content_for, not the helper:
+    a host renders this partial from views that may not include the engine's helpers. It
+    sits on the same line and renders nothing. %>
+<% content_for(:studio_page_h1, "1") unless content_for?(:studio_page_h1) %><%= studio_page_header_assets if respond_to?(:studio_page_header_assets) %><div class="page-header-sentinel" data-studio-controller="page-header" aria-hidden="true"></div>
 <%= tag.div(class: "page-header sticky #{row_class}".strip,
       style: "top: var(--pin-page-top, var(--nav-bottom, var(--nav-h, 0px))); z-index: var(--z-sticky, 30)",
       data: data.merge(pin: "page")) do %>

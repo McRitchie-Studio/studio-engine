@@ -380,6 +380,96 @@ The style guide's tab row holds the clicked tab as current from the first event 
 so the highlight does not run through every tab the scroll passes. A component that changes
 a panel by its hash keeps its own click: its handler runs first and prevents the default.
 
+## In a plain-CSS app
+
+The row is styled by the engine's Tailwind layer (`engine.css`). An app that does not
+build that layer, such as rantly (plain CSS, the engine taken for the site footer only),
+turns on the self-styled row:
+
+```ruby
+# config/initializers/studio.rb
+Studio.configure do |config|
+  config.page_header_self_styled = true   # or ->(view) { ... }
+end
+```
+
+Then the first `studio/_page_header` on a page also renders `studio/page_header/_assets`,
+once (`studio_page_header_assets`, `Studio::PageHeaderHelper`). It is the site footer's
+pattern (`studio/site_footer/_assets`):
+
+- **Scoped CSS.** Every rule is under `.page-header`, and each colour reads a theme token
+  with a fallback beside it. The rules are the ones `engine.css` gives the row, the `.btn`
+  family at `.btn-sm`, and `.label-upper`. The default bleed (`row_class: "-mx-4 px-4"`)
+  is defined on the row alone, so it fits a plain container with a 1rem gutter.
+- **A small module, no Stimulus and no import map.** `studio/page_header_self_styled` imports
+  nothing and loads by its own `<script type="module">` tag (no inline script). It marks the row stuck, fades an end
+  of the tabs that hides a tab, shows the open tab on a phone, keeps each Links menu's
+  `aria-expanded` in step (with ArrowDown into the list), and places the menu where the
+  browser has no anchor positioning. With no pinned stack on the page, it publishes
+  `--nav-bottom` from the document's first `<header>`, when that header is sticky or
+  fixed, so the row sticks under the app's own masthead. An app whose CSS sets
+  `--nav-bottom` or `--pin-page-top` itself keeps its value.
+- **Without the script** the row keeps its bar at all times (a `<noscript>` rule). The
+  menu is the browser's popover and the tabs are links, so both still work.
+- **The CSP nonce.** The `<style>` and the module tag carry the request's nonce when the
+  app sets one. The module is served from the asset path (`asset_path`), which the engine
+  adds for propshaft and sprockets alike.
+
+Off (the default), the partial renders exactly what it always has: the helper returns
+nil on the sentinel's own line, so a Tailwind app's row is the same to the byte
+(`test/views/page_header_self_styled_test.rb`). Do not turn it on in an app that builds
+`engine.css`: the two sheets say the same thing twice.
+
+**The tokens it reads.** Map them onto the app's own colours on `:root`, light and dark:
+
+| Token | Used for | Fallback |
+|-------|----------|----------|
+| `--color-text` | The title, the current crumb, a hovered link, the neutral button's label | `currentColor` |
+| `--color-text-body` | The menu's links | `currentColor` |
+| `--color-text-muted` | The crumbs, the parent link, the links line, the meta | `--color-text-secondary`, then `currentColor` |
+| `--color-surface` | The stuck bar, the menu's panel | `Canvas` |
+| `--color-surface-alt` | The neutral button, a hovered menu link | `--color-surface` |
+| `--color-border` | The stuck bar's edges, the menu's border, the neutral button's border | a 25% grey |
+| `--color-primary` | The primary button (the open tab, the action), the focus ring | violet |
+| `--btn-primary-fg` | The primary button's label | `#fff` |
+
+`--color-cta`, `--color-cta-fill`, `--color-cta-hover`, `--color-border-strong`,
+`--color-primary-ink` and `--type-base` are read first where an app has them. A light
+primary that fails 4.5:1 under white sets `--btn-primary-fg` to a dark ink.
+
+`e2e/page_header_self_styled.spec.js` drives it in a plain-CSS host
+(`layouts/plain_css_lab`), light and dark, at 1280px and at an emulated 390px.
+
+## The legal page
+
+`studio/_legal_page` is the standard frame for an app's privacy policy and terms: the page
+header (the page's one `h1`), a "Last updated" line and a readable column, 46rem at most.
+Render it as a layout around the page's sections:
+
+```erb
+<%= render layout: "studio/legal_page",
+      locals: { title: "Privacy Policy", updated: "November 8, 2026",
+                links: [{ label: "Terms of Service", href: terms_path }],
+                data: { legal_page: "privacy" } } do %>
+  <section>
+    <h2>1. Who We Are</h2>
+    <p>...</p>
+  </section>
+<% end %>
+```
+
+| Local | What it does |
+|-------|--------------|
+| `title` | The page's one `h1`, in the header. Required. |
+| `updated` | The date the text last changed. Printed as "Last updated" and the date. |
+| `crumbs`, `links` | The header's trail and links line, as `studio/_page_header` takes them. |
+| `data` | Data attributes for the column, such as `data-legal-page`. |
+
+The column brings its own scoped CSS, once per page, reading the same tokens, so it reads
+the same in a Tailwind app and a plain-CSS one. Its `h2`, `h3`, paragraphs, lists, links
+and `strong` are styled; write plain elements inside it. A plain-CSS app also sets
+`config.page_header_self_styled`, so the header is styled too.
+
 ## Who has adopted it
 
 The page row: `style/index`, `studio/admin_models/show` and `studio/admin_surveys/index`.

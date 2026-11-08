@@ -1,8 +1,9 @@
 # frozen_string_literal: true
 
 module Studio
-  # studio/_page_header's one piece of Ruby: the deprecation note for its old free-HTML
-  # slot (docs/PAGE_HEADER.md, "The four kinds of control").
+  # studio/_page_header's Ruby: whether a row is self-styled (self_styled?), and the
+  # deprecation note for its old free-HTML slot (docs/PAGE_HEADER.md, "The four kinds of
+  # control").
   #
   # actions_html still renders for one release. In development only, the first render
   # that passes it writes one warning to the log per call site, so a host sees each
@@ -16,6 +17,14 @@ module Studio
     @mutex = Mutex.new
 
     class << self
+      # Whether this view's rows bring their own CSS and script (config.page_header_self_styled,
+      # docs/PAGE_HEADER.md, "In a plain-CSS app"): true, false, or a callable that receives
+      # the view. Anything truthy is true.
+      def self_styled?(view, setting = Studio.page_header_self_styled)
+        setting = setting.call(view) if setting.respond_to?(:call)
+        setting ? true : false
+      end
+
       # site: the caller's "path:line", so each page warns once. env and logger default to
       # Rails' and are injectable for a test.
       def deprecate_actions_html(site: nil, env: rails_env, logger: rails_logger)

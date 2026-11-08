@@ -89,6 +89,8 @@ Studio.configure do |config|
   end
   # The app that sets nothing: no facts at all, so the engine's default footer.
   config.site_footer = nil if DEFAULT_FOOTER
+  # Rantly's next step: the standard page header and legal page, self-styled.
+  config.page_header_self_styled = true if ENV["PROBE_HEADER"] == "1"
 end
 
 FooterOnlyProbe::Application.initialize!
@@ -100,10 +102,20 @@ class ApplicationController < ActionController::Base; end
 
 class PagesController < ApplicationController
   def show = render(inline: "<main>Home</main><%= studio_site_footer %>")
+
+  # The shared legal page, which renders studio/_page_header.
+  def legal
+    render inline: <<~ERB
+      <main><%= render layout: "studio/legal_page", locals: { title: "Privacy Policy", updated: "November 8, 2026" } do %>
+        <section><h2>1. Who We Are</h2><p>A site with no database.</p></section>
+      <% end %></main>
+    ERB
+  end
 end
 
 Rails.application.routes.draw do
   root "pages#show"
+  get "legal", to: "pages#legal"
   get "privacy", to: "pages#show", as: :privacy if DEFAULT_FOOTER
   Studio.marketing_kit_routes(self) if ENV["PROBE_KIT"] == "1"
 end
@@ -119,6 +131,7 @@ result = {
 case ACTION
 when "render"
   page = ENV["PROBE_KIT"] == "1" ? "http://localhost/marketing-kit" : "http://localhost/"
+  page = "http://localhost/legal" if ENV["PROBE_HEADER"] == "1"
   status, _headers, body = Rails.application.call(Rack::MockRequest.env_for(page))
   html = +""
   body.each { |chunk| html << chunk }

@@ -792,6 +792,31 @@ class E2eLabController < ActionController::Base
     @lab_pills = params[:pills] == "anchors" ? "anchors" : "tabs"
   end
 
+  # studio/_page_header in a PLAIN-CSS host: layouts/plain_css_lab has no engine head
+  # and no Tailwind, only a host stylesheet in the shape rantly's is (its own tokens,
+  # mapped onto the engine's, and a sticky masthead). config.page_header_self_styled is
+  # on for these pages alone (test/dummy/config/application.rb), so the row brings its
+  # own CSS and script. ?parent=grid puts the row in a grid parent.
+  PLAIN_CSS_TABS = [{ label: "Latest", href: "/lab/plain_css/page_header", current: "page" },
+                    { label: "Most discussed", href: "/lab/plain_css/page_header?view=discussed" },
+                    { label: "Following", href: "/lab/plain_css/page_header?view=following" }].freeze
+  PLAIN_CSS_MENU = [{ label: "Privacy Policy", href: "/lab/plain_css/legal" },
+                    { label: "Terms of Service", href: "/lab/plain_css/legal?page=terms" }].freeze
+  PLAIN_CSS_CRUMBS = [{ label: "Home", href: "/lab/plain_css/page_header" }].freeze
+
+  def plain_css_page_header
+    @lab_parent_style = PAGE_HEADER_PARENTS[params[:parent]]
+    render :plain_css_page_header, layout: "plain_css_lab"
+  end
+
+  # studio/_legal_page in the same host: the shared privacy/terms frame.
+  def plain_css_legal
+    @lab_terms = params[:page] == "terms"
+    render :plain_css_legal, layout: "plain_css_lab"
+  end
+
+  def lab_page_header_self_styled? = action_name.to_s.start_with?("plain_css_")
+
   # studio/_carousel, three ways: a row of nine linked cards three to a view (the
   # hub's /websites shape), a row of plain text slides with nothing to focus, and
   # a row of two that fits. A view, no inputs.

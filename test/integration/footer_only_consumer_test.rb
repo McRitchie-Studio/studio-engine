@@ -25,6 +25,8 @@ require "rbconfig"
 #   8. the same app with Studio.site_footer UNSET gets the default footer: its
 #      name from config.app_name (there is no site-identity table to ask), the
 #      legal link its one route earns, and no Leaflet
+#   9. with config.page_header_self_styled, the shared legal page renders the
+#      standard page header with its own CSS and module tag
 #
 # The ActiveRecord half (the engine unchanged for a host WITH a database) is the
 # rest of the suite: every other integration test boots test/dummy, which loads
@@ -137,6 +139,23 @@ class FooterOnlyConsumerTest < Minitest::Test
     end
   end
 
+  # 9. The standard page header, self-styled, through the shared legal page: rantly's
+  # next step. The eager-loaded helper renders the row's scoped CSS and its module tag
+  # (docs/PAGE_HEADER.md, "In a plain-CSS app") in an app with no ActiveRecord, no
+  # Stimulus and no import map.
+  def test_production_like_eager_boot_renders_the_self_styled_header_and_legal_page
+    result = probe(env: "production", eager: true, header: true)
+
+    assert_equal 200, result["status"], "the legal page did not render:\n#{result['html'].to_s[0, 2000]}"
+    html = result["html"]
+    refute result["active_record_loaded"]
+    assert_includes html, '<h1 class="page-header-title">Privacy Policy</h1>'
+    assert_includes html, "--ph-ink:", "the row's own scoped CSS"
+    assert_match %r{<script type="module" src="[^"]*studio/page_header_self_styled[^"]*\.js"}, html
+    assert_includes html, "Last updated November 8, 2026"
+    assert_includes html, "<h2>1. Who We Are</h2>"
+  end
+
   private
 
   def assert_footer_rendered(result)
@@ -156,7 +175,7 @@ class FooterOnlyConsumerTest < Minitest::Test
     refute_includes html, ".ftr-map", "a footer with no address must not ship the map's CSS"
   end
 
-  def probe(env:, eager:, action: "render", footer: "declared", kit: false)
+  def probe(env:, eager:, action: "render", footer: "declared", kit: false, header: false)
     Dir.mktmpdir("studio-footer-only") do |root|
       result_path = File.join(root, "result.json")
       env_vars = {
@@ -167,6 +186,7 @@ class FooterOnlyConsumerTest < Minitest::Test
         "PROBE_RESULT" => result_path,
         "PROBE_FOOTER" => footer,
         "PROBE_KIT" => kit ? "1" : "0",
+        "PROBE_HEADER" => header ? "1" : "0",
         "BUNDLE_GEMFILE" => File.join(ENGINE_ROOT, "Gemfile")
       }
       out = IO.popen(env_vars, [RbConfig.ruby, "-I#{File.join(ENGINE_ROOT, 'lib')}", PROBE], err: %i[child out], &:read)

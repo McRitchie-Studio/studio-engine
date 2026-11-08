@@ -1,0 +1,15 @@
+<%# studio/_legal_page in a plain-CSS host (E2eLabController#plain_css_legal): the shared
+    privacy and terms frame, rendered by name around the host's sections. %>
+<%= render layout: "studio/legal_page",
+      locals: { title: (@lab_terms ? "Terms of Service" : "Privacy Policy"), updated: "November 8, 2026",
+                links: [{ label: (@lab_terms ? "Privacy Policy" : "Terms of Service"),
+                          href: (@lab_terms ? "/lab/plain_css/legal" : "/lab/plain_css/legal?page=terms") }],
+                data: { legal_page: (@lab_terms ? "terms" : "privacy") } } do %>
+  <% 8.times do |i| %>
+    <section>
+      <h2><%= i + 1 %>. A heading</h2>
+      <p>A paragraph of policy text, long enough to wrap at a phone's width and to show the column's measure on a desktop, with <a href="#">a link</a> and <strong>a strong phrase</strong>.</p>
+      <ul><li>One point.</li><li>Another point.</li></ul>
+    </section>
+  <% end %>
+<% end %>

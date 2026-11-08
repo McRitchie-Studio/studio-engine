@@ -165,6 +165,15 @@ Studio.site_footer = lambda do |view|
   controller.lab_site_footer if controller.respond_to?(:lab_site_footer)
 end
 
+# The self-styled page header (docs/PAGE_HEADER.md, "In a plain-CSS app"), the way a
+# plain-CSS host would turn it on, but only for the lab's plain-CSS pages
+# (E2eLabController#plain_css_page_header): every other page in the dummy renders the
+# row exactly as a Tailwind app does.
+Studio.page_header_self_styled = lambda do |view|
+  controller = view.controller if view.respond_to?(:controller)
+  controller.respond_to?(:lab_page_header_self_styled?) && controller.lab_page_header_self_styled?
+end
+
 # The host schema boot check (Studio::HostSchema) is off for the dummy. Its
 # database is an empty in-memory SQLite at boot, and each suite builds the tables
 # it needs afterwards, so a boot-time check here would report every table

@@ -1,0 +1,44 @@
+<%# The lab layout for a PLAIN-CSS host (E2eLabController#plain_css_page_header): no
+    engine head, no Tailwind, no Stimulus and no import map. Its stylesheet is the
+    host's, in the shape rantly's is: the app's own tokens, light and dark by
+    prefers-color-scheme, mapped onto the engine's theme tokens, and a sticky header
+    element as the masthead. The page header styles itself
+    (config.page_header_self_styled), so nothing here names a page-header class. %>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>studio-engine e2e lab · plain-CSS host</title>
+    <style>
+      :root {
+        --bg: #f5f1ea; --surface: #fffdf9; --surface-2: #f0ebe2; --ink: #1d1a16; --ink-2: #57504a; --ink-3: #6f675f;
+        --line: #e3dccf; --accent: #d63c1f; --accent-ink: #ffffff;
+        color-scheme: light dark;
+        --color-primary: var(--accent); --color-primary-500-rgb: 214 60 31;
+        --color-text: var(--ink); --color-text-body: var(--ink); --color-text-secondary: var(--ink-2);
+        --color-text-muted: var(--ink-3); --color-surface: var(--surface); --color-surface-alt: var(--surface-2);
+        --color-border: var(--line); --btn-primary-fg: var(--accent-ink);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg: #16130f; --surface: #1f1b16; --surface-2: #29241d; --ink: #f3ede4; --ink-2: #c4bab0; --ink-3: #a39990;
+          --line: #372f27; --accent: #ff6a4d; --accent-ink: #1a0d08; --color-primary-500-rgb: 255 106 77; }
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 ui-sans-serif, system-ui, sans-serif; }
+      a { color: inherit; text-underline-offset: 3px; }
+      a:hover { color: var(--accent); }
+      :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+      h1, h2, h3 { margin: 0; line-height: 1.2; }
+      p { margin: 0; }
+      .masthead { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+      .masthead__inner { max-width: 1040px; margin: 0 auto; padding: 12px 16px; font-weight: 900; font-size: 24px; }
+      .page { max-width: 1040px; margin: 0 auto; padding: 24px 16px 48px; }
+      .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; margin-top: 16px; }
+    </style>
+  </head>
+  <body>
+    <header class="masthead" data-lab-masthead><div class="masthead__inner">rantly</div></header>
+    <main id="main" class="page" data-lab-main><%= yield %></main>
+  </body>
+</html>
