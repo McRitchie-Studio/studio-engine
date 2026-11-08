@@ -4,6 +4,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.137.0 — 2026-11-08
+
+### Added
+
+- **Connections: generic OAuth 2.0 connection tooling.** A host declares each provider it connects with `Studio.define_connection`: static or per-account endpoints with strict account validation, scopes, form or HTTP Basic client auth, and one of three refresh policies (`:rotating`, which refreshes and stores the new refresh token under the row's lock before use; `:cached`, which keeps the access token until near expiry; `:memory`, the client-credentials grant with no stored token). The engine gives it `Studio::Connection` (one `studio_connections` table, tokens encrypted; install with `bin/rails g studio:connections`), the connect, callback and disconnect actions (`Studio::ConnectionFlow`, or the engine's `Studio::ConnectionsController`) behind `Studio.connection_admin_guard`, `Studio.draw_connection_routes`, a log filter by exact key for the keys a provider names, and `Studio::Connections::StandIn` for the e2e lane. The engine names no provider, and nothing changes until a host declares one. See `docs/CONNECTIONS.md`.
+
 ## 0.136.0 — 2026-11-08
 
 ### Added
