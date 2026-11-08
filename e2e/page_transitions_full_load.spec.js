@@ -16,10 +16,31 @@ function installRecorder(context) {
       sessionStorage.setItem("pt-log", JSON.stringify(lines));
     };
     window.ptLog = log;
+    // The state each side of a load was in, for the event log a red prints (afterEach below).
+    // Lines start "swap-" and "reveal-", so the specs that count "page..." lines never see them.
+    window.__ticks = 0;
+    window.__revealed = false;
     window.addEventListener("pageswap", (event) => {
       log(`pageswap ${event.viewTransition ? "transition" : "plain"}`);
+      log(`swap-state ${JSON.stringify({
+        type: event.activation ? event.activation.navigationType : null,
+        to: event.activation && event.activation.entry ? new URL(event.activation.entry.url).pathname : null,
+        visibility: document.visibilityState,
+        revealed: window.__revealed,
+        frames: window.__ticks,
+        ready: document.readyState,
+        module: !!document.documentElement.dataset.pageTransitionDirection,
+      })}`);
     }, { capture: true });
-    window.addEventListener("pagereveal", (event) => log(`pagereveal ${event.viewTransition ? "transition" : "plain"}`));
+    // After studio/page_transitions' own pageswap listener: the style it left for the next page.
+    window.addEventListener("load", () => window.addEventListener("pageswap", () => {
+      log(`swap-left ${sessionStorage.getItem("studio-page-transition-style")}`);
+    }));
+    window.addEventListener("pagereveal", (event) => {
+      window.__revealed = true;
+      log(`pagereveal ${event.viewTransition ? "transition" : "plain"}`);
+      log(`reveal-state ${JSON.stringify({ visibility: document.visibilityState, style: sessionStorage.getItem("studio-page-transition-style") })}`);
+    });
     window.addEventListener("pageshow", (event) => { if (event.persisted) log("restored"); });
     document.addEventListener("securitypolicyviolation", (event) => log(`violation ${event.violatedDirective}`));
     const start = Document.prototype.startViewTransition;
@@ -28,6 +49,7 @@ function installRecorder(context) {
     window.__seen = seen;
     window.__frames = [];
     const tick = () => {
+      window.__ticks += 1;
       for (const animation of document.getAnimations()) {
         const pseudo = animation.effect && animation.effect.pseudoElement;
         if (!pseudo || !pseudo.startsWith("::view-transition")) continue;
@@ -60,17 +82,40 @@ async function open(page, query) {
 }
 
 const logged = (page) => page.evaluate(() => JSON.parse(sessionStorage.getItem("pt-log") || "[]"));
+
+// A red carries its evidence: the whole event log, printed and attached to the JSON report
+// the CI uploads for every shard. A red with no log once left its cause unprovable.
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status === testInfo.expectedStatus) return;
+  const lines = await logged(page).catch((error) => [`(the log could not be read: ${error.message})`]);
+  console.log(`pt-log for "${testInfo.title}":\n${lines.join("\n")}`);
+  await testInfo.attach("pt-log", { body: lines.join("\n"), contentType: "text/plain" });
+});
 const rootMotion = (lines) => lines.filter((line) => /-(old|new)\(root\) /.test(line));
 
 // Past the whole motion: the document's own marks are gone when this returns.
+//
+// FIRST THE NEW PAGE'S REVEAL. Its DOM parses, and Playwright sees it as visible, before its
+// first render: a render-blocking sheet, or the reveal script's own hold to the end of parse,
+// keeps pagereveal back. Until then no mark is set and no pseudo runs, so "no marks, no
+// animations" also holds BEFORE the motion. Without the reveal wait the spec read an empty
+// log and went red in 312 ms (Engine CI run 42503970890).
 async function settled(page, testId) {
   await expect(page.locator(`[data-test="page-${testId}"]`)).toBeVisible();
-  await page.waitForFunction(() => document.documentElement.dataset.pageTransition === undefined
+  await page.waitForFunction(() => window.__revealed === true
+    && document.documentElement.dataset.pageTransition === undefined
     && !document.getAnimations().some((a) => (a.effect?.pseudoElement || "").startsWith("::view-transition")));
 }
 
+// The new page has revealed, for a spec that reads its pagereveal or asserts that nothing
+// played: visible is not revealed (settled, above).
+async function revealed(page, testId = "b") {
+  await expect(page.locator(`[data-test="page-${testId}"]`)).toBeVisible();
+  await page.waitForFunction(() => window.__revealed === true);
+}
+
 function expectOneMotion(lines, oldName, newName) {
-  expect(rootMotion(lines).sort()).toEqual([
+  expect(rootMotion(lines).sort(), `the event log:\n${lines.join("\n")}`).toEqual([
     `::view-transition-new(root) ${newName}`,
     `::view-transition-old(root) ${oldName}`,
   ]);
@@ -118,9 +163,34 @@ test("each direction plays its own move across a full load", async ({ page }) =>
 test("the motion outlives the new page's own turbo:load, then its marks go", async ({ page }) => {
   await blockOffsiteRequests(page);
   await installRecorder(page);
-  await page.addInitScript(() => document.addEventListener("turbo:load", () => {
-    setTimeout(() => window.ptLog(`after load ${document.documentElement.dataset.pageTransition}`), 0);
-  }));
+  // THE ORDER UNDER TEST, MADE CERTAIN: page b reveals, then its turbo:load, then the motion
+  // ends. Left to the network, Turbo (a module) came before the reveal here, where the rule
+  // this spec guards never runs, and after a short motion on one run in 290. So page b's Turbo
+  // is held until page b has revealed, and its motion is paused until its turbo:load.
+  let arrived = false;
+  let release;
+  const revealedB = new Promise((done) => { release = done; });
+  await page.exposeBinding("ptArrivalRevealed", () => release());
+  page.on("framenavigated", (frame) => { if (frame === page.mainFrame() && frame.url().includes("page_transitions_b")) arrived = true; });
+  await page.route("**/e2e/js/turbo.min.js*", async (route) => {
+    if (arrived) await revealedB;
+    await route.fallback();
+  });
+  await page.addInitScript(() => {
+    document.addEventListener("turbo:load", () => {
+      setTimeout(() => window.ptLog(`after load ${document.documentElement.dataset.pageTransition}`), 0);
+    });
+    window.addEventListener("pagereveal", (event) => {
+      if (!event.viewTransition) return;
+      const paused = event.viewTransition.ready.then(() => document.getAnimations()
+        .filter((a) => (a.effect?.pseudoElement || "").startsWith("::view-transition"))
+        .map((a) => { a.pause(); return a; }), () => []);
+      document.addEventListener("turbo:load", () => {
+        paused.then((animations) => setTimeout(() => animations.forEach((a) => a.play()), 0));
+      }, { once: true });
+      paused.then(() => window.ptArrivalRevealed());
+    });
+  });
   await page.goto(`${LAB}?${STRICT}`);
   await page.waitForFunction(() => window.Turbo);
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
@@ -196,6 +266,10 @@ test("a page that arrived by a full load then plays a Turbo visit once", async (
   await open(page, "direction=left");
   await fullLoad(page);
   await settled(page, "b");
+  // The motion can end before the new page's modules run. Clicked then, the link is a plain
+  // full load back, not a Turbo visit (seen once in 145 runs). Module scripts run in document
+  // order, and studio/page_transitions comes ahead of Turbo in the head, so Turbo means both.
+  await page.waitForFunction(() => window.Turbo);
   await page.evaluate(() => { window.__seen.clear(); sessionStorage.removeItem("pt-log"); });
   const load = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
   await page.locator('[data-test="other"]').click();
@@ -210,6 +284,7 @@ test("a reload plays nothing and leaves no name", async ({ page }) => {
   await open(page, STRICT);
   await page.reload();
   await page.waitForFunction(() => window.Turbo && document.documentElement.dataset.pageTransitionDirection);
+  await revealed(page, "a");
   await page.waitForTimeout(200);
   const lines = await logged(page);
   expect(lines).toEqual(expect.arrayContaining(["pageswap plain", "pagereveal plain"]));
@@ -222,6 +297,7 @@ test("a full load of the same path plays nothing", async ({ page }) => {
   await open(page, STRICT);
   await fullLoad(page, "same-full");
   await page.waitForFunction(() => window.Turbo && document.documentElement.dataset.pageTransitionDirection);
+  await revealed(page, "a");
   await page.waitForTimeout(200);
   const lines = await logged(page);
   expect(lines).toContain("pageswap transition");
@@ -281,7 +357,7 @@ test("a click before the old page's module has run gets the plain load, not the 
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
   await page.unroute("**/e2e/modules/studio/page_transitions*");
   await fullLoad(page);
-  await expect(page.locator('[data-test="page-b"]')).toBeVisible();
+  await revealed(page);
   await page.waitForTimeout(300);
   const lines = await logged(page);
   expect(lines).toContain("pagereveal transition");
@@ -484,7 +560,7 @@ test("with no direction, a full load has no sheet, no script, no at-rule and not
   page.on("request", (request) => requests.push(request.url()));
   await open(page, "");
   await fullLoad(page);
-  await expect(page.locator('[data-test="page-b"]')).toBeVisible();
+  await revealed(page);
   const lines = await logged(page);
   expect(lines).toEqual(expect.arrayContaining(["pageswap plain", "pagereveal plain"]));
   expect(lines.filter((line) => line.startsWith("::view-transition"))).toEqual([]);
@@ -530,7 +606,7 @@ test.describe("with reduced motion", () => {
     const errors = watchPageErrors(page);
     await open(page, STRICT);
     await fullLoad(page);
-    await expect(page.locator('[data-test="page-b"]')).toBeVisible();
+    await revealed(page);
     await page.waitForTimeout(200);
     const lines = await logged(page);
     expect(lines).toEqual(expect.arrayContaining(["pageswap plain", "pagereveal plain"]));
