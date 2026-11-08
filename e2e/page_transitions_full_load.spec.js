@@ -163,16 +163,40 @@ test("each direction plays its own move across a full load", async ({ page }) =>
 test("the motion outlives the new page's own turbo:load, then its marks go", async ({ page }) => {
   await blockOffsiteRequests(page);
   await installRecorder(page);
-  await page.addInitScript(() => document.addEventListener("turbo:load", () => {
-    setTimeout(() => window.ptLog(`after load ${document.documentElement.dataset.pageTransition}`), 0);
-  }));
+  // THE ORDER UNDER TEST, MADE CERTAIN: page b reveals, then its turbo:load, then the motion
+  // ends. Left to the network, Turbo (a module) came before the reveal here, where the rule
+  // this spec guards never runs, and after a short motion on one run in 290. So page b's Turbo
+  // is held until page b has revealed, and its motion is paused until its turbo:load.
+  let arrived = false;
+  let release;
+  const revealedB = new Promise((done) => { release = done; });
+  await page.exposeBinding("ptArrivalRevealed", () => release());
+  page.on("framenavigated", (frame) => { if (frame === page.mainFrame() && frame.url().includes("page_transitions_b")) arrived = true; });
+  await page.route("**/e2e/js/turbo.min.js*", async (route) => {
+    if (arrived) await revealedB;
+    await route.fallback();
+  });
+  await page.addInitScript(() => {
+    document.addEventListener("turbo:load", () => {
+      setTimeout(() => window.ptLog(`after load ${document.documentElement.dataset.pageTransition}`), 0);
+    });
+    window.addEventListener("pagereveal", (event) => {
+      if (!event.viewTransition) return;
+      const paused = event.viewTransition.ready.then(() => document.getAnimations()
+        .filter((a) => (a.effect?.pseudoElement || "").startsWith("::view-transition"))
+        .map((a) => { a.pause(); return a; }), () => []);
+      document.addEventListener("turbo:load", () => {
+        paused.then((animations) => setTimeout(() => animations.forEach((a) => a.play()), 0));
+      }, { once: true });
+      paused.then(() => window.ptArrivalRevealed());
+    });
+  });
   await page.goto(`${LAB}?${STRICT}`);
   await page.waitForFunction(() => window.Turbo);
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
   await fullLoad(page);
   await settled(page, "b");
-  // turbo:load can come after settled returns; the line it leaves is the fact under test.
-  await expect.poll(async () => (await logged(page)).find((line) => line.startsWith("after load "))).toBe("after load slide-left");
+  expect(await logged(page)).toContain("after load slide-left");
   const frames = await page.evaluate(() => window.__frames);
   expect(new Set(frames.map((frame) => frame.root)).size).toBeGreaterThan(3);
   expect(await page.evaluate(() => document.documentElement.dataset.pageTransitionVisit)).toBeUndefined();
