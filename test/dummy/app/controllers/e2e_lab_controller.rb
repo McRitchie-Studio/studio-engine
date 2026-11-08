@@ -75,6 +75,9 @@ class E2eLabController < ActionController::Base
     ENGINE_ASSET_PATHS = {
       "studio/leaflet.js" => "/e2e/js/studio/leaflet.js",
       "studio/leaflet.css" => "/e2e/css/studio/leaflet.css",
+      # studio/_cropper_assets: the vendored Cropper.js, loaded with its sha384 pin.
+      "studio/cropper-1.6.2.min.js" => "/e2e/js/studio/cropper-1.6.2.min.js",
+      "studio/cropper-1.6.2.min.css" => "/e2e/css/studio/cropper-1.6.2.min.css",
       # The "sortablejs" pin: studio/board imports the vendored SortableJS by it.
       "studio/sortable.js" => "/e2e/js/studio/sortable.js",
       # The "canvas-confetti" pin: studio/studio_confetti imports it.

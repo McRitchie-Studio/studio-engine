@@ -4,47 +4,55 @@ require "test_helper"
 require "action_view"
 require "nokogiri"
 
-# [unit] studio/_cropper_assets loads Cropper.js 1.6.2 from cdnjs. Each remote
-# tag must carry its pinned sha384 Subresource Integrity and
-# crossorigin="anonymous" (without CORS mode the browser cannot check the hash,
-# and the tag fails closed). The URLs stay exact because Turf Monster's CSP
-# names the script by file.
+# [unit] studio/_cropper_assets loads Cropper.js 1.6.2 from the engine's own
+# assets, never a CDN. It was two cdnjs tags until engine-skipped-transition-fix,
+# and a cdnjs connection that never answered held the load event of every page
+# that renders the partial (turf-monster's /account). Each tag keeps its pinned
+# sha384 Subresource Integrity and crossorigin="anonymous" (without CORS mode
+# the browser cannot check the hash, and the tag fails closed).
 #
-# The pinned values are sha384 over the files cdnjs serves;
-# test/integration/cropper_assets_sri_test.rb recomputes them offline from
-# byte-exact copies, and bin/cropper-sri-live against the live CDN.
+# test/integration/cropper_assets_sri_test.rb ties the pins to the vendored
+# bytes offline, and bin/cropper-sri-live ties those bytes to the npm package
+# and to cdnjs.
 class CropperAssetsIntegrityTest < Minitest::Test
-  CSS_URL = "https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css"
-  JS_URL = "https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"
+  CSS_ASSET = "studio/cropper-1.6.2.min.css"
+  JS_ASSET = "studio/cropper-1.6.2.min.js"
   CSS_SRI = "sha384-6LFfkTKLRlzFtgx8xsWyBdKGpcMMQTkv+dB7rAbugeJAu1Ym2q1Aji1cjHBG12Xh"
   JS_SRI = "sha384-jrOgQzBlDeUNdmQn3rUt/PZD+pdcRBdWd/HWRqRo+n2OR2QtGyjSaJC0GiCeH+ir"
 
-  def test_the_stylesheet_is_pinned
-    link = doc.at_css(%(link[rel="stylesheet"][href="#{CSS_URL}"]))
+  def test_the_stylesheet_is_the_vendored_file_pinned
+    link = doc.at_css(%(link[rel="stylesheet"][href="/#{CSS_ASSET}"]))
 
-    refute_nil link, "the cropper stylesheet must load from the exact 1.6.2 URL"
+    refute_nil link, "the cropper stylesheet must load from the engine's #{CSS_ASSET}"
     assert_equal CSS_SRI, link["integrity"]
     assert_equal "anonymous", link["crossorigin"]
   end
 
-  def test_the_script_is_pinned
-    script = doc.at_css(%(script[src="#{JS_URL}"]))
+  def test_the_script_is_the_vendored_file_pinned
+    script = doc.at_css(%(script[src="/#{JS_ASSET}"]))
 
-    refute_nil script, "the cropper script must load from the exact 1.6.2 URL (Turf's CSP names it)"
+    refute_nil script, "the cropper script must load from the engine's #{JS_ASSET}"
     assert_equal JS_SRI, script["integrity"]
     assert_equal "anonymous", script["crossorigin"]
     assert script.key?("defer"), "the script stays deferred"
   end
 
-  # A third remote tag added later must not slip in unpinned.
-  def test_every_remote_tag_carries_integrity
-    remote = doc.css("link[href], script[src]").select { |n| (n["href"] || n["src"]).start_with?("http") }
+  # The defect was a third-party host on the page's load path. None may return.
+  def test_nothing_loads_from_another_host
+    tags = doc.css("link[href], script[src]")
 
-    assert_equal 2, remote.size
-    remote.each do |node|
+    assert_equal 2, tags.size
+    tags.each do |node|
+      url = node["href"] || node["src"]
+      refute_match %r{\A(https?:)?//}, url, "#{node.name} loads from another host: #{url}"
       assert_match(/\Asha384-[A-Za-z0-9+\/]{64}\z/, node["integrity"].to_s, "#{node.name} lost its integrity")
-      assert_equal "anonymous", node["crossorigin"], "#{node.name} lost crossorigin"
     end
+  end
+
+  def test_both_files_ship_in_the_gem
+    root = File.expand_path("../..", __dir__)
+    assert File.file?(File.join(root, "app/assets/javascripts", JS_ASSET))
+    assert File.file?(File.join(root, "app/assets/stylesheets", CSS_ASSET))
   end
 
   private
