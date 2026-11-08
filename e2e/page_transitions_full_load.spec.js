@@ -94,10 +94,24 @@ test.afterEach(async ({ page }, testInfo) => {
 const rootMotion = (lines) => lines.filter((line) => /-(old|new)\(root\) /.test(line));
 
 // Past the whole motion: the document's own marks are gone when this returns.
+//
+// FIRST THE NEW PAGE'S REVEAL. Its DOM parses, and Playwright sees it as visible, before its
+// first render: a render-blocking sheet, or the reveal script's own hold to the end of parse,
+// keeps pagereveal back. Until then no mark is set and no pseudo runs, so "no marks, no
+// animations" also holds BEFORE the motion. Without the reveal wait the spec read an empty
+// log and went red in 312 ms (Engine CI run 42503970890).
 async function settled(page, testId) {
   await expect(page.locator(`[data-test="page-${testId}"]`)).toBeVisible();
-  await page.waitForFunction(() => document.documentElement.dataset.pageTransition === undefined
+  await page.waitForFunction(() => window.__revealed === true
+    && document.documentElement.dataset.pageTransition === undefined
     && !document.getAnimations().some((a) => (a.effect?.pseudoElement || "").startsWith("::view-transition")));
+}
+
+// The new page has revealed, for a spec that reads its pagereveal or asserts that nothing
+// played: visible is not revealed (settled, above).
+async function revealed(page, testId = "b") {
+  await expect(page.locator(`[data-test="page-${testId}"]`)).toBeVisible();
+  await page.waitForFunction(() => window.__revealed === true);
 }
 
 function expectOneMotion(lines, oldName, newName) {
@@ -157,7 +171,8 @@ test("the motion outlives the new page's own turbo:load, then its marks go", asy
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
   await fullLoad(page);
   await settled(page, "b");
-  expect(await logged(page)).toContain("after load slide-left");
+  // turbo:load can come after settled returns; the line it leaves is the fact under test.
+  await expect.poll(async () => (await logged(page)).find((line) => line.startsWith("after load "))).toBe("after load slide-left");
   const frames = await page.evaluate(() => window.__frames);
   expect(new Set(frames.map((frame) => frame.root)).size).toBeGreaterThan(3);
   expect(await page.evaluate(() => document.documentElement.dataset.pageTransitionVisit)).toBeUndefined();
@@ -241,6 +256,7 @@ test("a reload plays nothing and leaves no name", async ({ page }) => {
   await open(page, STRICT);
   await page.reload();
   await page.waitForFunction(() => window.Turbo && document.documentElement.dataset.pageTransitionDirection);
+  await revealed(page, "a");
   await page.waitForTimeout(200);
   const lines = await logged(page);
   expect(lines).toEqual(expect.arrayContaining(["pageswap plain", "pagereveal plain"]));
@@ -253,6 +269,7 @@ test("a full load of the same path plays nothing", async ({ page }) => {
   await open(page, STRICT);
   await fullLoad(page, "same-full");
   await page.waitForFunction(() => window.Turbo && document.documentElement.dataset.pageTransitionDirection);
+  await revealed(page, "a");
   await page.waitForTimeout(200);
   const lines = await logged(page);
   expect(lines).toContain("pageswap transition");
@@ -312,7 +329,7 @@ test("a click before the old page's module has run gets the plain load, not the 
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
   await page.unroute("**/e2e/modules/studio/page_transitions*");
   await fullLoad(page);
-  await expect(page.locator('[data-test="page-b"]')).toBeVisible();
+  await revealed(page);
   await page.waitForTimeout(300);
   const lines = await logged(page);
   expect(lines).toContain("pagereveal transition");
@@ -515,7 +532,7 @@ test("with no direction, a full load has no sheet, no script, no at-rule and not
   page.on("request", (request) => requests.push(request.url()));
   await open(page, "");
   await fullLoad(page);
-  await expect(page.locator('[data-test="page-b"]')).toBeVisible();
+  await revealed(page);
   const lines = await logged(page);
   expect(lines).toEqual(expect.arrayContaining(["pageswap plain", "pagereveal plain"]));
   expect(lines.filter((line) => line.startsWith("::view-transition"))).toEqual([]);
@@ -561,7 +578,7 @@ test.describe("with reduced motion", () => {
     const errors = watchPageErrors(page);
     await open(page, STRICT);
     await fullLoad(page);
-    await expect(page.locator('[data-test="page-b"]')).toBeVisible();
+    await revealed(page);
     await page.waitForTimeout(200);
     const lines = await logged(page);
     expect(lines).toEqual(expect.arrayContaining(["pageswap plain", "pagereveal plain"]));
