@@ -659,7 +659,7 @@ class ProfilePageRenderTest < Minitest::Test
   def test_the_read_page_never_loads_the_cropper
     html = render_page(Studio::ProfileSections.defaults.select { |x| x[:page] == :show })
 
-    refute_includes html, "cropper.min.js"
+    refute_match(/cropper[-\d.]*\.min\.js/, html)
   end
 
   def test_a_host_section_renders_with_its_own_locals
