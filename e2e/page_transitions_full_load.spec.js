@@ -242,6 +242,10 @@ test("a page that arrived by a full load then plays a Turbo visit once", async (
   await open(page, "direction=left");
   await fullLoad(page);
   await settled(page, "b");
+  // The motion can end before the new page's modules run. Clicked then, the link is a plain
+  // full load back, not a Turbo visit (seen once in 145 runs). Module scripts run in document
+  // order, and studio/page_transitions comes ahead of Turbo in the head, so Turbo means both.
+  await page.waitForFunction(() => window.Turbo);
   await page.evaluate(() => { window.__seen.clear(); sessionStorage.removeItem("pt-log"); });
   const load = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
   await page.locator('[data-test="other"]').click();
