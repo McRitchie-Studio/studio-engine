@@ -401,7 +401,8 @@ pattern (`studio/site_footer/_assets`):
   with a fallback beside it. The rules are the ones `engine.css` gives the row, the `.btn`
   family at `.btn-sm`, and `.label-upper`. The default bleed (`row_class: "-mx-4 px-4"`)
   is defined on the row alone, so it fits a plain container with a 1rem gutter.
-- **A small script, no Stimulus and no import map.** It marks the row stuck, fades an end
+- **A small module, no Stimulus and no import map.** `studio/page_header_self_styled` imports
+  nothing and loads by its own `<script type="module">` tag (no inline script). It marks the row stuck, fades an end
   of the tabs that hides a tab, shows the open tab on a phone, keeps each Links menu's
   `aria-expanded` in step (with ArrowDown into the list), and places the menu where the
   browser has no anchor positioning. With no pinned stack on the page, it publishes
@@ -410,8 +411,9 @@ pattern (`studio/site_footer/_assets`):
   `--nav-bottom` or `--pin-page-top` itself keeps its value.
 - **Without the script** the row keeps its bar at all times (a `<noscript>` rule). The
   menu is the browser's popover and the tabs are links, so both still work.
-- **The CSP nonce.** The `<style>` and the `<script>` carry the request's nonce when the
-  app sets one.
+- **The CSP nonce.** The `<style>` and the module tag carry the request's nonce when the
+  app sets one. The module is served from the asset path (`asset_path`), which the engine
+  adds for propshaft and sprockets alike.
 
 Off (the default), the partial renders exactly what it always has: the helper returns
 nil on the sentinel's own line, so a Tailwind app's row is the same to the byte
