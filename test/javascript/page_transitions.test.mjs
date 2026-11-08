@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs"
 import { runInNewContext } from "node:vm"
 
 const source = readFileSync(new URL("../../app/javascript/studio/page_transitions.js", import.meta.url), "utf8")
-const { STYLES, DEFAULT_STYLE, STILL, READY_CAP_MS, FULL_LOAD_STYLE_KEY, REVERSE, BACK_LINK, styleFor, planVisit, planFullLoad, visitIsBack, fullLoadIsBack, sameAddress, leaveStyle, withCap, shareName, holdRender, installPageTransitions } =
+const { STYLES, DEFAULT_STYLE, STILL, READY_CAP_MS, FULL_LOAD_STYLE_KEY, REVERSE, BACK_LINK, styleFor, planVisit, planFullLoad, visitIsBack, fullLoadIsBack, sameAddress, leaveStyle, withCap, shareName, holdRender, skipOwnTransition, installPageTransitions } =
   await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 const visit = { direction: "left", from: "/", to: "/chat", transitions: true, sharedName: false }
@@ -204,11 +204,31 @@ async function installed(pathname = "/a", { motion = false } = {}) {
   assert.equal(install(doc), true)
   const swap = (url) => {
     const skipped = { value: false }
-    on.win.pageswap({ viewTransition: { skipTransition: () => { skipped.value = true } }, activation: activation(url) })
+    const ready = { caught: false, catch() { this.caught = true; return this } }
+    on.win.pageswap({ viewTransition: { ready, skipTransition: () => { skipped.value = true } }, activation: activation(url) })
+    assert.equal(ready.caught, skipped.value, "a skip the engine chooses handles its own ready, and only then")
     return skipped.value
   }
   return { on, root, store, win, swap }
 }
+
+// Chrome leaves a skipped transition's ready rejection unhandled (a "Transition was skipped"
+// pageerror), so a skip the engine chooses handles that one promise itself.
+test("the engine's own skip handles its ready rejection, and only that", async () => {
+  const order = []
+  const ready = Promise.reject(new Error("Transition was skipped"))
+  const finished = Promise.resolve()
+  const real = { ready, finished, skipTransition: () => order.push("skip") }
+  const caught = []
+  const original = ready.catch.bind(ready)
+  ready.catch = (fn) => { caught.push("ready"); order.push("catch"); return original(fn) }
+  finished.catch = () => { caught.push("finished") }
+  skipOwnTransition(real)
+  assert.deepEqual(order, ["catch", "skip"], "handled before the skip rejects it")
+  assert.deepEqual(caught, ["ready"])
+  skipOwnTransition({ skipTransition: () => order.push("bare") })
+  assert.deepEqual(order.at(-1), "bare", "a transition with no ready still skips")
+})
 
 test("pageswap leaves a style and names the stack for the old picture", async () => {
   const { root, store, swap } = await installed()
@@ -451,10 +471,11 @@ function reveal({ style = null, storage, stack = {} } = {}) {
 }
 
 function transition() {
-  const state = { skipped: false }
+  const state = { skipped: false, readyCaught: false }
   let finish
   const finished = new Promise((done) => { finish = done })
-  return { state, finish, viewTransition: { skipTransition: () => { state.skipped = true }, finished } }
+  const ready = { catch() { state.readyCaught = true; return this } }
+  return { state, finish, viewTransition: { skipTransition: () => { state.skipped = true }, finished, ready } }
 }
 
 test("the classic script holds no table of styles and shares the module's key", () => {
@@ -496,6 +517,7 @@ test("an arrival nobody planned is skipped, so the browser's own fade never play
   const { viewTransition, state } = transition()
   listeners.pagereveal({ viewTransition })
   assert.equal(state.skipped, true)
+  assert.equal(state.readyCaught, true, "the skip it chose leaves no unhandled ready rejection")
   assert.equal(root.dataset.pageTransition, undefined)
 })
 

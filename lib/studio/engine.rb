@@ -88,7 +88,8 @@ module Studio
       # app/assets/javascripts/studio: the vendored third-party builds, each
       # loaded as an ES module (Alpine by the head's type="module" tag,
       # canvas-confetti and SortableJS through their importmap pins, Leaflet by
-      # studio/footer_map's import()), and studio/session.js, the one classic
+      # studio/footer_map's import(), Cropper.js by studio/_cropper_assets'
+      # two tags), and studio/session.js, the one classic
       # script (layouts/studio/_head says why), with studio/page_transition_reveal.js,
       # the other classic one. The engine's own modules are under app/javascript,
       # enumerated below.
@@ -99,6 +100,8 @@ module Studio
         studio/sortable.js
         studio/leaflet.js
         studio/leaflet.css
+        studio/cropper-1.6.2.min.js
+        studio/cropper-1.6.2.min.css
         studio/session.js
         studio/page_transition_full_load.css
         studio/page_transition_reveal.js

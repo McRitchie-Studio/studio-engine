@@ -106,6 +106,15 @@ export function leaveStyle(win, style) {
   }
 }
 
+// A skip the engine chooses. Chrome rejects the skipped transition's `ready` with "Transition
+// was skipped" and leaves the rejection unhandled (measured: a pageerror whenever nothing
+// awaits `ready`). This skip is the engine's own decision, so that one rejection is expected
+// and handled here. A transition the engine did not skip is never touched.
+export function skipOwnTransition(transition) {
+  if (transition.ready && typeof transition.ready.catch === "function") transition.ready.catch(() => {})
+  transition.skipTransition()
+}
+
 // A slow image must not hold a click: past the cap the swap goes ahead.
 export function withCap(promise, ms, timer = setTimeout) {
   return Promise.race([promise, new Promise((done) => timer(done, ms))])
@@ -307,7 +316,7 @@ export function installPageTransitions(doc) {
     const left = leaveStyle(win, style)
     if (!transition) return
     if (!left) {
-      transition.skipTransition()
+      skipOwnTransition(transition)
       return
     }
     markHeld(doc)

@@ -49,10 +49,16 @@ class CropperAssetsIntegrityTest < Minitest::Test
     end
   end
 
-  def test_both_files_ship_in_the_gem
+  def test_both_files_ship_in_the_gem_and_are_precompiled
     root = File.expand_path("../..", __dir__)
-    assert File.file?(File.join(root, "app/assets/javascripts", JS_ASSET))
-    assert File.file?(File.join(root, "app/assets/stylesheets", CSS_ASSET))
+    engine = File.read(File.join(root, "lib/studio/engine.rb"))
+    { JS_ASSET => "javascripts", CSS_ASSET => "stylesheets" }.each do |asset, dir|
+      body = File.read(File.join(root, "app/assets", dir, asset))
+      assert_includes body, "Cropper.js v1.6.2", "#{asset} is not the 1.6.2 build"
+      assert_includes body, "Released under the MIT license", "the licence notice must travel with #{asset}"
+      assert_match(/^\s*#{Regexp.escape(asset)}\s*$/, engine,
+                   "#{asset} must be in the engine's assets.precompile list, or a Sprockets host will not serve it")
+    end
   end
 
   private
