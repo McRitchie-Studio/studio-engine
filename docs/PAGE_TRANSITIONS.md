@@ -134,9 +134,15 @@ a full load every `data-vt-morph` name is off, and the direction plays. A host's
 with no marker still floats over the moving page, as on a Turbo visit.
 
 **Turbo.** A plain visit stays in one document, so no full-load event fires. Turbo opens its
-view transition before it reads `turbo-visit-control`. So `data-page-transition="still"` stands
-from `turbo:visit` until `turbo:before-render`. A response that Turbo will not render draws
-nothing, and the full load after it plays the one motion.
+view transition before it reads `turbo-visit-control`, and a response it will not render
+(`turbo-visit-control: reload`, or a changed `data-turbo-track="reload"` asset) is then answered
+by a full load, which can skip that transition while its `ready` promise is pending. Turbo
+awaits only `finished`, so the skip was an unhandled "Transition was skipped" error.
+`studio/reload_visits` asks Turbo's own `PageRenderer` about each response at
+`turbo:before-fetch-response` and, for one Turbo will not render, takes the view-transition meta
+out of the HTML Turbo parses. So Turbo opens no transition, and the full load plays the one
+motion. As a fallback, `data-page-transition="still"` stands from `turbo:visit` until
+`turbo:before-render`, so a transition that still opens draws nothing.
 
 **What a full load does in Chrome.**
 
