@@ -16,10 +16,31 @@ function installRecorder(context) {
       sessionStorage.setItem("pt-log", JSON.stringify(lines));
     };
     window.ptLog = log;
+    // The state each side of a load was in, for the event log a red prints (afterEach below).
+    // Lines start "swap-" and "reveal-", so the specs that count "page..." lines never see them.
+    window.__painted = 0;
+    window.__revealed = false;
     window.addEventListener("pageswap", (event) => {
       log(`pageswap ${event.viewTransition ? "transition" : "plain"}`);
+      log(`swap-state ${JSON.stringify({
+        type: event.activation ? event.activation.navigationType : null,
+        to: event.activation && event.activation.entry ? new URL(event.activation.entry.url).pathname : null,
+        visibility: document.visibilityState,
+        revealed: window.__revealed,
+        painted: window.__painted,
+        ready: document.readyState,
+        module: !!document.documentElement.dataset.pageTransitionDirection,
+      })}`);
     }, { capture: true });
-    window.addEventListener("pagereveal", (event) => log(`pagereveal ${event.viewTransition ? "transition" : "plain"}`));
+    // After studio/page_transitions' own pageswap listener: the style it left for the next page.
+    window.addEventListener("load", () => window.addEventListener("pageswap", () => {
+      log(`swap-left ${sessionStorage.getItem("studio-page-transition-style")}`);
+    }));
+    window.addEventListener("pagereveal", (event) => {
+      window.__revealed = true;
+      log(`pagereveal ${event.viewTransition ? "transition" : "plain"}`);
+      log(`reveal-state ${JSON.stringify({ visibility: document.visibilityState, style: sessionStorage.getItem("studio-page-transition-style") })}`);
+    });
     window.addEventListener("pageshow", (event) => { if (event.persisted) log("restored"); });
     document.addEventListener("securitypolicyviolation", (event) => log(`violation ${event.violatedDirective}`));
     const start = Document.prototype.startViewTransition;
@@ -28,6 +49,7 @@ function installRecorder(context) {
     window.__seen = seen;
     window.__frames = [];
     const tick = () => {
+      window.__painted += 1;
       for (const animation of document.getAnimations()) {
         const pseudo = animation.effect && animation.effect.pseudoElement;
         if (!pseudo || !pseudo.startsWith("::view-transition")) continue;
@@ -60,6 +82,15 @@ async function open(page, query) {
 }
 
 const logged = (page) => page.evaluate(() => JSON.parse(sessionStorage.getItem("pt-log") || "[]"));
+
+// A red carries its evidence: the whole event log, printed and attached to the JSON report
+// the CI uploads for every shard. A red with no log once left its cause unprovable.
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status === testInfo.expectedStatus) return;
+  const lines = await logged(page).catch((error) => [`(the log could not be read: ${error.message})`]);
+  console.log(`pt-log for "${testInfo.title}":\n${lines.join("\n")}`);
+  await testInfo.attach("pt-log", { body: lines.join("\n"), contentType: "text/plain" });
+});
 const rootMotion = (lines) => lines.filter((line) => /-(old|new)\(root\) /.test(line));
 
 // Past the whole motion: the document's own marks are gone when this returns.
@@ -70,7 +101,7 @@ async function settled(page, testId) {
 }
 
 function expectOneMotion(lines, oldName, newName) {
-  expect(rootMotion(lines).sort()).toEqual([
+  expect(rootMotion(lines).sort(), `the event log:\n${lines.join("\n")}`).toEqual([
     `::view-transition-new(root) ${newName}`,
     `::view-transition-old(root) ${oldName}`,
   ]);
@@ -122,7 +153,9 @@ test("the motion outlives the new page's own turbo:load, then its marks go", asy
     setTimeout(() => window.ptLog(`after load ${document.documentElement.dataset.pageTransition}`), 0);
   }));
   await page.goto(`${LAB}?${STRICT}`);
-  await page.waitForFunction(() => window.Turbo);
+  // Turbo is a module of its own: it can be up before studio/page_transitions has run, and a
+  // click then gets the plain load (the "click before the old page's module" spec below).
+  await page.waitForFunction(() => window.Turbo && document.documentElement.dataset.pageTransitionDirection);
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
   await fullLoad(page);
   await settled(page, "b");
