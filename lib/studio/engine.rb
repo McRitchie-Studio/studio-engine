@@ -429,8 +429,10 @@ module Studio
       # The host's error_logs, theme_settings and image_caches carry every
       # column the engine's models write (Studio::HostSchema). Skipped in a
       # rake task, which boots to migrate rather than to serve.
+      # Then the device-session columns, which only warn (docs/DEVICE_SESSIONS.md).
       if Studio.active_record? && !Studio::HostSchema.inside_rake_task?
         Studio::HostSchema.check!
+        Studio::HostSchema.device_session_check!
       end
     end
 

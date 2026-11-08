@@ -13,6 +13,21 @@ require_relative "../../db/migrate/20261108120000_add_device_revocation_to_studi
 
 ActiveRecord::Schema.verbose = false
 ActiveRecord::Migration.verbose = false
+ActiveRecord::Schema.define do
+  create_table :error_logs, force: true do |t|
+    t.string :slug
+    t.text   :message
+    t.text   :inspect
+    t.text   :backtrace
+    t.string :target_type
+    t.bigint :target_id
+    t.string :target_name
+    t.string :parent_type
+    t.bigint :parent_id
+    t.string :parent_name
+    t.timestamps
+  end
+end
 ActiveRecord::Base.connection.drop_table(:studio_user_sessions, if_exists: true)
 CreateStudioUserSessions.migrate(:up)
 AddDeviceRevocationToStudioUserSessions.migrate(:up)
@@ -27,12 +42,23 @@ class UserSessionRevocationTest < ActiveSupport::TestCase
   setup do
     Session.record_in_test = true
     Session.pruned_at = nil
+    Session.check_failure_logged_at = nil
     Session.delete_all
+    ErrorLog.delete_all
   end
 
   teardown do
     Session.record_in_test = false
     Session.pruned_at = nil
+    Session.check_failure_logged_at = nil
+  end
+
+  class RecordingLogger
+    attr_reader :warnings
+
+    def initialize = @warnings = []
+    def warn(text) = @warnings << text
+    def debug(_text) = nil
   end
 
   def now = Time.zone.parse("2026-11-08 12:00:00")
@@ -214,5 +240,130 @@ class UserSessionRevocationTest < ActiveSupport::TestCase
     assert_equal :live, Session.verdict(decoded, now: now).first
     Session.revoke!(store, now: now)
     assert_equal :ended, Session.verdict(decoded, now: now).first
+  end
+
+  # --- device-session-hardening (Carl's review of logout-ends-device-session) ---
+
+  test "ended? is the cable check: true only for an ended sid, false for live, legacy and off" do
+    store = {}
+    Session.start!(store, member, now: now)
+    decoded = JSON.parse(store.to_json)
+
+    refute Session.ended?(decoded, now: now), "a live sid opens a socket"
+    refute Session.ended?({}, now: now), "a sid-less cookie inside the grace opens a socket"
+    Session.revoke!(store, now: now)
+    assert Session.ended?(decoded, now: now), "a revoked sid is refused"
+    assert Session.ended?({ Session.cookie_key.to_s => { "sid" => "forged" } }, now: now), "a sid with no row is refused"
+
+    Session.record_in_test = false
+    refute Session.ended?(decoded, now: now), "off answers false"
+  end
+
+  test "ended? never writes the store it reads" do
+    store = {}
+    Session.start!(store, member, now: now)
+    Session.revoke!(store.dup, now: now)
+    before = store.deep_dup
+
+    assert Session.ended?(store, now: now)
+    assert_equal before, store
+  end
+
+  test "a failed verdict writes one ErrorLog row, throttled per process" do
+    store = { Session.cookie_key => { "sid" => "x" } }
+    Session.define_singleton_method(:where) { |*| raise ActiveRecord::StatementInvalid, "down" }
+
+    assert_equal [:off, nil], Session.verdict(store, now: now)
+    assert_equal 1, ErrorLog.count
+    assert_match(/down/, ErrorLog.last.message)
+
+    Session.verdict(store, now: now + 1.minute)
+    assert_equal 1, ErrorLog.count, "inside the window no second row"
+
+    Session.verdict(store, now: now + Session::CHECK_FAILURE_LOG_EVERY + 1.second)
+    assert_equal 2, ErrorLog.count, "past the window it logs again"
+  ensure
+    Session.singleton_class.remove_method(:where)
+  end
+
+  test "a failed ErrorLog write in the verdict still answers :off and is not retried every request" do
+    store = { Session.cookie_key => { "sid" => "x" } }
+    Session.define_singleton_method(:where) { |*| raise ActiveRecord::StatementInvalid, "down" }
+    calls = 0
+    # ErrorLog.capture! is the real method: alias it so the ensure restores it
+    # (a bare remove_method would delete it for every later test).
+    ErrorLog.singleton_class.alias_method(:capture_before_fault!, :capture!)
+    ErrorLog.define_singleton_method(:capture!) { |*| calls += 1; raise ActiveRecord::ConnectionNotEstablished, "no db" }
+
+    assert_equal [:off, nil], Session.verdict(store, now: now)
+    assert_equal [:off, nil], Session.verdict(store, now: now + 1.minute)
+    assert_equal 1, calls
+  ensure
+    Session.singleton_class.remove_method(:where)
+    ErrorLog.singleton_class.alias_method(:capture!, :capture_before_fault!)
+    ErrorLog.singleton_class.remove_method(:capture_before_fault!)
+  end
+
+  test "start! never reuses a revoked sid: a sign-in on a logged-out cookie mints a new one" do
+    store = {}
+    first = Session.start!(store, member, now: now)
+    copy = store.deep_dup
+    Session.revoke!(store, now: now + 1.minute)
+
+    row = Session.start!(copy, member, now: now + 2.minutes)
+    assert row, "a new row is written"
+    refute_equal first.sid, row.sid
+    assert_equal row.sid, copy[Session.cookie_key]["sid"]
+    assert_equal :live, Session.verdict(copy, now: now + 2.minutes).first
+  end
+
+  test "start! does not reuse a sid with no row, or one another user's row holds" do
+    forged = { Session.cookie_key => { "user" => member.id, "sid" => "forged" } }
+    row = Session.start!(forged, member, now: now)
+    refute_equal "forged", row.sid
+
+    other = Session.start!({}, Person.new(8, false), now: now)
+    borrowed = { Session.cookie_key => { "user" => member.id, "sid" => other.sid } }
+    mine = Session.start!(borrowed, member, now: now)
+    refute_equal other.sid, mine.sid
+  end
+
+  test "start! keeps a live sid of the same user in one query" do
+    store = {}
+    first = Session.start!(store, member, now: now)
+
+    assert_equal 1, queries { assert_nil Session.start!(store, member, now: now + 1.minute) }
+    assert_equal first.sid, store[Session.cookie_key]["sid"]
+  end
+
+  test "the boot warns when the device-session columns are missing, and is quiet when whole" do
+    connection = ActiveRecord::Base.connection
+    logger = RecordingLogger.new
+    assert_equal [], Studio::HostSchema.device_session_check!(connection: connection, mode: :raise, logger: logger)
+    assert_empty logger.warnings
+
+    AddDeviceRevocationToStudioUserSessions.migrate(:down)
+    connection.schema_cache.clear!
+    missing = Studio::HostSchema.device_session_check!(connection: connection, mode: :raise, logger: logger)
+    assert_equal %w[sid revoked_at], missing, "it warns and never raises, even in :raise mode"
+    assert_match(/NOT checked/, logger.warnings.last)
+
+    assert_equal [], Studio::HostSchema.device_session_check!(connection: connection, mode: false, logger: logger)
+  ensure
+    AddDeviceRevocationToStudioUserSessions.migrate(:up)
+    Session.reset_column_information
+    connection.schema_cache.clear!
+  end
+
+  test "the boot warns when the table itself is missing, and skips an unreachable database" do
+    logger = RecordingLogger.new
+    absent = Object.new
+    def absent.table_exists?(_) = false
+    assert_equal %w[sid revoked_at], Studio::HostSchema.device_session_check!(connection: absent, mode: :log, logger: logger)
+    assert_equal 1, logger.warnings.size
+
+    broken = Object.new
+    def broken.table_exists?(_) = raise(ActiveRecord::ConnectionNotEstablished, "no database")
+    assert_equal [], Studio::HostSchema.device_session_check!(connection: broken, mode: :log, logger: logger)
   end
 end
