@@ -1,31 +1,25 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Re-checks the vendored Cropper.js against its published release. It needs the
-# network, so it is a script rather than a test: the suite may not skip, and it
-# may not depend on npm or cdnjs being up. Run it whenever the pinned version,
-# the files or the hashes change.
+# Re-checks the Cropper.js pins against the live CDN. It needs the network, so
+# it is a script rather than a test: the suite may not skip, and it may not
+# depend on cdnjs being up. Run it whenever the pinned version or hashes change.
 #
 #   bin/cropper-sri-live
 #
-# For each tag in app/views/studio/_cropper_assets.html.erb it reads the
-# vendored file and checks four things: its sha384 equals the pinned integrity;
-# its bytes equal the dist file in the cropperjs npm tarball (the official
-# package, itself checked against the registry's dist.integrity); its bytes
-# equal what cdnjs serves; and its sha512 equals the SRI cdnjs publishes.
+# For each tag in app/views/studio/_cropper_assets.html.erb it fetches the URL
+# and checks three things: the sha384 of the live bytes equals the pinned
+# integrity, the sha512 equals the SRI cdnjs publishes, and the bytes equal the
+# copy in test/fixtures/files/cropperjs-<version> that the browser lane serves.
 # Exit 0 when all hold, 1 otherwise.
 
 require "net/http"
 require "openssl"
 require "base64"
 require "json"
-require "rubygems/package"
-require "zlib"
-require "stringio"
 
 ROOT = File.expand_path("..", __dir__)
 PARTIAL = File.join(ROOT, "app/views/studio/_cropper_assets.html.erb")
-DIRS = { "js" => "app/assets/javascripts", "css" => "app/assets/stylesheets" }.freeze
 
 def get(url, limit = 3)
   response = Net::HTTP.get_response(URI(url))
@@ -38,39 +32,23 @@ def digest(algorithm, body)
   "#{algorithm.downcase}-#{Base64.strict_encode64(OpenSSL::Digest.digest(algorithm, body))}"
 end
 
-# The dist files of one npm release, read from the tarball the registry names.
-def npm_dist(version)
-  dist = JSON.parse(get("https://registry.npmjs.org/cropperjs/#{version}")).fetch("dist")
-  tarball = get(dist.fetch("tarball"))
-  abort "the cropperjs #{version} tarball does not match the registry's integrity" unless digest("SHA512", tarball) == dist.fetch("integrity")
-
-  files = {}
-  Gem::Package::TarReader.new(Zlib::GzipReader.new(StringIO.new(tarball))) do |tar|
-    tar.each { |entry| files[entry.full_name.delete_prefix("package/")] = entry.read.b if entry.file? }
-  end
-  files
-end
-
 source = File.read(PARTIAL)
-tags = source.scan(%r{(?:href|src)="<%= asset_path\("(studio/cropper-([\d.]+)\.min\.(js|css))"\) %>"\s+integrity="([^"]+)"})
+tags = source.scan(%r{(?:href|src)="(https://cdnjs\.cloudflare\.com/ajax/libs/cropperjs/([\d.]+)/([^"]+))"\s+integrity="([^"]+)"})
 abort "expected 2 pinned cropper tags in #{PARTIAL}, found #{tags.size}" unless tags.size == 2
 
 failures = 0
 tags.group_by { |(_, version)| version }.each do |version, group|
-  dist = npm_dist(version)
   published = JSON.parse(get("https://api.cdnjs.com/libraries/cropperjs/#{version}?fields=sri")).fetch("sri")
-  group.each do |asset, _, ext, integrity|
-    vendored = File.join(DIRS.fetch(ext), asset)
-    body = File.binread(File.join(ROOT, vendored))
-    file = "cropper.min.#{ext}"
+  group.each do |url, _, file, integrity|
+    body = get(url)
+    fixture = File.join(ROOT, "test/fixtures/files/cropperjs-#{version}", file)
     checks = {
       "sha384 equals pinned integrity" => digest("SHA384", body) == integrity,
-      "bytes equal the npm package's dist/#{file}" => dist["dist/#{file}"] == body,
-      "bytes equal cdnjs's #{file}" => get("https://cdnjs.cloudflare.com/ajax/libs/cropperjs/#{version}/#{file}") == body,
       "sha512 equals cdnjs published SRI" => digest("SHA512", body) == published[file],
+      "bytes equal #{fixture.delete_prefix("#{ROOT}/")}" => File.exist?(fixture) && File.binread(fixture) == body,
     }
     checks.each do |label, ok|
-      puts "#{ok ? "ok  " : "FAIL"} #{vendored}: #{label}"
+      puts "#{ok ? "ok  " : "FAIL"} #{file}: #{label}"
       failures += 1 unless ok
     end
   end

@@ -1,5 +1,7 @@
 // Shared helpers for the engine's browser lane.
 
+const path = require("path");
+
 // watchPageErrors, and the answered-not-aborted offsite block below, come from the
 // engine's Node tooling package (lib/studio/node_tooling/e2e_helpers.js), the one
 // every host links. Their WHY lives there.
@@ -111,11 +113,31 @@ async function sampleAcrossFrames(page, { perturb, read, frames = 30 }) {
 // and text measurements are fair game. e2e/vendored_montserrat.spec.js is the first
 // spec to take one, and it could not have been written before.
 //
-// No off-origin file is pinned any more. Cropper.js was the one (cdnjs, with sha384
-// integrity, answered here with byte-exact copies); since engine-skipped-transition-fix
-// the engine vendors it, so it arrives from the asset pipeline like Montserrat.
+// THE ONE EXCEPTION: AN OFF-ORIGIN FILE PINNED WITH INTEGRITY. studio/_cropper_assets
+// loads Cropper.js 1.6.2 from cdnjs with sha384 Subresource Integrity, so an empty
+// body no longer reads as "nothing happened": the digest fails, Chromium refuses the
+// file and logs `Failed to find a valid digest`, which watchPageErrors counts. Those
+// two URLs are answered with byte-exact copies of the real files
+// (test/fixtures/files/cropperjs-1.6.2, the same bytes whose sha512 equals cdnjs's
+// published SRI), so the hash matches, nothing logs, and the page exercises the tag
+// exactly as shipped. test/integration/cropper_assets_sri_test.rb holds the copies
+// to the pinned hashes, so a hash bump without new copies fails the unit suite
+// before it fails here. A spec that needs Cropper.js absent or refused registers
+// its own route after this one (the route registered last answers first).
+const PINNED_FIXTURES = path.join(__dirname, "..", "test", "fixtures", "files");
+const PINNED_OFFSITE = {
+  "https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js": {
+    file: path.join(PINNED_FIXTURES, "cropperjs-1.6.2/cropper.min.js"),
+    contentType: "application/javascript",
+  },
+  "https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css": {
+    file: path.join(PINNED_FIXTURES, "cropperjs-1.6.2/cropper.min.css"),
+    contentType: "text/css",
+  },
+};
+
 async function blockOffsiteRequests(page) {
-  await shared.blockOffsiteRequests(page);
+  await shared.blockOffsiteRequests(page, { pinned: PINNED_OFFSITE });
 }
 
 module.exports = { watchPageErrors, expectStickyChromeIsLive, sampleAcrossFrames, blockOffsiteRequests };

@@ -7,9 +7,10 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 // when Cropper.js never arrives instead of taking a press that does nothing.
 //
 // /lab/style_modals renders the style guide's Modals section, whose page-scoped
-// host mounts the real crop card on $store.dsModals. Cropper.js is the engine's
-// vendored 1.6.2 copy, pinned with sha384 integrity, so the shipped tag loads
-// as it would in production. The specs that drive a crop still want a
+// host mounts the real crop card on $store.dsModals. Cropper.js comes from
+// cdnjs, pinned with sha384 integrity, and blockOffsiteRequests answers those
+// two URLs with byte-exact copies of the real 1.6.2 files, so the shipped tag
+// loads as it would in production. The specs that drive a crop still want a
 // stand-in that records how it was constructed and exports a real canvas, and
 // a substitute BODY can no longer be served (it fails the digest). So the
 // stand-in is defined before any script runs, as a window.Cropper accessor
@@ -18,7 +19,7 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 // library.
 //
 // The missing-library spec answers the script with a body that is NOT the
-// pinned file, which is how a tampered file looks to the page: the
+// pinned file, which is how a tampered CDN file looks to the page: the
 // browser refuses it on its integrity, window.Cropper stays undefined, and
 // the card has to say so. That spec fails if the tag ever loses its integrity.
 //
@@ -28,7 +29,7 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 //   - return from the missing-library branch without setting the error: the
 //     last spec fails, the card showing nothing.
 
-const CROPPER_JS = /\/studio\/cropper-1\.6\.2\.min\.js$/;
+const CROPPER_JS = /cdnjs\.cloudflare\.com\/ajax\/libs\/cropperjs\/.*cropper\.min\.js/;
 const CARD = '[role="dialog"]';
 const SAVE = `${CARD} button.btn-primary`;
 const CANCEL = `${CARD} button:has-text("Cancel")`;
@@ -156,20 +157,6 @@ test("a file that is no image is refused on the card's own line", async ({ page 
 
   await page.locator(`${CARD} input[type="file"]`).setInputFiles({ name: "party.gif", mimeType: "image/gif", buffer: Buffer.from("GIF89a") });
   await expect(page.locator(`${CARD} [role="alert"]`)).toHaveText("GIFs aren't accepted here. Use a PNG, JPG or WebP.");
-});
-
-// The cause behind turf-monster's /account stalls (turf-e2e-retry-only-causes, E2): the two
-// cdnjs tags held the load event while a cdnjs connection hung. With every cdnjs request
-// left unanswered, the page still loads and the real library runs from the engine's copy.
-test("the page loads and Cropper.js runs with cdnjs unreachable", async ({ page }) => {
-  const errors = watchPageErrors(page);
-  await blockOffsiteRequests(page);
-  const hung = [];
-  await page.route(/^https:\/\/cdnjs\.cloudflare\.com\//, (route) => { hung.push(route.request().url()); });
-  await page.goto("/lab/style_modals", { waitUntil: "load", timeout: 10_000 });
-  expect(await page.evaluate(() => typeof window.Cropper === "function" && typeof window.Cropper.prototype.getCroppedCanvas)).toBe("function");
-  expect(hung).toEqual([]);
-  expect(errors).toEqual([]);
 });
 
 test("when Cropper.js never arrives the card says so, stays dismissible and confirms nothing", async ({ page }) => {

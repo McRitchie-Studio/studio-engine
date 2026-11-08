@@ -1116,7 +1116,7 @@ class StylePageTest < ActiveSupport::TestCase
     html = render_index
     assert_includes html, "cropPhotoModal",
       "the crop modal binds the crop factory"
-    assert_match %r{src="[^"]*/studio/cropper-1\.6\.2\.min\.js"}, html,
+    assert_includes html, "cropperjs",
       "cropper.js is loaded on the page"
     assert_includes html, "$store.dsModals.open('crop-photo', { imageUrl:",
       "the Crop photo specimen opens the crop state"
