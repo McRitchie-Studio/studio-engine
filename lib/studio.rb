@@ -157,6 +157,21 @@ module Studio
   mattr_accessor :theme_logos,         default: []
   mattr_accessor :sticky_table_headers, default: false
 
+  # ---- The self-styled page header ------------------------------------------
+  # For an app that does not build the engine's Tailwind layer (a plain-CSS app,
+  # such as rantly): studio/_page_header then brings its own scoped CSS and the
+  # small script for its stuck bar and its Links menu, once per page, as the site
+  # footer does (docs/PAGE_HEADER.md, "In a plain-CSS app"). true, false (the
+  # default: the row renders exactly as it always has, for a Tailwind app), or a
+  # callable that receives the view.
+  mattr_accessor :page_header_self_styled, default: false
+
+  def self.page_header_self_styled_for?(view)
+    value = page_header_self_styled
+    value = value.call(view) if value.respond_to?(:call)
+    value ? true : false
+  end
+
   # ---- Smooth-load convention ---------------------------------------------
   # Opt-in per app: renders the view-transition + no-preview metas so Turbo 8
   # page swaps materialize behind the current page and present with a view

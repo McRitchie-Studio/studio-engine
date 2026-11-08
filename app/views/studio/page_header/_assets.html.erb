@@ -1,0 +1,294 @@
+<%# The self-styled page header's CSS and script. Rendered once per page, by
+    studio_page_header_assets, and only where config.page_header_self_styled asks
+    (docs/PAGE_HEADER.md, "In a plain-CSS app").
+
+    SCOPED CSS, NOT UTILITIES, as studio/site_footer/_assets. Everything the row needs
+    is here, under .page-header, reading the theme's custom properties with a fallback
+    beside each, so the row renders whole in an app whose stylesheet has never seen
+    the engine's classes. The rules are the ones engine.css gives the row (its "page
+    header" block, the .btn family at .btn-sm, and .label-upper), so the two looks
+    are one. Change one, change the other.
+
+    The default bleed (row_class "-mx-4 px-4") is a pair of Tailwind classes. This
+    file defines them on the row alone, so the default fits a plain container with a
+    1rem gutter as it fits a Tailwind px-4.
+
+    THE SCRIPT is the page-header controller without Stimulus: it marks the row
+    stuck, fades an end of the tabs that hides a tab, shows the open tab on a phone,
+    keeps each Links menu's aria-expanded in step, and places the menu where the
+    browser has no anchor positioning. Its four measurements are the ones in
+    app/javascript/studio/page_header.js, copied, because a plain app may have no
+    import map. With no pinned stack on the page it also publishes --nav-bottom from
+    the document's first header element, when that header is sticky or fixed, so the
+    row sticks under the app's own masthead. Without the script the row keeps its
+    bar at all times (the noscript rule), and every control is still a link or a
+    popover. %>
+<style<%= tag.attributes(nonce: (content_security_policy_nonce if respond_to?(:content_security_policy_nonce))) %>>
+  .page-header { --ph-ink: var(--color-text, currentColor); --ph-body: var(--color-text-body, currentColor);
+    --ph-muted: var(--color-text-muted, var(--color-text-secondary, currentColor));
+    --ph-surface: var(--color-surface, Canvas); --ph-surface-alt: var(--color-surface-alt, var(--color-surface, Canvas));
+    --ph-line: var(--color-border, rgb(127 127 127 / .25));
+    --ph-line-strong: var(--color-border-strong, var(--color-border, rgb(127 127 127 / .4)));
+    --ph-primary: var(--color-cta-fill, var(--color-cta, var(--color-primary, #6558e5)));
+    --ph-primary-hover: var(--color-cta-hover, var(--ph-primary));
+    --ph-primary-fg: var(--btn-primary-fg, #fff);
+    --ph-focus: var(--color-primary-ink, var(--color-primary, #6558e5));
+    --ph-base: var(--type-base, 16px);
+    position: sticky; box-sizing: border-box;
+    display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; min-width: 0;
+    padding-block: .5rem; border-block: 1px solid transparent; background-color: transparent;
+    transition: background-color 150ms ease, border-color 150ms ease; }
+  .page-header *, .page-header *::before, .page-header *::after { box-sizing: border-box; }
+  .page-header[data-stuck] { background-color: var(--ph-surface); border-color: var(--ph-line); }
+  .page-header.-mx-4 { margin-inline: -1rem; }
+  .page-header.px-4 { padding-inline: 1rem; }
+  .page-header-sentinel { position: absolute; width: 0; height: 0; }
+  .page-header a { text-decoration: none; }
+
+  /* The title and the meta. */
+  .page-header-lead { display: flex; align-items: baseline; gap: .5rem; flex: 0 1 auto; min-width: 0; }
+  .page-header .page-header-title { margin: 0; color: var(--ph-ink); font-size: calc(var(--ph-base) * 1.5);
+    font-weight: var(--type-display-weight, 800); line-height: 1.25; min-width: 0; overflow-wrap: anywhere;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow-x: visible; overflow-y: clip; }
+  @media (width >= 40rem) { .page-header .page-header-title { font-size: 30px; line-height: 1.2; } }
+  .page-header .page-header-meta { margin: 0; white-space: nowrap; color: var(--ph-muted);
+    font-size: .75rem; line-height: 1rem; text-transform: uppercase; letter-spacing: .05em; }
+  @media (width < 40rem) { .page-header .page-header-meta { display: none; } }
+
+  /* The buttons, at .btn-sm: every control on the right stands at one height. */
+  .page-header .btn { display: inline-flex; align-items: center; justify-content: center; margin: 0;
+    font-family: inherit; font-weight: 700; border: 1px solid transparent; border-radius: .5rem;
+    white-space: nowrap; cursor: pointer; text-decoration: none;
+    transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, filter 150ms ease; }
+  .page-header .btn-sm { padding: .375rem .75rem; font-size: .75rem; line-height: 1rem; }
+  .page-header .btn-primary { color: var(--ph-primary-fg); background-color: var(--ph-primary); }
+  .page-header .btn-primary:hover { color: var(--btn-primary-fg-hover, var(--ph-primary-fg));
+    background-color: var(--ph-primary-hover); filter: brightness(.94); }
+  .page-header .btn-neutral { color: var(--ph-ink); background-color: var(--btn-neutral-bg, var(--ph-surface-alt));
+    border-color: var(--ph-line-strong); }
+  .page-header .btn-neutral:hover { color: var(--ph-ink); background-color: var(--btn-neutral-bg-hover, var(--ph-surface));
+    filter: var(--btn-neutral-hover-filter, none); }
+  .page-header .btn:focus-visible { outline: 2px solid var(--ph-focus); outline-offset: 2px; border-radius: .5rem; }
+
+  /* The pill group: it scrolls sideways inside the row on a phone, with a fade at an end
+     that hides a tab. */
+  .page-header .page-header-tabs { --page-header-fade-start: 0px; --page-header-fade-end: 0px;
+    flex: 1 1 6rem; min-width: 0; overflow-x: auto; scrollbar-width: none; padding: .25rem; margin: -.25rem;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--page-header-fade-start), #000 calc(100% - var(--page-header-fade-end)), transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0, #000 var(--page-header-fade-start), #000 calc(100% - var(--page-header-fade-end)), transparent 100%); }
+  .page-header .page-header-tabs::-webkit-scrollbar { display: none; }
+  .page-header .page-header-tabs[data-fade-start] { --page-header-fade-start: 2rem; }
+  .page-header .page-header-tabs[data-fade-end] { --page-header-fade-end: 2rem; }
+  .page-header-track { display: flex; align-items: center; gap: .5rem; width: max-content; margin-left: auto; }
+  .page-header-tab-label { position: relative; z-index: 2; }
+  .page-header .page-header-glide { display: none; }
+
+  /* The cluster: the menu, the action, the tools. */
+  .page-header-actions { flex-shrink: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end;
+    gap: .5rem; max-width: 100%; margin-left: auto; }
+  .page-header-tabs + .page-header-actions { margin-left: 0; }
+  .page-header-menu { position: relative; anchor-scope: --page-header-menu; }
+  .page-header .page-header-menu-button { gap: .375rem; anchor-name: --page-header-menu; }
+  .page-header-menu-caret { width: .375rem; height: .375rem; border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor; transform: translateY(-.125rem) rotate(45deg); transition: transform 150ms ease; }
+  .page-header-menu:has(> .page-header-menu-list:popover-open) .page-header-menu-caret { transform: translateY(.125rem) rotate(225deg); }
+  .page-header .page-header-menu-list { position: fixed; inset: auto; margin: 0; min-width: 10rem;
+    max-width: min(20rem, calc(100vw - 2rem)); padding: .25rem; border: 1px solid var(--ph-line); border-radius: .5rem;
+    background-color: var(--ph-surface); color: var(--ph-body);
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / .1), 0 4px 6px -4px rgb(0 0 0 / .1); }
+  .page-header .page-header-menu-list ul { margin: 0; padding: 0; list-style: none; }
+  @supports (anchor-name: --a) and (position-anchor: --a) {
+    .page-header .page-header-menu-list { position-anchor: --page-header-menu; top: anchor(bottom); right: anchor(right);
+      margin-top: .25rem; position-try-fallbacks: flip-block, flip-inline; }
+  }
+  .page-header .page-header-menu-item { display: block; padding: .5rem .75rem; border-radius: .375rem;
+    font-size: calc(var(--ph-base) * .875); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    color: var(--ph-body); }
+  .page-header .page-header-menu-item:is(:hover, :focus-visible) { background-color: var(--ph-surface-alt); color: var(--ph-ink); }
+  .page-header .page-header-menu-item:focus-visible { outline: 2px solid var(--ph-focus); outline-offset: -2px; }
+  .page-header-tools { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; padding-left: .5rem;
+    border-left: 1px dashed var(--ph-line); opacity: .7; transition: opacity 150ms ease; }
+  .page-header-tools:is(:hover, :focus-within) { opacity: 1; }
+
+  /* The trail above the title, and the one parent link that stands for it on a phone. */
+  .page-header-trail { flex: 1 0 100%; min-width: 0; margin-bottom: -.5rem;
+    font-size: calc(var(--ph-base) * .8125); line-height: 1.25; }
+  .page-header-crumbs { min-width: 0; }
+  .page-header-crumbs ol { display: flex; flex-wrap: wrap; align-items: center; column-gap: .5rem; row-gap: .125rem;
+    margin: 0; padding: 0; list-style: none; }
+  .page-header-crumbs li { display: inline-flex; align-items: center; gap: .5rem; min-width: 0; }
+  .page-header-crumbs li + li::before { content: "\203A"; content: "\203A" / ""; color: var(--ph-muted); opacity: .6; }
+  @media (width < 40rem) { .page-header-crumbs { display: none; } }
+  .page-header .page-header-crumb { color: var(--ph-muted); transition: color 150ms ease; }
+  .page-header .page-header-crumb-current { color: var(--ph-ink); font-weight: 600; overflow-wrap: anywhere; }
+  .page-header .page-header-parent { display: none; color: var(--ph-muted); font-size: calc(var(--ph-base) * .875); }
+  @media (width < 40rem) { .page-header .page-header-parent { display: inline-flex; gap: .25rem; align-items: baseline; } }
+
+  /* The links line at the foot of the row. */
+  .page-header-links { flex: 1 0 100%; display: flex; align-items: center; gap: 1rem; min-width: 0; margin-top: -.25rem;
+    overflow-x: auto; scrollbar-width: none; white-space: nowrap; font-size: calc(var(--ph-base) * .8125); }
+  .page-header .page-header-link { color: var(--ph-muted); transition: color 150ms ease; }
+  .page-header .page-header-link[aria-current] { font-weight: 600; }
+  .page-header :is(.page-header-crumb, .page-header-parent, .page-header-link):is(:hover, :focus-visible),
+  .page-header .page-header-link[aria-current] { color: var(--ph-ink); }
+
+  /* The gliding pill, where the browser can anchor it (engine.css, "The gliding pill"). */
+  @supports (anchor-name: --a) and (position-anchor: --a) and selector(:has(a)) {
+    .page-header .page-header-track { position: relative; anchor-scope: --page-header-current; }
+    .page-header .page-header-track > [aria-current] { anchor-name: --page-header-current; }
+    .page-header .page-header-track:has(> .page-header-tab[aria-current]) > .page-header-glide {
+      display: block; position: absolute; position-anchor: --page-header-current;
+      top: anchor(top); right: anchor(right); bottom: anchor(bottom); left: anchor(left);
+      z-index: 1; margin: 0; padding: 0; pointer-events: none;
+      transition: top 320ms cubic-bezier(.2, .8, .2, 1), right 320ms cubic-bezier(.2, .8, .2, 1),
+        bottom 320ms cubic-bezier(.2, .8, .2, 1), left 320ms cubic-bezier(.2, .8, .2, 1); }
+    .page-header .page-header-track:has(> .page-header-glide) > .page-header-tab[aria-current] {
+      background-color: transparent; background-image: none; border-color: transparent; box-shadow: none; filter: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .page-header, .page-header *, .page-header-menu-caret { transition: none !important; }
+  }
+</style>
+<noscript><style>.page-header { background-color: var(--ph-surface); border-color: var(--ph-line); }</style></noscript>
+<script<%= tag.attributes(nonce: (content_security_policy_nonce if respond_to?(:content_security_policy_nonce))) %>>
+  (function () {
+    if (window.studioPageHeaderSelfStyled) { window.studioPageHeaderSelfStyled.scan(); return; }
+
+    var rows = [];
+    var frame = null;
+    var root = document.documentElement;
+
+    function anchorsSupported() {
+      return typeof CSS !== "undefined" && !!CSS.supports && CSS.supports("anchor-name: --a") && CSS.supports("position-anchor: --a");
+    }
+    // studio/page_header.js: isStuck, sentinelMarksThePlace, hiddenEnds, revealBy, menuPlacement.
+    function isStuck(rowTop, restTop) { return rowTop - restTop > 0.5; }
+    function sentinelMarksThePlace(display) { return !/flex|grid/.test(display); }
+    function hiddenEnds(el) {
+      return { start: el.scrollLeft > 1, end: el.scrollLeft + el.clientWidth < el.scrollWidth - 1 };
+    }
+    function revealBy(box, tab) {
+      if (tab.left < box.left) return tab.left - box.left - 32;
+      if (tab.right > box.right) return tab.right - box.right + 32;
+      return 0;
+    }
+    function menuPlacement(button, list, viewport) {
+      var gap = 8;
+      var below = viewport.height - button.bottom;
+      var above = button.top;
+      var top = below < list.height + gap && above > below ? Math.max(gap, button.top - list.height - 4) : button.bottom + 4;
+      var left = Math.min(Math.max(gap, button.right - list.width), Math.max(gap, viewport.width - list.width - gap));
+      return { top: top, left: left };
+    }
+
+    // The bottom of the app's own sticky masthead, under the pinned stack's name, unless
+    // the pinned stack runs here or the app's CSS already sets it.
+    var ownsNavBottom = null;
+    function publishNavBottom() {
+      if (window.studioPinnedStack) return;
+      if (ownsNavBottom === null) {
+        ownsNavBottom = !root.style.getPropertyValue("--nav-bottom") &&
+          !getComputedStyle(root).getPropertyValue("--nav-bottom").trim() &&
+          !getComputedStyle(root).getPropertyValue("--pin-page-top").trim();
+      }
+      if (!ownsNavBottom) return;
+      var header = document.querySelector("header");
+      var bottom = 0;
+      if (header) {
+        var position = getComputedStyle(header).position;
+        if (position === "sticky" || position === "fixed") bottom = Math.max(0, header.getBoundingClientRect().bottom);
+      }
+      var value = Math.round(bottom * 100) / 100 + "px";
+      if (root.style.getPropertyValue("--nav-bottom") !== value) root.style.setProperty("--nav-bottom", value);
+    }
+
+    function restTop(item) {
+      if (sentinelMarksThePlace(getComputedStyle(item.sentinel.parentElement).display)) {
+        return item.sentinel.getBoundingClientRect().top;
+      }
+      item.row.style.position = "static";
+      var top = item.row.getBoundingClientRect().top;
+      item.row.style.position = "";
+      return top;
+    }
+
+    function placeMenu(button, list) {
+      var place = menuPlacement(button.getBoundingClientRect(), list.getBoundingClientRect(),
+        { width: window.innerWidth, height: window.innerHeight });
+      list.style.top = place.top + "px";
+      list.style.left = place.left + "px";
+      list.style.right = "auto";
+    }
+
+    function sync() {
+      publishNavBottom();
+      rows = rows.filter(function (item) { return item.row.isConnected; });
+      rows.forEach(function (item) {
+        item.row.toggleAttribute("data-stuck", isStuck(item.row.getBoundingClientRect().top, restTop(item)));
+        if (!anchorsSupported()) {
+          item.menus.forEach(function (menu) { if (menu.list.matches(":popover-open")) placeMenu(menu.button, menu.list); });
+        }
+        if (!item.tabs) return;
+        var ends = hiddenEnds(item.tabs);
+        item.tabs.toggleAttribute("data-fade-start", ends.start);
+        item.tabs.toggleAttribute("data-fade-end", ends.end);
+      });
+    }
+
+    function schedule() {
+      if (frame) return;
+      frame = requestAnimationFrame(function () { frame = null; sync(); });
+    }
+
+    function wireMenu(menu) {
+      var button = menu.querySelector("[popovertarget]");
+      var list = menu.querySelector("[popover]");
+      if (!button || !list) return null;
+      button.setAttribute("aria-expanded", "false");
+      list.addEventListener("toggle", function (event) {
+        var open = event.newState === "open";
+        button.setAttribute("aria-expanded", String(open));
+        if (open) {
+          if (!anchorsSupported()) placeMenu(button, list);
+          return;
+        }
+        if (document.activeElement === document.body || list.contains(document.activeElement)) button.focus();
+      });
+      button.addEventListener("keydown", function (event) {
+        if (event.key !== "ArrowDown") return;
+        event.preventDefault();
+        if (!list.matches(":popover-open") && list.showPopover) list.showPopover();
+        var first = list.querySelector("a");
+        if (first) first.focus();
+      });
+      return { button: button, list: list };
+    }
+
+    function wire(sentinel) {
+      if (sentinel.hasAttribute("data-page-header-live")) return;
+      var row = sentinel.nextElementSibling;
+      if (!row || !row.classList.contains("page-header")) return;
+      sentinel.setAttribute("data-page-header-live", "");
+      var item = { sentinel: sentinel, row: row, tabs: row.querySelector(".page-header-tabs"), menus: [] };
+      item.menus = Array.prototype.map.call(row.querySelectorAll(".page-header-menu"), wireMenu).filter(Boolean);
+      if (item.tabs) {
+        item.tabs.addEventListener("scroll", schedule, { passive: true });
+        var open = item.tabs.querySelector("[aria-current]");
+        if (open) item.tabs.scrollLeft += revealBy(item.tabs.getBoundingClientRect(), open.getBoundingClientRect());
+      }
+      rows.push(item);
+    }
+
+    function scan() {
+      Array.prototype.forEach.call(document.querySelectorAll(".page-header-sentinel"), wire);
+      sync();
+    }
+
+    window.studioPageHeaderSelfStyled = { scan: scan };
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule, { passive: true });
+    document.addEventListener("turbo:load", scan);
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", scan);
+    else scan();
+  })();
+</script>
