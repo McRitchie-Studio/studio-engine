@@ -122,6 +122,7 @@ module EngineTailwindBuild
   UNSCANNED_VENDORED = %w[
     app/assets/javascripts/studio/alpine.js
     app/assets/javascripts/studio/canvas_confetti.js
+    app/assets/javascripts/studio/cropper-1.6.2.min.js
     app/assets/javascripts/studio/leaflet.js
     app/assets/javascripts/studio/sortable.js
   ].freeze
