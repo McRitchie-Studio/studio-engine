@@ -312,6 +312,12 @@ the navbar, in the pinned stack so a table's sticky header sits under it
 `actions_html:` is deprecated for one release; the decision rule for which kind a link is
 lives in [`docs/PAGE_HEADER.md`](docs/PAGE_HEADER.md#the-four-kinds-of-control).
 
+A plain-CSS app (no engine Tailwind build) sets `config.page_header_self_styled = true`, and
+the row brings its own scoped CSS and script, once per page, as the site footer does
+([`docs/PAGE_HEADER.md`](docs/PAGE_HEADER.md#in-a-plain-css-app)). `studio/_legal_page` is the
+shared privacy and terms frame: the header and a readable column
+([`docs/PAGE_HEADER.md`](docs/PAGE_HEADER.md#the-legal-page)).
+
 ### The section header — `studio/_section_header`
 
 A section's title that sticks under the page row until the next section's takes its place,

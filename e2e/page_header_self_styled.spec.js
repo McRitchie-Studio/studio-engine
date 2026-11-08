@@ -15,11 +15,12 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 // phone check opens its own mobile context and asserts the real window.innerWidth first.
 //
 // CONTROLS, each run against this file with the lab server restarted:
-//   - the partial's studio_page_header_assets call removed: every test red (an unstyled
-//     row: a 32px default h1, no sticky bar, no live sentinel).
-//   - publishNavBottom made a no-op: 1 red, the stuck row slides under the masthead.
+//   - the partial's studio_page_header_assets call removed: 6 red, all of them (an
+//     unstyled row, and no script to mark the sentinel live).
+//   - publishNavBottom made a no-op: 4 red, the stuck row slides under the masthead on
+//     the desktop and the phone, in both schemes.
 //   - wireMenu not called: 1 red, aria-expanded never set.
-//   - the "-mx-4"/"px-4" rules removed: 1 red, the row loses its bleed.
+//   - the "-mx-4" rule removed: 2 red, the row loses its bleed (desktop, both schemes).
 
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true };
