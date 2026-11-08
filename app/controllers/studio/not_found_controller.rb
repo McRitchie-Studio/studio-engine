@@ -13,6 +13,15 @@ module Studio
   # public/404.html, so a wall can cost the page its layout but never its status.
   class NotFoundController < ::ApplicationController
     skip_before_action :require_authentication, raise: false
+    # The page runs as the exceptions app, after the request has left the
+    # session and cookie middleware: nothing it writes to the session or a
+    # cookie is ever saved. A callback that throttles through the session never
+    # holds here, so it would pay its full cost on every 404 (docs/NOT_FOUND_PAGE.md).
+    # Session tracking would add a Studio::UserSession row per signed-in 404.
+    skip_after_action :track_user_session, raise: false
+    # Geo detection (Studio::GeoDetection) would pay an IP lookup, up to 3s, per
+    # 404. raise: false, so a host without the concern is unaffected.
+    skip_before_action :detect_geo_state, raise: false
     # No forgery skip: Rails' ShowExceptions calls the exceptions app as a GET
     # (request_method = "GET"), which never needs the token, so the host's CSRF
     # allow-lists stay as they are.

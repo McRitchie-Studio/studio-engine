@@ -61,6 +61,30 @@ lists it in `AdminWall::PUBLIC_ACTIONS`:
 A real walled page still answers with its wall. Only an address the app does not have,
 or a record it does not hold, reaches this page.
 
+## What it skips
+
+The page runs as the exceptions app. Rails calls it from `ShowExceptions`, which sits
+outside the session and cookie middleware, so the request has already left them.
+Nothing the page writes to the session or a cookie is saved. A callback that throttles
+itself through the session (it stamps "done" and skips the next time) never holds here:
+it pays its full cost on every 404. So `Studio::NotFoundController` skips the engine's
+callbacks of that kind:
+
+| Callback | From | What it would cost on every 404 |
+|----------|------|---------------------------------|
+| `track_user_session` (after_action) | `Studio::ErrorHandling` | A new `Studio::UserSession` row for each signed-in 404 |
+| `detect_geo_state` (before_action) | `Studio::GeoDetection` | An IP geo lookup, up to 3s |
+
+Both skips take `raise: false`, so an app without the concern is unaffected. An app needs
+no initializer for either. An app that adds its own session-throttled or network
+callback to `ApplicationController` skips it the same way, in an initializer:
+
+```ruby
+Rails.application.config.to_prepare do
+  Studio::NotFoundController.skip_before_action :my_callback, raise: false
+end
+```
+
 ## Where the words come from
 
 | Part | Source |

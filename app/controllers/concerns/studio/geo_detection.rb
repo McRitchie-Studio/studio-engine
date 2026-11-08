@@ -20,7 +20,8 @@ module Studio
   #
   # Detection itself is registered here as a before_action, because a badge that
   # renders on every page needs a location on every page. A controller that must
-  # not pay for it (webhooks, health checks) skips it the ordinary way:
+  # not pay for it (webhooks, health checks) skips it the ordinary way. The
+  # engine's not-found page (Studio::NotFoundController) already does:
   #
   #   skip_before_action :detect_geo_state
   #
