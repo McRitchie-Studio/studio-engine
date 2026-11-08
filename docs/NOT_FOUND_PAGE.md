@@ -81,6 +81,10 @@ they stay registered. An app that already skips them itself, even with a raising
 An app without `Studio::GeoDetection` is unaffected. An app needs no initializer for
 either.
 
+`end_revoked_device_session` (`Studio::ErrorHandling`, [`DEVICE_SESSIONS.md`](DEVICE_SESSIONS.md))
+stays on the page. It is not throttled: it reads one row and writes nothing to the
+database, so a 404 for an ended device session renders signed out.
+
 An app that adds its own session-throttled or network callback to
 `ApplicationController` skips it on the page in an initializer:
 
