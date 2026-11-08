@@ -223,8 +223,9 @@ The studio-header name and any class-named element that should stay still need n
 
 The browser takes the old page's picture before `turbo:before-render` fires, so the
 decision is made ahead of it. The script reads the marks from the response, and from a
-remembered list for a page in Turbo's cache. If the response is late, the visit plays the
-fade with the element fading across, and no morph.
+remembered list for a page in Turbo's cache. Turbo reads the response through the script's
+own read, so it cannot start the transition before the marks are known, however slow the
+device. A response the script cannot parse morphs nothing and still renders.
 
 An advance visit to the page's own path counts as two pages: a launch panel can give way to
 the chat at the same address, and the portrait they share morphs. A replace is a refresh,
