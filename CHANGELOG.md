@@ -4,6 +4,43 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.136.0 — 2026-11-08
+
+### Added
+
+- **The page header styles itself in a plain-CSS app.** `config.page_header_self_styled = true` (or a callable receiving the view) makes the first `studio/_page_header` on a page render its own scoped CSS and a small script (`studio/page_header/_assets`, `studio_page_header_assets`), as the site footer does: the stuck bar under the app's own sticky masthead, the tab fades, and the Links menu's `aria-expanded`, with no Tailwind, Stimulus or import map. It reads the theme tokens (`--color-text`, `--color-surface`, `--color-border`, `--color-primary`, `--btn-primary-fg`, ...), so light and dark follow the app. Off by default, and off it renders nothing, so a Tailwind app's row is the same to the byte. See docs/PAGE_HEADER.md, "In a plain-CSS app".
+- **`studio/_legal_page`, the shared privacy and terms frame.** `render layout: "studio/legal_page", locals: { title:, updated: }` draws the standard page header, a "Last updated" line and a readable 46rem column with its own scoped prose styles, for the apps that each hand-build the same page. See docs/PAGE_HEADER.md, "The legal page".
+
+### Fixed
+
+- **A shared chat head morphs on a slow device too.** On a first visit to a page,
+  `studio/page_transitions` reads the new page's `data-vt-morph` names from the
+  response and lets the shared name through before the browser takes the old
+  page's picture. That read raced Turbo's own read of the same response: under
+  load Turbo could start the view transition first, and the element faded
+  instead of morphing (2 of 6 visits under an 8x CPU throttle). Turbo now reads
+  the response through the module's read, so the names are always known first.
+  `studio/reload_visits` hid the race where it loads first; the module no longer
+  depends on that. Nothing for a consumer to change.
+- **One h1 per page: the navbar's brand gives way to the page's own h1.** The
+  navbar drew the brand as an h1 unless the layout passed `brand_heading: false`,
+  so a page with the standard header (`studio/_page_header`) carried two h1s, and
+  an app that passed `false` everywhere left pages with none (the profile, the
+  error logs). Now `studio/_page_header` records its h1, the navbar also reads
+  the page body for an `<h1>` tag (`studio_page_has_h1?`), and the brand is a div
+  with the same classes only when the page has its own. An explicit
+  `brand_heading:` still wins, and a `preview: true` navbar keeps the h1. A
+  consumer test that selects the brand as `h1.nav-title` on a page with its own
+  h1 must select `.nav-title`; an app that passes `brand_heading: false` on every
+  page, or computes it from the page body, can drop the local.
+- **A Turbo visit into a page that reloads no longer raises "Transition was skipped".** With smooth load or the page transition on, Turbo opened its view transition before it read the response, so a visit into a page answering `turbo-visit-control: reload` (turf-monster's /wallet and /account), or one with a changed `data-turbo-track="reload"` asset, started a transition that the full load then skipped. Turbo awaits only `finished`, so `ready` rejected unhandled. The new boot module `studio/reload_visits` asks Turbo's own `PageRenderer` about each response at `turbo:before-fetch-response` and, for one Turbo will not render, takes the view-transition meta out of the HTML Turbo parses, so no transition opens and the full load plays the one motion. No promise is marked handled, so a real transition failure still surfaces. Nothing to do in a host: it arrives with the engine bump.
+- **Cropper.js loads from the engine, not cdnjs.** `studio/_cropper_assets` loaded `cropper.min.js` (deferred) and `cropper.min.css` from cdnjs, and a cdnjs connection that never answered held the load event of every page that renders it (avatar, banner and contest editors). The engine now ships the cropperjs 1.6.2 npm package's dist files byte for byte as `studio/cropper-1.6.2.min.js` and `studio/cropper-1.6.2.min.css`, served by the host's asset pipeline under the same sha384 integrity pins. `bin/cropper-sri-live` checks them against the npm tarball and cdnjs. A host whose CSP names `https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js` or `.css` may remove those entries after the bump; `'self'` covers the new files.
+
+### Security
+
+- **A logged-out device can no longer open a `/cable` socket, and its session check is no longer silent when it cannot run.** `Studio::UserSession.ended?(session)` is the one check a host's `ApplicationCable::Connection` makes (the hub and Cyvasse call it; guard it with `respond_to?(:ended?)` on older engines). `start!` reads a kept sid again before it reuses it, so a sign-in on a logged-out cookie mints a new sid instead of bringing the ended one back. A failed check writes an `ErrorLog` row, at most once per 5 minutes per process. The boot logs a warning (and a Sentry warning) when `studio_user_sessions` lacks `sid`/`revoked_at`, in every environment and never raising. See [`docs/DEVICE_SESSIONS.md`](docs/DEVICE_SESSIONS.md).
+- **A logout ends that device's session on the server.** The cookie store kept the whole session in the browser, so a copy of the pre-logout cookie still signed in. A sign-in now writes a `studio_user_sessions` row with a random `sid` and puts the sid in the app's session mark; every signed-in request reads that row (one query on the `sid` index), and a logout (`clear_app_session` or `reset_session`) stamps `revoked_at`, so a replayed copy is signed out. Other devices of the same user stay signed in. Install the new migration (`AddDeviceRevocationToStudioUserSessions`; the release sweep does it). A cookie from before the change is accepted and given a sid until `Studio::UserSession.legacy_grace_until` (2026-12-08); rows idle for 90 days are pruned. No host code change. See [`docs/DEVICE_SESSIONS.md`](docs/DEVICE_SESSIONS.md).
+
 ## 0.135.2 — 2026-11-08
 
 ### Fixed
