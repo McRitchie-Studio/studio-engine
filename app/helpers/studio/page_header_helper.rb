@@ -17,7 +17,7 @@ module Studio
     # the assets in <head>.
     def studio_page_header_assets
       return if @_studio_page_header_assets_rendered
-      return unless Studio.page_header_self_styled_for?(self)
+      return unless Studio::PageHeader.self_styled?(self)
 
       @_studio_page_header_assets_rendered = true
       render "studio/page_header/assets"

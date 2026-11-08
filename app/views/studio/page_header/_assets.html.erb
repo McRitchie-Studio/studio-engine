@@ -51,7 +51,7 @@
     font-weight: var(--type-display-weight, 800); line-height: 1.25; min-width: 0; overflow-wrap: anywhere;
     display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow-x: visible; overflow-y: clip; }
   @media (width >= 40rem) { .page-header .page-header-title { font-size: 30px; line-height: 1.2; } }
-  .page-header .page-header-meta { margin: 0; white-space: nowrap; color: var(--ph-muted);
+  .page-header :is(.page-header-meta, .label-upper) { margin: 0; white-space: nowrap; color: var(--ph-muted);
     font-size: .75rem; line-height: 1rem; text-transform: uppercase; letter-spacing: .05em; }
   @media (width < 40rem) { .page-header .page-header-meta { display: none; } }
 

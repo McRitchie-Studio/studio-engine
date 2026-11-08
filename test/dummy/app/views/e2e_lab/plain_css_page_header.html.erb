@@ -1,0 +1,17 @@
+<%# studio/_page_header in a plain-CSS host (E2eLabController#plain_css_page_header). The
+    row is the engine's, rendered by name, with every kind of control; the cards below
+    it are the host's, long enough to scroll the row into its stuck bar. %>
+<div data-lab-parent<%= %( style="#{@lab_parent_style}").html_safe if @lab_parent_style %>>
+  <%= render "studio/page_header",
+        title: "Latest rants",
+        crumbs: E2eLabController::PLAIN_CSS_CRUMBS,
+        meta: "Demo",
+        label: "Views",
+        tabs: E2eLabController::PLAIN_CSS_TABS,
+        menu: E2eLabController::PLAIN_CSS_MENU,
+        action: { label: "New rant", href: "/lab/plain_css/page_header?to=new" },
+        links: [{ label: "Privacy", href: "/lab/plain_css/legal" }, { label: "Terms", href: "/lab/plain_css/legal?page=terms" }] %>
+  <% 12.times do |i| %>
+    <article class="card"><h2>Rant <%= i + 1 %></h2><p>Long-form text that a reader scrolls past, so the row sticks under the masthead.</p></article>
+  <% end %>
+</div>

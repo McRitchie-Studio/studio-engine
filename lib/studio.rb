@@ -164,13 +164,8 @@ module Studio
   # footer does (docs/PAGE_HEADER.md, "In a plain-CSS app"). true, false (the
   # default: the row renders exactly as it always has, for a Tailwind app), or a
   # callable that receives the view.
+  # Studio::PageHeader.self_styled? reads it.
   mattr_accessor :page_header_self_styled, default: false
-
-  def self.page_header_self_styled_for?(view)
-    value = page_header_self_styled
-    value = value.call(view) if value.respond_to?(:call)
-    value ? true : false
-  end
 
   # ---- Smooth-load convention ---------------------------------------------
   # Opt-in per app: renders the view-transition + no-preview metas so Turbo 8
