@@ -290,6 +290,9 @@ class UserSessionRevocationTest < ActiveSupport::TestCase
     store = { Session.cookie_key => { "sid" => "x" } }
     Session.define_singleton_method(:where) { |*| raise ActiveRecord::StatementInvalid, "down" }
     calls = 0
+    # ErrorLog.capture! is the real method: alias it so the ensure restores it
+    # (a bare remove_method would delete it for every later test).
+    ErrorLog.singleton_class.alias_method(:capture_before_fault!, :capture!)
     ErrorLog.define_singleton_method(:capture!) { |*| calls += 1; raise ActiveRecord::ConnectionNotEstablished, "no db" }
 
     assert_equal [:off, nil], Session.verdict(store, now: now)
@@ -297,7 +300,8 @@ class UserSessionRevocationTest < ActiveSupport::TestCase
     assert_equal 1, calls
   ensure
     Session.singleton_class.remove_method(:where)
-    ErrorLog.singleton_class.remove_method(:capture!)
+    ErrorLog.singleton_class.alias_method(:capture!, :capture_before_fault!)
+    ErrorLog.singleton_class.remove_method(:capture_before_fault!)
   end
 
   test "start! never reuses a revoked sid: a sign-in on a logged-out cookie mints a new one" do
