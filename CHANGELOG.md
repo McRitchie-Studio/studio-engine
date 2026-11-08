@@ -138,8 +138,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## 0.132.0 — 2026-11-06
 
-## 0.131.0 — 2026-11-05
-
 ### Added
 
 - **A carousel opens where you tell it: `start:`, and a spotlight opens on its middle
@@ -150,6 +148,26 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   controller jumps there on connect, with no glide and an empty status line. The dots,
   `data-current` and both arrows' `aria-disabled` are right from the server. A
   `#fragment` inside the row wins over the start (task `carousel-start-and-button-glass`).
+
+### Changed
+
+- **A dark, full-size lit button's fill drops from 0.85 to 0.65 alpha** (`--lit-fill-alpha`),
+  Alex McRitchie's "even more transparent". White label on the primary, measured from painted
+  pixels at the label's median: a dark page 3.95 to 5.62, the lab photo 3.16 to 3.29, a mid-grey
+  backdrop (#808080) 3.25 to 3.42, a lighter one (#a0a0a0) 3.06 to 2.98. Light pages stay solid
+  (3.10).
+- **A spotlight's arrows say "Previous slide" and "Next slide"**: they move one slide. A
+  standard row keeps "slides".
+
+### Fixed
+
+- **A standard carousel's `caption:` is a styled line** (small body text under each slide),
+  not bare text; the partial's docs and the README say which style shows which captions.
+
+## 0.131.0 — 2026-11-05
+
+### Added
+
 - **`.studio-border-glow--clear`.** The border glow on a clear button: no fill, only the
   moving rainbow ring and its halo, with the heading ink as the label (16:1 light, 18:1 dark,
   measured). `<button class="btn studio-border-glow studio-border-glow--clear">`. Under
@@ -178,8 +196,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   same carousel, arrows, dots and keys, but each slide snaps to the centre. The centred
   slide is full size and colour, with an optional `caption:` line under it (a callable on
   the item); its neighbours are smaller (0.75), faded and grey, and the next ones peek at
-  the edges. An arrow ("Previous slide", "Next slide") or key moves one slide, and every
-  slide gets a dot. It opens on its middle slide (`start:`, below). Where the browser
+  the edges. An arrow or key moves one slide, and every slide gets a dot. Where the browser
   has scroll-driven animations (`animation-timeline: view()`), each slide's own view
   timeline drives the look, so it follows the finger; elsewhere the controller marks the
   centred slide `data-current` and CSS transitions it. Reduced motion scales and greys
@@ -227,11 +244,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Changed
 
-- **A dark, full-size lit button's fill drops from 0.85 to 0.65 alpha** (`--lit-fill-alpha`),
-  Alex McRitchie's "even more transparent". White label on the primary, measured from painted
-  pixels at the label's median: a dark page 3.95 to 5.62, the lab photo 3.16 to 3.29, a mid-grey
-  backdrop (#808080) 3.25 to 3.42, a lighter one (#a0a0a0) 3.06 to 2.98. Light pages stay solid
-  (3.10).
 - **Back plays the app's page move the other way.** Browser Back (a Turbo restore that Turbo
   marks `back`, or a full load that traverses to an earlier entry) and a click on a link with
   `data-page-transition-back` (every ancestor crumb and the phone's parent link) play the
@@ -243,8 +255,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
-- **A standard carousel's `caption:` is a styled line** (small body text under each slide),
-  not bare text; the partial's docs and the README say which style shows which captions.
 - **Review follow-ups on the sidebar, the carousel and the page header** (/tasks/engine-ui-polish-follow-ups).
   The link sidebar's focus ring (its rows, close button, Log out, trigger and geo rows) is
   `ring-primary-ink`, a new ring colour from the theme's primary ink: measured 5.4 to 8.9:1
