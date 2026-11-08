@@ -315,6 +315,14 @@ module Studio
       app.config.filter_parameters += [/(\A|\.)voice\.(embeddings|embedding|audio)\z/, /\Avoice_embedding\z/]
     end
 
+    # The connections' log filter (Studio::Connections::LOG_FILTER): each
+    # provider's filter_keys by exact key, and the auth code on the connection
+    # controllers. One lambda that reads the registry when it runs, so a
+    # provider declared in a host initializer, after this, is covered.
+    initializer "studio.connections.filter_parameters" do |app|
+      app.config.filter_parameters += [Studio::Connections::LOG_FILTER]
+    end
+
     initializer "studio.footer_only_eager_load" do
       next if Studio.active_record?
 
