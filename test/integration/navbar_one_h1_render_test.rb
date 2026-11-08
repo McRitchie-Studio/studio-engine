@@ -112,6 +112,28 @@ class NavbarOneH1RenderTest < ActiveSupport::TestCase
     assert body_view.studio_page_has_h1?
   end
 
+  # The engine's own pages. Those with no heading of their own keep the brand
+  # as their one h1, so they must not grow an h1 or a page header unnoticed;
+  # the style guide draws the standard header, so its brand is a div.
+  NO_OWN_H1 = %w[
+    app/views/studio/profiles/show.html.erb
+    app/views/studio/profiles/edit.html.erb
+    app/views/error_logs/index.html.erb
+    app/views/error_logs/show.html.erb
+  ].freeze
+
+  test "engine pages with no heading of their own leave the brand as the page's h1" do
+    root = File.expand_path("../..", __dir__)
+    NO_OWN_H1.each do |path|
+      source = File.read(File.join(root, path))
+      refute_match NavbarOneH1RenderTest.page_h1, source, "#{path}: an h1 of its own"
+      refute_includes source, "studio/page_header", "#{path}: the standard header"
+    end
+    assert_includes File.read(File.join(root, "app/views/style/index.html.erb")), %(render "studio/page_header")
+  end
+
+  def self.page_h1 = StudioNavbarHelper::PAGE_H1
+
   private
 
   def render_page(body, **navbar_locals)
