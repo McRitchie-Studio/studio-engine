@@ -32,9 +32,11 @@ module Studio
       return head(:unauthorized) if entry.user_only? && !studio_modal_viewer_signed_in?
 
       @studio_modal = entry
+      render "studio/modals/remote", layout: false, formats: [:html]
+      # Stamped AFTER the render, so a partial that raises leaves no header on
+      # the host's error page for the browser to mistake for a fragment.
       response.headers["X-Studio-Modal"] = entry.id
       response.headers["Vary"] = [response.headers["Vary"], "Cookie"].compact.join(", ")
-      render "studio/modals/remote", layout: false, formats: [:html]
     end
 
     private

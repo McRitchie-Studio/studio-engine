@@ -222,7 +222,7 @@
 <template x-if="$store.modals.current()"
           data-studio-controller="modal-host"
           data-modal-host-store-value="modals"<% if studio_remote_modals %>
-          data-modal-host-remote-value="<%= Studio.modals.client_config(url_template: studio_modal_path(id: "__id__"), logged_in: respond_to?(:logged_in?) && logged_in?).to_json %>"<% end %>>
+          data-modal-host-remote-value="<%= Studio.modals.client_config(url_template: studio_modal_path(id: "0").delete_suffix("0") + "__id__", logged_in: respond_to?(:logged_in?) && logged_in?).to_json %>"<% end %>>
   <%# Backdrop + card use CSS keyframe animations (NOT Alpine
       x-transition), all shipped in the inline style block above. On
       mount, the .modal-backdrop-mount + card mount classes fire fade-in

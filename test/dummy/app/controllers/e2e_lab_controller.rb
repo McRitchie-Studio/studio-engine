@@ -406,6 +406,17 @@ class E2eLabController < ActionController::Base
   # the global one.
   def modal_host = render(:modal_host)
 
+  # On-demand modals (Studio.modals; the lab-* ids are registered in
+  # e2e/boot.rb) under Turbo, as two pages linked to each other.
+  def modal_remote = modal_remote_lab("a", "/lab/modal_remote_b")
+  def modal_remote_b = modal_remote_lab("b", "/lab/modal_remote")
+
+  private def modal_remote_lab(name, other_path)
+    @lab_page = name
+    @lab_other_url = other_path
+    render(:modal_remote, layout: "survey_turbo_lab")
+  end
+
   # The modal blocks' consumer locals (engine-modal-blocks-carry-consumer), each
   # rendered with and without them on the GLOBAL host, as turf-monster mounts
   # them. @user has no address, so the newsletter cards ask for one.
