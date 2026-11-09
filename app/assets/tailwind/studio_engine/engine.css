@@ -1147,10 +1147,10 @@ body.modal-open .studio-app-banner {
   & > .carousel-track {
     --carousel-cascade-reach: 2;
     --cascade-w: min(34cqi, 22rem);
-    --cascade-shift: 0.56;
+    --cascade-shift: 0.52;
     --cascade-scale: 0.12;
-    --cascade-depth: 5rem;
-    --cascade-turn: 7deg;
+    --cascade-depth: 6rem;
+    --cascade-turn: 10deg;
     --cascade-dim: 0.22;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
