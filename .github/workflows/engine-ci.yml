@@ -300,6 +300,22 @@ jobs:
           path: playwright-report
           if-no-files-found: ignore
 
+      # A screenshot spec that fails writes what the lane painted (-actual), the
+      # baseline it expected (-expected) and the difference (-diff) under
+      # test-results/. Without them nobody can see the drift, and a native Linux
+      # baseline can only come from here (docs/E2E_LANE.md, "Screenshot baselines").
+      - name: Keep the screenshot drift from a failed run
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: screenshot-drift-shard-${{ matrix.shard }}
+          path: |
+            test-results/**/*-actual.png
+            test-results/**/*-expected.png
+            test-results/**/*-diff.png
+          retention-days: 7
+          if-no-files-found: ignore
+
   # THE VERDICT GATE. The lane above can say its specs PASSED; it cannot say it RAN
   # THEM ALL. This job reads the receipt and asserts the executed set against the
   # census of e2e/ (bin/lib/e2e_spec_census.rb).
