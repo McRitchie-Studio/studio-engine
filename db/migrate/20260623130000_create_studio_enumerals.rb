@@ -23,8 +23,8 @@ class CreateStudioEnumerals < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :studio_enumerals, [:category, :key], unique: true
-    add_index :studio_enumerals, [:category, :position]
-    add_index :studio_enumerals, [:category, :rank]
+    add_index :studio_enumerals, [ :category, :key ], unique: true
+    add_index :studio_enumerals, [ :category, :position ]
+    add_index :studio_enumerals, [ :category, :rank ]
   end
 end
