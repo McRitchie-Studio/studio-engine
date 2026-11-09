@@ -652,8 +652,9 @@ test("the style guide's image-only specimen moves its one caption with the open 
 //     second row's move changes the caption).
 //   - the narrow cascade's shadow room removed: the phone shadow spec red (the mask
 //     ends inside the front card's shadow).
-//   - the narrow cascade's controls lift removed: the 390 image-only spec red (the
-//     track's room intercepts the arrow click).
+//   - the narrow cascade's controls lift removed: the phone shadow specs red (the
+//     track's room is the element at each arrow's centre) and the 390 image-only spec
+//     red (its arrow click times out).
 //   - motion-reduce:transition-none dropped from the style guide's captions: the
 //     reduced-motion caption spec red (a 0.2s fade).
 
@@ -758,7 +759,13 @@ for (const theme of ["dark", "light"]) {
       expect(reach, "the open card wears its shadow-xl").toBeGreaterThanOrEqual(30);
       // The mask paints only inside the track's box, so the box must reach past the shadow.
       expect(look.below, `the track's box reaches ${reach}px below the card`).toBeGreaterThanOrEqual(reach);
-      // The room changes no layout: the arrows still take a press (a click checks the hit).
+      // The room changes no layout, and the arrows over it still take a press: the
+      // point at each arrow's centre hits the arrow, not the track's room.
+      const hits = await row.locator(".carousel-arrows .carousel-button").evaluateAll((buttons) => buttons.map((button) => {
+        const box = button.getBoundingClientRect();
+        return button.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2));
+      }));
+      expect(hits, "each arrow is the element at its own centre").toEqual([true, true]);
       await row.getByRole("button", { name: "Next slide", exact: true }).click();
       await expect(row.locator(".carousel-slide[data-current]")).toHaveAttribute("aria-label", "App 2");
       await expectNoSideScroll(page);
