@@ -149,24 +149,25 @@ test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: "wait" })
 
 const TABS = [["Modals", "modals"], ["Tricks", "tricks"], ["Tasks", "tasks"], ["Theme", "theme"]];
 
-// Each check runs without Turbo and under it. Declared bare, twice: the lane's census counts
-// test( in the source, so a loop around test() would not match what runs.
-async function tabJump(page, url) {
+// Each check runs without Turbo and under it. Declared bare: the lane's census counts test(
+// in the source, so a loop around test() would not match what runs. A tab's jump is one test
+// per screen: at 8x CPU both screens in one test took about 40s of real work (eight smooth
+// jumps of the full style guide, measured with the hold after the end on and off alike), over
+// the 30s limit; one screen takes about 20s.
+async function tabJump(page, url, viewport) {
   const errors = watchPageErrors(page);
   await watchInPageJumps(page);
-  for (const viewport of [DESKTOP, PHONE]) {
-    await blockOffsiteRequests(page);
-    await serveFeed(page);
-    await page.setViewportSize(viewport);
-    await page.goto(url);
-    await page.waitForFunction(() => document.documentElement.hasAttribute("data-pin-live"));
-    const row = styleRow(page);
-    for (const [index, [label, id]] of TABS.entries()) {
-      await row.locator("a", { hasText: label }).click();
-      await page.waitForFunction((want) => location.hash === `#${want}`, id);
-      await landed(page, index + 1);
-      await expectLanded(page, row, label, id, viewport, index > 0);
-    }
+  await blockOffsiteRequests(page);
+  await serveFeed(page);
+  await page.setViewportSize(viewport);
+  await page.goto(url);
+  await page.waitForFunction(() => document.documentElement.hasAttribute("data-pin-live"));
+  const row = styleRow(page);
+  for (const [index, [label, id]] of TABS.entries()) {
+    await row.locator("a", { hasText: label }).click();
+    await page.waitForFunction((want) => location.hash === `#${want}`, id);
+    await landed(page, index + 1);
+    await expectLanded(page, row, label, id, viewport, index > 0);
   }
   expect(errors).toEqual([]);
 }
@@ -214,8 +215,10 @@ async function scrollHolds(page, url) {
   // module's own timer window must read the reader's place.
   expect(new Set(await scrollYAcrossWindow(page, inPageTimerWindow())), "the reader's scroll holds").toEqual(new Set([held]));
 }
-test("a tab's jump shows the section's title under the row, on the right bar and tab, without Turbo", async ({ page }) => tabJump(page, STYLE));
-test("a tab's jump shows the section's title under the row, on the right bar and tab, under Turbo", async ({ page }) => tabJump(page, `${STYLE}?turbo=1`));
+test("a tab's jump shows the section's title under the row, on the right bar and tab, without Turbo", async ({ page }) => tabJump(page, STYLE, DESKTOP));
+test("a tab's jump shows the section's title under the row, on the right bar and tab, under Turbo", async ({ page }) => tabJump(page, `${STYLE}?turbo=1`, DESKTOP));
+test("on a phone, a tab's jump shows the section's title under the row, on the right bar and tab, without Turbo", async ({ page }) => tabJump(page, STYLE, PHONE));
+test("on a phone, a tab's jump shows the section's title under the row, on the right bar and tab, under Turbo", async ({ page }) => tabJump(page, `${STYLE}?turbo=1`, PHONE));
 test("Back keeps the reader's place after two jumps, without Turbo", async ({ page }) => backKeepsPlace(page, STYLE));
 test("Back keeps the reader's place after two jumps, under Turbo", async ({ page }) => backKeepsPlace(page, `${STYLE}?turbo=1`));
 test("a scroll right after a jump is the reader's or the app's, and holds, without Turbo", async ({ page }) => scrollHolds(page, STYLE));
