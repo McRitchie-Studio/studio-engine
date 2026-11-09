@@ -164,9 +164,20 @@ test("StudioLoader.hide ends the wait at once", async ({ page }) => {
 });
 
 test("a response that asks for a full load, as a signing page does, gains no wait", async ({ page }) => {
-  await timeline(page, "direction=left&strict=1&control=reload&slow=450");
+  await timeline(page, "direction=left&strict=1&control=reload");
   await page.evaluate(() => {
     document.addEventListener("turbo:reload", () => sessionStorage.setItem("pt-reload-at", String(Math.round(performance.now() - window.__t.visit))));
+  });
+  // The visit's answer is fetched at once and handed over once the loader shows, so the wait
+  // under test is certain to be on offer, and the server's own speed stays outside the window
+  // unless it is slower than the loader. The full load that follows passes straight through.
+  let held = false;
+  await page.route("**/lab/page_transitions_b*", async (route) => {
+    if (held) return route.fallback();
+    held = true;
+    const answer = await route.fetch();
+    await loaderSeen(page);
+    return route.fulfill({ response: answer });
   });
   await click(page);
   await expect(page.locator('[data-test="page-b"]')).toBeVisible();
