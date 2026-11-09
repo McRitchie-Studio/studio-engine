@@ -58,8 +58,8 @@ test("a title typed before the card's controller connects still repaints the car
 
   await page.goto("/lab/site_identity");
   const title = page.locator(CARD_TITLE);
+  await expect.poll(() => asked, { message: "the page asks for the card's controller" }).toBe(true);
   await page.fill('[data-link-preview-input="title"]', "Typed before the controller");
-  expect(asked, "the page asked for the card's controller").toBe(true);
   await expect(title, "nothing listens yet, so the card still shows the saved title").toHaveText("Saved title");
 
   release();
