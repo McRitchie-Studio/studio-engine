@@ -267,6 +267,21 @@
         <% end %>
       </div>
     <% end %>
+
+    <%# The cascade: a 3D stack, five in view (visible: 3 shows one each side, and so
+        does a region under 36rem). Click a side card, drag, or use the arrow keys. %>
+    <%= render layout: "style/specimen", locals: { trick: "cascade" } do %>
+      <div class="w-full min-w-0" data-carousel-cascade-specimen>
+        <%= render layout: "studio/carousel",
+              locals: { label: "Cascade specimen", items: (1..7).to_a, style: :cascade, loop: true,
+                        id: "style-carousel-cascade-specimen", caption: ->(n) { "Slide #{n}" } } do |n| %>
+          <div class="card h-full p-5 space-y-1 aspect-[4/3]" style="background-image: linear-gradient(150deg, rgb(var(--color-primary-rgb) / 0.35), transparent)">
+            <p class="label-upper">Slide <%= n %></p>
+            <p class="text-sm text-body">Any block content.</p>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
   </section>
 
   <!-- Surfaces, text and form -->

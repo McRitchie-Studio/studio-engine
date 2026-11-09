@@ -7,7 +7,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { createRequire } from "node:module"
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { execFileSync } from "node:child_process"
@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url"
 
 const require = createRequire(import.meta.url)
 const TOOLING = new URL("../../lib/studio/node_tooling/", import.meta.url)
-const { DEFAULTS, studioBaseURL, railsWebServer, studioPlaywrightConfig } = require(fileURLToPath(new URL("playwright_base.js", TOOLING)))
+const { DEFAULTS, studioBaseURL, listenerRoot, mayReuseServer, railsWebServer, studioPlaywrightConfig } = require(fileURLToPath(new URL("playwright_base.js", TOOLING)))
 const { isOffOrigin, blockOffsiteRequests } = require(fileURLToPath(new URL("e2e_helpers.js", TOOLING)))
 
 test("the base is one chromium worker collecting ./e2e, booting Rails on /up", () => {
@@ -161,4 +161,115 @@ test("a top-level name with digits maps to its file; a relative or URL specifier
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
+})
+
+test("a local run reuses only a server this tree started", () => {
+  const root = mkdtempSync(join(tmpdir(), "studio-desk-"))
+  try {
+    mkdirSync(join(root, "test/dummy"), { recursive: true })
+    const warnings = []
+    const warn = (message) => warnings.push(message)
+    const reuse = (found) => mayReuseServer({ port: "3620", root, lookup: () => found, warn })
+    assert.equal(reuse({ root: null }), true, "nothing listens: nothing to refuse")
+    assert.equal(reuse({ root }), true)
+    assert.equal(reuse({ root: join(root, "test/dummy") }), true, "a server started from inside the tree is the tree's")
+    assert.deepEqual(warnings, [])
+    assert.equal(reuse({ root: `${root}-sibling` }), false, "a sibling desk's path shares the prefix but not the tree")
+    assert.equal(reuse({ root: "/Users/alex/projects/studio-engine/.worktrees/another-desk" }), false)
+    assert.equal(reuse({ unknown: true }), false, "a root that cannot be read is not assumed to be this one")
+    assert.equal(warnings.length, 3)
+    assert.match(warnings[0], /port 3620 is held by a server rooted at .*-sibling.*E2E_PORT=/)
+    assert.match(warnings[2], /whose root cannot be read/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test("the server's reuse follows the listener's root, and CI never asks", () => {
+  let asked = 0
+  const lookup = (port) => { asked += 1; assert.equal(port, "3620"); return { root: "/elsewhere" } }
+  const local = studioPlaywrightConfig({ defaultPort: "3620", env: {}, webServer: { command: "x", root: "/here", lookup } })
+  assert.equal(local.webServer.reuseExistingServer, false)
+  const mine = studioPlaywrightConfig({ defaultPort: "3620", env: {}, webServer: { command: "x", root: "/here", lookup: () => ({ root: "/here" }) } })
+  assert.equal(mine.webServer.reuseExistingServer, true)
+  const ci = studioPlaywrightConfig({ defaultPort: "3620", env: { CI: "1" }, webServer: { command: "x", lookup } })
+  assert.equal(ci.webServer.reuseExistingServer, false)
+  assert.equal(asked, 1)
+})
+
+test("the listener lookup reads a real server's working directory", async () => {
+  const { createServer } = await import("node:net")
+  const server = createServer()
+  await new Promise((done) => server.listen(0, "127.0.0.1", done))
+  try {
+    const found = listenerRoot(String(server.address().port))
+    if (found.unknown) return // no lsof on this machine; mayReuseServer then refuses, tested above
+    assert.equal(realpathSync(found.root), realpathSync(process.cwd()))
+  } finally {
+    await new Promise((done) => server.close(done))
+  }
+  const free = createServer()
+  await new Promise((done) => free.listen(0, "127.0.0.1", done))
+  const port = String(free.address().port)
+  await new Promise((done) => free.close(done))
+  const none = listenerRoot(port)
+  if (!none.unknown) assert.equal(none.root, null)
+})
+
+test("logOnRed prints and attaches the log for a red only, and survives an unreadable one", async () => {
+  const { logOnRed, sessionLog } = require(fileURLToPath(new URL("e2e_helpers.js", TOOLING)))
+  let hook
+  logOnRed({ afterEach: (fn) => { hook = fn } }, async () => ["pagereveal transition", "::view-transition-old(root) pt-out-left"])
+  const run = async (status, read) => {
+    const attached = []
+    const info = { status, expectedStatus: "passed", title: "a test", attach: async (name, body) => attached.push({ name, ...body }) }
+    const logged = []
+    const real = console.log
+    console.log = (line) => logged.push(line)
+    try { await (read || hook)({ page: {} }, info) } finally { console.log = real }
+    return { attached, logged }
+  }
+  assert.deepEqual(await run("passed"), { attached: [], logged: [] })
+  const red = await run("failed")
+  assert.equal(red.attached.length, 1)
+  assert.equal(red.attached[0].name, "pt-log")
+  assert.equal(red.attached[0].body, "pagereveal transition\n::view-transition-old(root) pt-out-left")
+  assert.match(red.logged[0], /^pt-log for "a test":\npagereveal transition/)
+
+  let broken
+  logOnRed({ afterEach: (fn) => { broken = fn } }, () => { throw new Error("context destroyed") }, { name: "event-log" })
+  const unreadable = await run("timedOut", broken)
+  assert.equal(unreadable.attached[0].name, "event-log")
+  assert.match(unreadable.attached[0].body, /the log could not be read: context destroyed/)
+
+  // The default reader is the sessionStorage log, by key.
+  const page = { evaluate: async (fn, key) => { assert.equal(key, "pt-log"); return ["x"] } }
+  assert.deepEqual(await sessionLog(page), ["x"])
+})
+
+test("the reveal waits ask the page for its reveal, never for a clock", async () => {
+  const { watchReveal, revealed, settled, arrivalSettled } = require(fileURLToPath(new URL("e2e_helpers.js", TOOLING)))
+  const source = readFileSync(fileURLToPath(new URL("e2e_helpers.js", TOOLING)), "utf8")
+  assert.doesNotMatch(source, /waitForTimeout|setTimeout/, "a helper here waits on an event, not a pause")
+
+  const calls = []
+  const page = {
+    addInitScript: async (fn) => calls.push(["init", fn.toString()]),
+    locator: (selector) => ({ first: () => ({ waitFor: async (options) => calls.push(["visible", selector, options.state]) }) }),
+    waitForFunction: async (fn) => calls.push(["until", fn.toString()]),
+    evaluate: async (_fn, count) => calls.push(["frames", count]),
+  }
+  await watchReveal(page)
+  assert.match(calls[0][1], /pagereveal/)
+  assert.match(calls[0][1], /finished\.then/)
+  calls.length = 0
+  await revealed(page, '[data-test="page-b"]')
+  await settled(page, '[data-test="page-b"]')
+  await arrivalSettled(page, '[data-test="page-b"]')
+  const kinds = calls.map(([kind]) => kind)
+  assert.deepEqual(kinds, ["visible", "until", "visible", "until", "until", "visible", "until", "until", "frames"])
+  assert.match(calls[1][1], /__studioReveal\.revealed === true/)
+  assert.match(calls[4][1], /::view-transition/)
+  assert.match(calls[7][1], /__studioReveal\.done === true/)
+  assert.equal(calls[8][1], 2)
 })

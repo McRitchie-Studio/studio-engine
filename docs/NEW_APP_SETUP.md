@@ -321,6 +321,8 @@ class User < ApplicationRecord
     name.presence || email&.split("@")&.first || "User"
   end
 
+  # `include Studio::Account` gives admin?, display_name, the role list and the
+  # safe email lookup in one line (docs/USER_CONTRACT.md, "The account concern").
   def admin?
     role == "admin"
   end
@@ -629,9 +631,11 @@ and the seed stops there with the rest of the list uncreated. Rename or remove
 the existing row, then re-seed. Reproduced on mcritchie-industries, whose sole
 account was already "Alex McRitchie" under a different address.
 
-**`role:` values are yours.** There is no shared role vocabulary: the non-admin
-role is `viewer` in mcritchie-studio and mcritchie-industries but `user` in
-turf-monster. Use whatever your `admin?` tests against.
+**`role:` values come from the engine.** `Studio::Roles` is the one list:
+`viewer`, `member`, `admin`. An app may narrow it (`studio_roles %w[viewer admin]`
+on a model that includes `Studio::Account`), never widen it. Turf's old `user`
+spelling moved to `viewer` on 2026-11-08. See docs/USER_CONTRACT.md, "The
+account concern".
 
 ### The list is yours from here
 

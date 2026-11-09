@@ -4,6 +4,12 @@ const { blockOffsiteRequests } = require("./helpers");
 // [e2e] The one pace of a page load (docs/LOADER.md): under 350ms no loader; once shown, at
 // least 750ms. /lab/page_transitions renders no overlay of its own, so these read the one every
 // app gets from layouts/studio/_head. `slow=ms` makes page b answer that late.
+//
+// EVERY TIME IS FROM THE VISIT'S OWN START, turbo:visit, which is when studio/loader starts its
+// clock (350ms, then at least 750ms shown). Not from before Playwright's click: on a loaded
+// machine the click alone took over 250ms to land, and a limit read from the test's side of it
+// measured the host (787ms against 700, a fast visit's move at 453 against 350). A held wait
+// still reads 1100ms or later on the visit's clock, so every limit still catches one.
 const LAB = "/lab/page_transitions";
 
 async function timeline(page, query) {
@@ -11,8 +17,10 @@ async function timeline(page, query) {
   await page.route("**/e2e/img/pt-hung.png", () => {});
   await page.addInitScript(() => {
     const t = (window.__t = {});
-    const stamp = (key) => { if (t[key] === undefined && t.click !== undefined) t[key] = Math.round(performance.now() - t.click); };
+    const stamp = (key) => { if (t[key] === undefined && t.visit !== undefined) t[key] = Math.round(performance.now() - t.visit); };
     window.__mark = () => { t.click = performance.now(); };
+    // Capture, so this runs ahead of the page's own turbo:visit listeners, studio/loader's included.
+    document.addEventListener("turbo:visit", () => { if (t.click !== undefined && t.visit === undefined) t.visit = performance.now(); }, { capture: true });
     const start = Document.prototype.startViewTransition;
     if (start) {
       Document.prototype.startViewTransition = function (...args) {
@@ -51,6 +59,9 @@ const landed = async (page) => {
   await page.waitForTimeout(60);
   return page.evaluate(() => window.__t);
 };
+// The loader is up, as this spec's own per-frame recorder saw it. A response held until then
+// meets the wait it must not get; a fixed 450ms hold raced the loader's 350ms on a loaded host.
+const loaderSeen = (page) => page.waitForFunction(() => window.__t.loaderIn !== undefined);
 const report = (name, t) => { console.log(`[pace] ${name}: ${JSON.stringify(t)}`); };
 
 test("a fast visit shows no loader and gains no wait", async ({ page }) => {
@@ -106,13 +117,13 @@ test("the image wait comes after the minimum, and neither cuts the other short",
 test("a page that answers 500 gains no wait", async ({ page }) => {
   await timeline(page, "direction=left");
   await page.route("**/lab/page_transitions_b*", async (route) => {
-    await new Promise((done) => setTimeout(done, 450));
+    await loaderSeen(page);
     await route.fulfill({ status: 500, contentType: "text/html", body: "<html><body><h1 data-test=\"page-b\">Broken</h1></body></html>" });
   });
   await click(page);
   await expect(page.locator('h1[data-test="page-b"]')).toBeVisible();
   const t = await page.evaluate(() => window.__t);
-  report("500 at 450", t);
+  report("500 once the loader shows", t);
   expect(t.render).toBeLessThan(700);
 });
 
@@ -128,11 +139,13 @@ test("a visit the network drops clears the loader at once", async ({ page }) => 
   await page.route("**/lab/page_transitions_b*", async (route) => {
     if (dropped) return route.continue();
     dropped = true;
-    await new Promise((done) => setTimeout(done, 450));
+    await loaderSeen(page);
     return route.abort();
   });
   await click(page);
-  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("pt-dropped"))).not.toBeNull();
+  // Turbo answers a failed visit with a full load of the same URL, which the second request
+  // serves. sessionStorage outlives it, so read once page b is there, not while it navigates.
+  await expect(page.locator('[data-test="page-b"]')).toBeVisible();
   expect(JSON.parse(await page.evaluate(() => sessionStorage.getItem("pt-dropped")))).toEqual({ hidden: true, shown: true });
 });
 
@@ -151,9 +164,20 @@ test("StudioLoader.hide ends the wait at once", async ({ page }) => {
 });
 
 test("a response that asks for a full load, as a signing page does, gains no wait", async ({ page }) => {
-  await timeline(page, "direction=left&strict=1&control=reload&slow=450");
+  await timeline(page, "direction=left&strict=1&control=reload");
   await page.evaluate(() => {
-    document.addEventListener("turbo:reload", () => sessionStorage.setItem("pt-reload-at", String(Math.round(performance.now() - window.__t.click))));
+    document.addEventListener("turbo:reload", () => sessionStorage.setItem("pt-reload-at", String(Math.round(performance.now() - window.__t.visit))));
+  });
+  // The visit's answer is fetched at once and handed over once the loader shows, so the wait
+  // under test is certain to be on offer, and the server's own speed stays outside the window
+  // unless it is slower than the loader. The full load that follows passes straight through.
+  let held = false;
+  await page.route("**/lab/page_transitions_b*", async (route) => {
+    if (held) return route.fallback();
+    held = true;
+    const answer = await route.fetch();
+    await loaderSeen(page);
+    return route.fulfill({ response: answer });
   });
   await click(page);
   await expect(page.locator('[data-test="page-b"]')).toBeVisible();

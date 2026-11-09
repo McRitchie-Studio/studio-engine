@@ -414,6 +414,7 @@ class E2eLaneContractTest < Minitest::Test
       "carousel.html.erb" => ["studio/carousel"],
       "carousel_spotlight.html.erb" => ["studio/carousel"],
       "carousel_autoplay.html.erb" => ["studio/carousel"],
+      "carousel_cascade.html.erb" => ["studio/carousel"],
       # The voice row's recorder, meter and save are the engine's program
       # (studio/voice_profile), mounted by the row's own markup.
       "voice_profile.html.erb" => ["studio/profiles/voice_section"],

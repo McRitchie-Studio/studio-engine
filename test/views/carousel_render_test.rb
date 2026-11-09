@@ -3,6 +3,7 @@
 require "test_helper"
 require "action_view"
 require "nokogiri"
+require "digest"
 
 # [unit] studio/_carousel: what the carousel renders. Its motion is a browser's
 # (e2e/carousel.spec.js); this tier pins the seams: one slide per item drawn by the
@@ -190,7 +191,7 @@ class CarouselRenderTest < Minitest::Test
     end
     refused = chain.find { |e| e.is_a?(ArgumentError) }
     assert refused, "an ArgumentError in #{chain.map(&:class).inspect}"
-    assert_match(/not :standard or :spotlight/, refused.message)
+    assert_match(/not :standard, :spotlight or :cascade/, refused.message)
   end
 
   # THE START: the slide the row opens on (start:).
@@ -371,4 +372,132 @@ class CarouselRenderTest < Minitest::Test
       assert_match(/not a number of seconds above 0 or nil/, refused.message)
     end
   end
+
+  # THE CASCADE (style: :cascade): a 3D stack the controller and engine.css lay out
+  # from each slide's data-cascade-step. studio/carousel's cascadeStep and cascadeSlot
+  # rewrite the steps on a move (test/javascript/carousel_cascade.test.mjs); this pins
+  # the first paint's, which must agree with them.
+  SEVEN = %w[a b c d e f g].map { |name| Item.new(name) }.freeze
+
+  def cascade_refusal(&block)
+    error = assert_raises(StandardError, &block)
+    error = error.cause while error && !error.is_a?(ArgumentError)
+    assert error, "an ArgumentError in the chain"
+    error.message
+  end
+
+  def steps(doc) = doc.css(".carousel-slide").map { |slide| slide["data-cascade-step"] }
+
+  def test_cascade_marks_the_region_and_wraps_each_slide_in_a_body
+    doc = render_carousel(style: :cascade)
+    section = region(doc)
+
+    assert_equal %w[carousel carousel-cascade], section["class"].split
+    assert_equal "5", section["data-carousel-visible"], "five in view by default"
+    assert_equal "carousel", section["data-studio-controller"], "the same controller"
+    assert_equal %w[Turf Cyvasse Rolio], doc.css(".carousel-slide > .carousel-cascade-body a.card").map(&:text)
+    assert_empty doc.css(".carousel-spotlight-body")
+    assert_equal ["Previous slide", "Next slide"], doc.css(".carousel-button").map { |b| b["aria-label"] }
+    assert_equal 3, doc.css(".carousel-dot").size, "a dot per real slide"
+    assert_equal %w[group] * 3, doc.css(".carousel-slide").map { |slide| slide["role"] }
+    assert_empty doc.css("[data-carousel-start-slide]"), "a cascade does not scroll, so it needs no scroll target"
+  end
+
+  def test_cascade_takes_visible_three
+    section = region(render_carousel(style: :cascade, visible: 3))
+
+    assert_equal "3", section["data-carousel-visible"]
+    assert_equal "5", region(render_carousel(style: "cascade", visible: 5))["data-carousel-visible"]
+  end
+
+  def test_cascade_refuses_a_visible_that_is_not_three_or_five
+    [1, 4, 7, "5", :five].each do |visible|
+      assert_match(/visible: .* is not 3 or 5/, cascade_refusal { render_carousel(style: :cascade, visible: visible) })
+    end
+  end
+
+  def test_only_a_cascade_takes_visible
+    [:standard, :spotlight].each do |style|
+      assert_match(/only a style: :cascade row takes it/, cascade_refusal { render_carousel(style: style, visible: 5) })
+    end
+  end
+
+  def test_cascade_opens_on_its_middle_slide_with_two_steps_each_side
+    doc = render_carousel(items: SEVEN, style: :cascade)
+
+    assert_equal %w[before -2 -1 0 1 2 after], steps(doc)
+    assert_equal "3", current_dot(doc)
+    assert_equal [3], doc.css(".carousel-slide").each_with_index.select { |slide, _| slide.key?("data-current") }.map(&:last)
+    assert_equal "3", region(doc)["data-carousel-start"]
+  end
+
+  def test_cascade_takes_an_explicit_start
+    doc = render_carousel(items: SEVEN, style: :cascade, start: 0)
+
+    assert_equal %w[0 1 2 after after after after], steps(doc)
+    assert_equal ["true", nil], arrows(doc), "Previous is off at the first slide"
+    assert_equal %w[-2 -1 0 1 2 after after], steps(render_carousel(items: SEVEN, style: :cascade, start: 2))
+  end
+
+  def test_a_looping_cascade_opens_on_its_first_slide_with_the_last_two_on_its_left
+    doc = render_carousel(items: SEVEN, style: :cascade, loop: true)
+
+    assert_equal %w[0 1 2 after before -2 -1], steps(doc)
+    assert_equal "0", current_dot(doc)
+    assert_equal %w[false], arrows(doc).compact.uniq, "a looping row disables neither arrow"
+  end
+
+  def test_a_looping_cascade_breaks_the_far_tie_to_the_later_side
+    four = SEVEN.first(4)
+
+    assert_equal %w[0 1 2 -1], steps(render_carousel(items: four, style: :cascade, loop: true))
+    assert_equal %w[-2 -1 0 1 2 after], steps(render_carousel(items: SEVEN.first(6), style: :cascade, loop: true, start: 2))
+  end
+
+  def test_a_cascade_caption_sits_under_the_body
+    doc = render_carousel(style: :cascade, caption: ->(item) { "#{item.name}, live" })
+
+    assert_equal %w[carousel-cascade-body carousel-caption], doc.at_css(".carousel-slide").element_children.map { |el| el["class"] }
+    assert_equal ["Turf, live", "Cyvasse, live", "Rolio, live"], doc.css(".carousel-caption").map(&:text)
+  end
+
+  def test_a_cascade_of_none_or_one_renders
+    assert_empty render_carousel(items: [], style: :cascade).css(".carousel-slide")
+    assert_equal %w[0], steps(render_carousel(items: SEVEN.first(1), style: :cascade, loop: true))
+  end
+
+  def test_a_cascade_autoplays_with_the_pause_button
+    doc = render_carousel(style: :cascade, autoplay: 5, loop: true)
+
+    assert_equal "5", region(doc)["data-carousel-autoplay"]
+    assert doc.at_css(".carousel-autoplay[aria-label='Pause slideshow']")
+  end
+
+  # The cascade lives beside the other styles, not in them: each renders byte for
+  # byte what it rendered before the cascade was added. These digests were taken on
+  # the release before it (0.137.0) and pin the whole output, so a change to the
+  # standard or spotlight markup has to change them on purpose.
+  BYTE_IDENTITY = [
+    [ITEMS, {}],
+    [ITEMS, { style: :standard, caption: ->(i) { "Cap #{i.name}" } }],
+    [ITEMS, { style: :spotlight }],
+    [SEVEN, { style: :spotlight, caption: ->(i) { "Cap #{i.name}" } }],
+    [SEVEN, { style: :spotlight, loop: true, autoplay: 3.5, start: 1 }],
+    [SEVEN, { start: :middle, per_view: 2.5, loop: true, slide_label: ->(i) { i.name } }]
+  ].freeze
+  BYTE_IDENTITY_DIGESTS = %w[3490a0179a62aa1a 202ca6983533a326 e6d195e03de08832 f221ee2dc38d062e b7634921dd03c65b 417bfdb4bb325e7f].freeze
+
+  def raw(items, locals)
+    view = ActionView::Base.with_empty_template_cache.new(ActionView::LookupContext.new([VIEWS]), {}, nil)
+    view.render(layout: "studio/carousel", locals: { label: "Portfolio", items: items, **locals }) do |item|
+      view.tag.a(item.name, href: "/#{item.name.downcase}", class: "card")
+    end
+  end
+
+  def test_standard_and_spotlight_render_byte_for_byte_as_before_the_cascade
+    digests = BYTE_IDENTITY.map { |items, locals| Digest::SHA256.hexdigest(raw(items, locals))[0, 16] }
+
+    assert_equal BYTE_IDENTITY_DIGESTS, digests
+  end
+
 end

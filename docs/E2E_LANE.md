@@ -202,6 +202,12 @@ built on that and was wrong in a way that read as a finding: the trim mutation
 looked caught when it was not. Kill the server on port 3620 between mutations, or
 you are grading a page that no longer exists.
 
+*A reused server can be another desk's.* Every engine desk defaults to port 3620,
+and Playwright's own reuse check is only "something answers `/up`", so one desk's
+local run once could grade a sibling desk's server and code. The shared base now
+reuses only a server whose working directory is inside this tree, and refuses any
+other, naming its root. Run a second desk on its own port: `E2E_PORT=<free port>`.
+
 *A negative asserted about a state the page is already in cannot fail.*
 `toBeHidden()` immediately after typing is satisfied by the first poll, before
 Alpine has reacted; polling for the compact header's opacity at load is satisfied
