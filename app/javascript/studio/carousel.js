@@ -246,3 +246,69 @@ export function loopPositionText(first, shown, total) {
   const head = first + 1 === total ? `Slides ${total}` : `Slides ${first + 1} to ${total}`
   return `${head} and ${over === 1 ? "1" : `1 to ${over}`} of ${total}`
 }
+
+// THE CASCADE (style: :cascade, class carousel-cascade). The row does not scroll:
+// every slide sits in one grid cell and wears data-cascade-step, its place from the
+// open slide, which engine.css turns into the 3D stack. A STEP is signed: 0 is the
+// open slide, -1 and 1 its neighbours, and so on. CASCADE_REACH steps either side
+// are in view; past them a slide's slot is "before" or "after", hidden.
+//
+// app/views/studio/_carousel.html.erb writes the first paint's slots with the same
+// rule, so the two must agree (test/views/carousel_render_test.rb pins the partial).
+export const CASCADE_REACH = 2
+
+// A slide's step from the open one. A looping set has no ends, so the step is the
+// short way round; a tie (an even set's far side) goes to the later side.
+export function cascadeStep(index, active, total, loop = false) {
+  const step = index - active
+  if (!loop || !(total > 1)) return step
+  const round = wrapIndex(step, total)
+  return round > total / 2 ? round - total : round
+}
+
+// Every slide's step, in row order.
+export function cascadeSteps(total, active, loop = false) {
+  return Array.from({ length: Math.max(0, total) }, (_, index) => cascadeStep(index, active, total, loop))
+}
+
+// The data-cascade-step a step is written as: the step itself in view, "before" or
+// "after" past the reach.
+export function cascadeSlot(step, reach = CASCADE_REACH) {
+  if (step < -reach) return "before"
+  if (step > reach) return "after"
+  return String(step)
+}
+
+// The cascade's reach from its view: 5 slides in view reach 2 each side, 3 reach 1.
+export function cascadeReach(visible) {
+  return Number(visible) === 3 ? 1 : CASCADE_REACH
+}
+
+// Which slides JUMP on a move from one set of steps to the next: the ones that cross
+// round a looping set's seam (the far left slide becoming the far right one) instead
+// of shifting with the rest. They take no glide across the stack. Every other slide
+// moves by the same shift, the open slide's old step turned round.
+export function cascadeJumps(before, after, active) {
+  const shift = -(before[active] ?? 0)
+  return after.map((step, index) => step - before[index] !== shift)
+}
+
+// How many slides a drag of `dx` pixels moves, against `width` pixels a step: none
+// under the threshold, else at least one, the open slide following the pointer
+// (a drag to the left brings the next slides in, so it moves forward).
+export const DRAG_THRESHOLD = 40
+export function dragSteps(dx, width) {
+  if (!(Math.abs(dx) >= DRAG_THRESHOLD)) return 0
+  const per = width > 0 ? width : 1
+  const count = Math.max(1, Math.round(Math.abs(dx) / per))
+  return dx < 0 ? count : -count
+}
+
+// The slide a drag or a click takes a cascade to, from the open one: held to the
+// ends of a set that does not loop, round the set on one that does.
+export function cascadeTarget(active, by, total, loop = false) {
+  if (!(total > 0)) return 0
+  const to = active + by
+  if (loop) return wrapIndex(to, total)
+  return Math.min(total - 1, Math.max(0, to))
+}
