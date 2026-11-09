@@ -10,7 +10,7 @@ These are the methods/attributes the engine actively calls. Missing one of these
 | Name | Used by | Notes |
 |------|---------|-------|
 | `User.find_by(id:)` | `Studio::ErrorHandling#current_user` | Standard ActiveRecord finder — automatic on any AR model. |
-| `User.find_by(email:)` | `SessionsController#create` | Same. |
+| `User.where` on `email` | `SessionsController#create`, the SSO path | Through `Studio::Account.find_by_email`: a blank address finds nobody, compared `LOWER(email)`. Automatic on any AR model with an `email` column. |
 
 ### Instance methods
 | Name | Used by | Notes |
@@ -143,7 +143,7 @@ The engine doesn't care about DB shape directly, but in practice every consumer 
 - `email:string` (unique-indexed, nullable for wallet-only apps)
 - `password_digest:string` only when enabling password auth
 - `provider:string`, `uid:string` (OmniAuth)
-- `role:string` or `role:integer` (for `admin?`)
+- `role:string` (for `admin?`), one of `Studio::Roles`, guarded by CHECK `users_role_known`. A host still on an integer role keeps its own `admin?`; the engine's role migration skips it
 - `slug:string` (for `Sluggable`-friendly URLs)
 - `first_name:string` (and `last_name:string` where the app wants the surname) — the standard-columns migration installs `first_name`
 
@@ -151,16 +151,8 @@ The engine doesn't care about DB shape directly, but in practice every consumer 
 
 ```ruby
 class User < ApplicationRecord
-  include Sluggable                  # from the engine
+  include Studio::Account            # admin?, display_name, roles, Sluggable, OmniauthUser
   has_many :error_logs, as: :target  # if you want to associate logged errors
-
-  def admin?
-    role == "admin"
-  end
-
-  def display_name
-    name.presence || email&.split("@")&.first || "User"
-  end
 
   def name_slug
     (name.presence || email.to_s.split("@").first).parameterize

@@ -43,6 +43,10 @@ class UsersRoleKnownMigrationTest < ActiveSupport::TestCase
     ActiveRecord::Migration.suppress_messages { AddUsersRoleKnownCheck.new.migrate(:up) }
   end
 
+  def migrate_down
+    ActiveRecord::Migration.suppress_messages { AddUsersRoleKnownCheck.new.migrate(:down) }
+  end
+
   def check_names
     connection.check_constraints(:users).map(&:name)
   end
@@ -92,6 +96,30 @@ class UsersRoleKnownMigrationTest < ActiveSupport::TestCase
     assert_includes error.message, '"user"'
     assert_empty check_names
     assert_equal 1, connection.select_value("SELECT COUNT(*) FROM users WHERE role IS NULL"), "nothing was written"
+  end
+
+  test "skips an integer role column" do
+    connection.create_table(:users) { |t| t.integer :role }
+    migrate_up
+
+    assert_empty check_names
+  end
+
+  test "down removes its own CHECK" do
+    create_users
+    migrate_up
+    migrate_down
+
+    assert_empty check_names
+    insert_role("anything")
+  end
+
+  test "down leaves a host's own narrower CHECK" do
+    create_users(check: "role IN ('viewer', 'admin')")
+    migrate_up
+    migrate_down
+
+    assert_equal ["users_role_known"], check_names
   end
 
   test "spells its list out, and it matches Studio::Roles" do

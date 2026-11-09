@@ -7,7 +7,8 @@
 # `bin/rails studio_engine:install:migrations`, never auto-run, and safe on an
 # app that already disagrees.
 #
-#   * No `users` table, or no `role` column: skipped.
+#   * No `users` table, no `role` column, or a role that is not a string (an
+#     integer enum): skipped.
 #   * A CHECK named users_role_known already there: skipped. The hub and Turf
 #     installed their own on 2026-11-08, narrowed to viewer + admin, and a host's
 #     narrower CHECK is the stronger guard; this one is the ceiling.
@@ -25,7 +26,7 @@ class AddUsersRoleKnownCheck < ActiveRecord::Migration[7.2]
   NAME = "users_role_known"
 
   def up
-    return unless table_exists?(:users) && column_exists?(:users, :role)
+    return unless string_role?
     return if check_constraint_exists?(:users, name: NAME)
 
     allowed = ROLES.map { |role| connection.quote(role) }.join(", ")
@@ -43,14 +44,26 @@ class AddUsersRoleKnownCheck < ActiveRecord::Migration[7.2]
     add_check_constraint :users, "role IN (#{allowed})", name: NAME
   end
 
-  # The `up` skips a host whose own CHECK of this name was already there, so a
-  # `down` cannot tell that one from its own. Dropping a host's CHECK would
-  # remove a guard the host wrote; refuse instead, as the standard-columns
-  # migration does. Remove the CHECK by hand, by name, if you mean to.
+  # Removes the CHECK only when it is this migration's: one that names every
+  # engine role. A host's own users_role_known, which `up` left in place, is
+  # narrower (the hub's and Turf's name viewer and admin only) and stays. NOT
+  # NULL stays too: `up` cannot record whether the host had it already, and a
+  # NULL role is the one value no host wants back.
   def down
-    return unless table_exists?(:users) && column_exists?(:users, :role)
+    return unless string_role?
 
-    raise ActiveRecord::IrreversibleMigration,
-          "AddUsersRoleKnownCheck does not know whether it or the host added #{NAME}; remove it by hand."
+    ours = check_constraints(:users).find { |check| check.name == NAME }
+    return unless ours && ROLES.all? { |role| ours.expression.include?("'#{role}'") }
+
+    remove_check_constraint :users, name: NAME
+  end
+
+  private
+
+  def string_role?
+    return false unless table_exists?(:users)
+
+    column = columns(:users).find { |c| c.name == "role" }
+    column && %i[string text].include?(column.type)
   end
 end

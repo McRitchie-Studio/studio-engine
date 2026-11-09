@@ -115,7 +115,19 @@ module Studio
       Rails.logger.warn(
         "[Studio::LocalReviewsController] could not provision #{email}: #{e.class}: #{e.message}"
       )
+      # An ErrorLog too, so the miss is on the page an operator reads. The
+      # likeliest cause: Studio.local_review_role names a role this app's
+      # Studio::Account list refuses.
+      log_provisioning_failure(e)
       nil
+    end
+
+    # Best-effort as well: a host whose error_logs table is missing or broken
+    # must not turn a logged miss into a failed mint.
+    def log_provisioning_failure(error)
+      ErrorLog.capture!(error) if defined?(::ErrorLog) && ::ErrorLog.respond_to?(:capture!)
+    rescue StandardError => e
+      Rails.logger.warn("[Studio::LocalReviewsController] could not log the miss: #{e.class}")
     end
 
     # A brand-new reviewer goes through the host's own new-user hook first, so
