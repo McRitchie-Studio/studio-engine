@@ -7,8 +7,13 @@
 //
 // The repaint is studio/link_preview_card. One listener on the root takes the
 // `input` of every [data-link-preview-input] inside it.
+//
+// The controller is registered lazily, so its module arrives after the page has
+// loaded and an operator can type before connect() listens. That input event is
+// gone, so connect() also paints the card from the fields as they stand
+// (e2e/site_identity.spec.js holds the module back to prove it).
 import { Controller } from "@hotwired/stimulus"
-import { paintCard } from "studio/link_preview_card"
+import { paintCard, paintAll } from "studio/link_preview_card"
 
 export default class extends Controller {
   connect() {
@@ -17,6 +22,7 @@ export default class extends Controller {
       if (input && input.matches && input.matches("[data-link-preview-input]")) paintCard(this.element, input)
     }
     this.element.addEventListener("input", this.repaint)
+    paintAll(this.element)
   }
 
   disconnect() {

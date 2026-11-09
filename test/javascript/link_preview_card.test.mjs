@@ -5,7 +5,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/link_preview_card.js", import.meta.url), "utf8")
-const { cardText, fallbacksOf, paintCard } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
+const { cardText, fallbacksOf, paintCard, paintAll } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 test("the module imports nothing", () => {
   assert.doesNotMatch(source, /^\s*import\s/m)
@@ -24,10 +24,13 @@ test("the fallbacks come from the page, blank when it carries none", () => {
   assert.deepEqual(fallbacksOf({ dataset: {} }), { title: "", description: "" })
 })
 
-function fakePage() {
+function fakePage(inputs = []) {
   const nodes = { title: {}, description: {} }
   return {
     nodes,
+    querySelectorAll(selector) {
+      return selector === "[data-link-preview-input]" ? inputs : []
+    },
     dataset: { fallbackTitle: "Studio", fallbackDescription: "The default words" },
     querySelector(selector) {
       const match = selector.match(/^\[data-link-preview-card-(\w+)\]$/)
@@ -58,4 +61,20 @@ test("paint ignores an input that feeds no card node", () => {
   assert.equal(paintCard(page, { value: "x", dataset: { linkPreviewInput: "image" } }), null)
   assert.equal(paintCard(page, { value: "x", dataset: {} }), null)
   assert.equal(paintCard(page, null), null)
+})
+
+// The controller is registered lazily, so a field can change before connect()
+// listens for input. connect() paints from the fields as they stand
+// (e2e/site_identity.spec.js holds the module back to prove it in a browser).
+test("paintAll paints every field's current value, so text typed before connect shows", () => {
+  const page = fakePage([
+    { value: "Typed before connect", dataset: { linkPreviewInput: "title" } },
+    { value: "  ", dataset: { linkPreviewInput: "description" } },
+    { value: "x", dataset: { linkPreviewInput: "image" } }
+  ])
+
+  paintAll(page)
+
+  assert.equal(page.nodes.title.textContent, "Typed before connect")
+  assert.equal(page.nodes.description.textContent, "The default words")
 })

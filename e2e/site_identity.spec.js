@@ -39,6 +39,36 @@ test("typing a title repaints the card, and a blank one shows the drafted defaul
   expect(pageErrors).toEqual([]);
 });
 
+// THE RACE. The card's controller is registered lazily: its module is one more
+// request after the page has loaded, so an operator (or Playwright's fill) can
+// type before connect() adds the input listener. That input event is gone, and
+// the card kept the saved title while the field held the typed one (CI run
+// 42568726367). connect() must paint from the fields as they stand. This holds
+// the controller's module back until the title is typed, so the order is fixed.
+test("a title typed before the card's controller connects still repaints the card", async ({ page }) => {
+  const pageErrors = watchPageErrors(page);
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  let asked = false;
+  await page.route(/\/studio\/controllers\/link_preview_card_controller(?:-[0-9a-f]+)?\.js(?:\?|$)/, async (route) => {
+    asked = true;
+    await held;
+    await route.continue();
+  });
+
+  await page.goto("/lab/site_identity");
+  const title = page.locator(CARD_TITLE);
+  await expect.poll(() => asked, { message: "the page asks for the card's controller" }).toBe(true);
+  await page.fill('[data-link-preview-input="title"]', "Typed before the controller");
+  await expect(title, "nothing listens yet, so the card still shows the saved title").toHaveText("Saved title");
+
+  release();
+  await expect(page.locator(PAGE)).not.toHaveAttribute("data-studio-controller-failed", /.*/);
+  await expect(title).toHaveText("Typed before the controller");
+
+  expect(pageErrors).toEqual([]);
+});
+
 // Unfurls show about two lines of description; the card clamps the same way,
 // which only a layout engine can measure.
 test("a long description repaints the card and is clamped to two lines", async ({ page }) => {
