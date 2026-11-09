@@ -136,3 +136,112 @@ test("a target's own scroll margin wins; else it stops under the pinned stack", 
   assert.equal(marginFor(0, 90.4), 90)
   assert.equal(marginFor(0, 0), null, "no stack, no margin")
 })
+
+// THE JUMP'S END, on a slow main thread. A fake window with its own clock: a smooth scroll
+// whose frames come further apart than SETTLE_MS (a phone, or CI at 8x CPU) must not end
+// before the browser's scrollend. Measured red at 8x before the fix: the quiet spell ended
+// the jump at its first frame, the target then moved and nothing aimed again.
+function fakeWindow({ scrollend }) {
+  const timers = new Map()
+  let now = 0
+  let next = 1
+  const listeners = {}
+  const docListeners = {}
+  const dispatched = []
+  const on = (bag) => (name, fn) => { (bag[name] ||= []).push(fn) }
+  const off = (bag) => (name, fn) => { bag[name] = (bag[name] || []).filter((f) => f !== fn) }
+  let top = 900
+  const target = {
+    style: {},
+    matches: () => true,
+    focus: () => {},
+    setAttribute: () => {},
+    addEventListener: () => {},
+    getBoundingClientRect: () => ({ top }),
+    scrollIntoView: () => {},
+  }
+  const link = { getAttribute: (n) => (n === "href" ? "#tricks" : null), hasAttribute: () => false, closest: () => null, dispatchEvent: () => {} }
+  const win = {
+    scrollY: 0,
+    location: { href: "https://app.test/admin/style" },
+    history: { state: null, replaceState() {}, pushState(_s, _t, href) { win.location.href = href } },
+    matchMedia: () => ({ matches: false }),
+    getComputedStyle: () => ({ scrollMarginTop: "100px" }),
+    setTimeout: (fn, ms) => { const id = next++; timers.set(id, { fn, at: now + ms }); return id },
+    clearTimeout: (id) => { timers.delete(id) },
+    addEventListener: on(listeners),
+    removeEventListener: off(listeners),
+    dispatchEvent: () => {},
+    CustomEvent: class { constructor(type) { this.type = type } },
+    HashChangeEvent: class { constructor(type) { this.type = type } },
+  }
+  if (scrollend) win.onscrollend = null
+  const doc = {
+    defaultView: win,
+    getElementById: (id) => (id === "tricks" ? target : null),
+    getElementsByName: () => [],
+    addEventListener: on(docListeners),
+    dispatchEvent: (event) => { dispatched.push(event.type) },
+  }
+  const fire = (bag, name, event = {}) => { for (const fn of [...(bag[name] || [])]) fn(event) }
+  const advance = (ms) => {
+    const until = now + ms
+    for (;;) {
+      const due = [...timers.entries()].filter(([, t]) => t.at <= until).sort((a, b) => a[1].at - b[1].at)[0]
+      if (!due) break
+      timers.delete(due[0])
+      now = due[1].at
+      due[1].fn()
+    }
+    now = until
+  }
+  return {
+    doc,
+    ends: () => dispatched.filter((type) => type === "studio:in-page-scroll-end").length,
+    click: () => fire(docListeners, "click", { ...click(), target: { closest: () => link }, preventDefault() {} }),
+    frame: (dy) => { win.scrollY += dy; top -= dy; fire(listeners, "scroll") },
+    scrollend: () => fire(listeners, "scrollend"),
+    advance,
+  }
+}
+// installInPageLinks keeps one install per module, so each case loads its own copy.
+const freshInstall = async (tag) => (await import(`data:text/javascript,${encodeURIComponent(`${source}\n// ${tag}`)}`)).installInPageLinks
+
+test("with scrollend, a slow frame does not end the jump; the browser's scrollend does", async () => {
+  const install = await freshInstall("slow-frames")
+  const page = fakeWindow({ scrollend: true })
+  assert.equal(install(page.doc), true)
+  page.click()
+  page.frame(100)
+  page.advance(260) // one frame at 8x CPU: longer than SETTLE_MS
+  page.frame(300)
+  page.advance(260)
+  assert.equal(page.ends(), 0, "still scrolling: no end yet")
+  page.scrollend()
+  assert.equal(page.ends(), 1, "the browser's scrollend ends it")
+})
+
+test("without scrollend, a quiet spell of SETTLE_MS ends the jump", async () => {
+  const { SETTLE_MS } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
+  const install = await freshInstall("no-scrollend")
+  const page = fakeWindow({ scrollend: false })
+  assert.equal(install(page.doc), true)
+  page.click()
+  page.frame(100)
+  page.advance(SETTLE_MS - 1)
+  assert.equal(page.ends(), 0)
+  page.advance(1)
+  assert.equal(page.ends(), 1)
+})
+
+test("a jump that never scrolls still ends at its cap, with scrollend or without", async () => {
+  const { START_CAP_MS } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
+  for (const scrollend of [true, false]) {
+    const install = await freshInstall(`never-moves-${scrollend}`)
+    const page = fakeWindow({ scrollend })
+    install(page.doc)
+    page.click()
+    page.advance(START_CAP_MS)
+    assert.equal(page.ends(), 1, `scrollend ${scrollend}`)
+  }
+})

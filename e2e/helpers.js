@@ -180,7 +180,90 @@ function transitionsDone(locator) {
     .map((a) => a.finished.catch(() => {}))).then(() => undefined));
 }
 
+// The pinned stack has settled: studio/pinned_stack writes the root's --pin-* values only
+// once a scroll has been still for its SETTLE_MS (in motion it writes copies onto the
+// elements that read them), and a layer under a moved layer settles one publish later. So
+// the root holds what a live read measures now, the stack's bottom and every layer's height.
+// CSS that reads the root (a section bar's sticky top, a scroll margin) is then final.
+function stackSettled(page) {
+  return page.waitForFunction(() => {
+    const live = window.studioPinnedStack.read();
+    const root = getComputedStyle(document.documentElement);
+    const same = (name, px) => Math.abs((parseFloat(root.getPropertyValue(name)) || 0) - px) < 0.5;
+    return same("--pin-stack-bottom", live.bottom)
+      && Object.entries(live.layers).every(([name, layer]) => same(`--pin-${name}-h`, layer.h));
+  });
+}
+
+// ---- In-page jumps and history (studio/in_page_links) ----------------------------------
+//
+// Counts, from the document's first script on: each jump the module starts
+// (studio:in-page-scroll), each it ends (studio:in-page-scroll-end: its scrollend after the
+// last aim, or the reader taking over), and each popstate. An init script, so the popstate
+// listener is bound ahead of the module's own. Under Turbo the module stops the popstate
+// (stopImmediatePropagation) after it has scrolled, so a listener bound later never hears it.
+// Call before page.goto.
+function watchInPageJumps(page) {
+  return page.addInitScript(() => {
+    const seen = { starts: 0, ends: 0, pops: 0 };
+    window.__inPageJumps = seen;
+    document.addEventListener("studio:in-page-scroll", () => { seen.starts += 1; });
+    document.addEventListener("studio:in-page-scroll-end", () => { seen.ends += 1; });
+    window.addEventListener("popstate", () => { seen.pops += 1; }, { capture: true });
+  });
+}
+
+// The module's jump has ended: at least `count` jumps started since the document began, and
+// every one has ended. The end is the module's own: the browser's scrollend after its last
+// aim, so the target is in place, not a guess at how long a smooth scroll takes. A page
+// without the module never starts one, and the wait times out.
+function jumpEnded(page, count = 1) {
+  return page.waitForFunction((n) => {
+    const seen = window.__inPageJumps;
+    return seen.starts >= n && seen.ends >= seen.starts;
+  }, count);
+}
+
+// Back or Forward between two entries of one page, and the place it restored. A traversal
+// fires popstate even when it does not move the page, where no scroll or scrollend event
+// comes. The restore runs in the popstate's own task: the module's instant scroll under
+// Turbo, the browser's own restore without it. So the read is two frames after the
+// popstate, and it is the restored position whether the page moved or not.
+async function traversed(page, go) {
+  const before = await page.evaluate(() => window.__inPageJumps.pops);
+  await go();
+  await page.waitForFunction((n) => window.__inPageJumps.pops > n, before);
+  return page.evaluate(() => new Promise((done) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => done(window.scrollY)));
+  }));
+}
+
+// A NEGATIVE PROOF, so it has a window: every scrollY, each frame, for at least `ms` and at
+// least 30 frames. Nothing fires for a move that does not happen, so the window is the app's
+// own: callers pass the in-page module's longest timer, twice (inPageTimerWindow). A move
+// and a move back cannot pass as stillness, since every frame is read.
+function scrollYAcrossWindow(page, ms) {
+  return page.evaluate((span) => new Promise((done) => {
+    const ys = [];
+    const start = performance.now();
+    const tick = () => {
+      ys.push(window.scrollY);
+      if (ys.length >= 30 && performance.now() - start >= span) done(ys);
+      else requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }), ms);
+}
+
+// The in-page module's longest timer (START_CAP_MS), twice, read from its source so the
+// window follows the module.
+function inPageTimerWindow() {
+  const source = require("fs").readFileSync(require("path").join(__dirname, "../app/javascript/studio/in_page_links.js"), "utf8");
+  return 2 * Number(source.match(/export const START_CAP_MS = (\d+)/)[1]);
+}
+
 module.exports = {
   watchPageErrors, expectStickyChromeIsLive, sampleAcrossFrames, blockOffsiteRequests,
-  scrolledTo, navAtRest, slidIn, transitionsDone,
+  scrolledTo, navAtRest, slidIn, transitionsDone, stackSettled,
+  watchInPageJumps, jumpEnded, traversed, scrollYAcrossWindow, inPageTimerWindow,
 };
