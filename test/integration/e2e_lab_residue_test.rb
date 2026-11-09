@@ -20,9 +20,14 @@ require "tmpdir"
 # WHAT THIS PROVES. The real boot script runs as its own process, serves the lab
 # (the favicon request still succeeds, which is why the lab writes one), and is
 # then stopped with SIGKILL: the harshest end a run can have, because no exit
-# handler runs. After that, test/dummy/public holds exactly what git tracks
-# there, which is nothing. A clean-up-on-exit fix fails this test; only a lab
-# that never writes into the folder passes it.
+# handler runs. After that, test/dummy/public holds no file the boot added, and
+# none of the paths the old lab wrote. A clean-up-on-exit fix fails this test;
+# only a lab that never writes into the folder passes it.
+#
+# A SNAPSHOT, NOT A COMPARISON WITH GIT. Git tracks nothing in that folder, but
+# three other suites (marketing_kit, link_preview, public_user_page) write a file
+# there and remove it in teardown. An interrupted run of one of them is not the
+# lab's residue, so this test compares the folder with itself before the boot.
 #
 # E2E_LAB_ROOT points the boot at a temporary folder, so this test does not
 # clear the folder or the database of a lab that a builder is running.
@@ -30,8 +35,11 @@ class E2eLabResidueTest < Minitest::Test
   ROOT = File.expand_path("../..", __dir__)
   DUMMY_PUBLIC = File.join(ROOT, "test", "dummy", "public")
   BOOT_DEADLINE = 240 # seconds; the first boot compiles Tailwind.
+  # What the lab wrote into test/dummy/public before it had its own folder.
+  LAB_WRITTEN = %w[favicon.png e2e images/state-flags].freeze
 
   def test_a_killed_lab_run_leaves_the_dummy_public_folder_as_git_has_it
+    before = files_in_dummy_public
     Dir.mktmpdir("e2e-lab-residue") do |lab_root|
       log = File.join(lab_root, "boot.log")
       port = free_port
@@ -48,15 +56,17 @@ class E2eLabResidueTest < Minitest::Test
         assert_equal "200", Net::HTTP.get_response(URI("http://127.0.0.1:#{port}/e2e/tailwind.css")).code,
                      "the lab must still serve its compiled CSS"
 
-        assert_equal tracked_files, files_in_dummy_public,
+        assert_empty files_in_dummy_public - before,
                      "the running lab wrote into test/dummy/public, the minitest suite's public folder"
       ensure
         stop(pid)
       end
 
-      assert_equal tracked_files, files_in_dummy_public,
+      assert_empty files_in_dummy_public - before,
                    "a killed lab run left files in test/dummy/public; they redden HeadScriptNonceTest"
-      refute File.exist?(File.join(DUMMY_PUBLIC, "favicon.png")), "the lab's favicon outlived the lab"
+      LAB_WRITTEN.each do |path|
+        refute File.exist?(File.join(DUMMY_PUBLIC, path)), "test/dummy/public/#{path} outlived the lab"
+      end
     end
   end
 
@@ -95,10 +105,6 @@ class E2eLabResidueTest < Minitest::Test
     Process.waitpid(pid)
   rescue Errno::ESRCH, Errno::ECHILD
     # Already gone and reaped.
-  end
-
-  def tracked_files
-    IO.popen(["git", "-C", ROOT, "ls-files", "--", "test/dummy/public"], &:read).split("\n").sort
   end
 
   def files_in_dummy_public
