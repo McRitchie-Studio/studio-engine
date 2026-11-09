@@ -1,7 +1,7 @@
 const { test, expect } = require("@playwright/test");
 const {
   watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive, scrolledTo, navAtRest,
-  watchInPageJumps, jumpEnded, traversed, scrollYAcrossFrames,
+  watchInPageJumps, jumpEnded, traversed, scrollYAcrossWindow, inPageTimerWindow,
 } = require("./helpers");
 
 // [e2e] THE SECTION HEADER (studio/_section_header, docs/PAGE_HEADER.md). Alex McRitchie,
@@ -26,6 +26,16 @@ const {
 // test/javascript/pinned_stack.test.mjs. Hub and Turf were checked by hand on this engine:
 // the lab's Turbo layout stops 30px short of the page's end, so the short last section
 // is left out of TABS here.
+//
+// THE WAITS READ REAL CONDITIONS (engine-anchor-scroll-waits): a tab's landing is the in-page
+// module's end event (jumpEnded) and the navbar at rest; a scroll to the top is the scroll
+// event heard at 0; Back is the place restored two frames after its popstate (traversed),
+// which holds when Back does not move. Two checks stay negative proofs, each over every frame
+// of the module's own timer window (twice START_CAP_MS): nothing moves after Back, and the
+// reader's scroll right after a jump holds. Controls, each red under the new spec: the end
+// event never sent, red 3/3; Back's restore smooth or removed, red; a late aim 300ms after
+// the end, red 2/2; the stuck bar never set, red (inner target); no tab highlighted, red
+// (load with a hash).
 
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
@@ -172,11 +182,11 @@ async function backKeepsPlace(page, url) {
   const held = await traversed(page, () => page.goBack());
   expect(await page.evaluate(() => location.hash)).toBe("#tricks");
   expect(held, "Back left the jump's place").toBeLessThan(before);
-  // Back starts no jump, so none is left to end. Then every frame of the navbar's collapse
-  // and thirty more read the same place.
+  // Back starts no jump, so none is left to end. What stays is a negative proof: every frame
+  // of the module's own timer window reads the same place.
   await jumpEnded(page, 2);
   await navAtRest(page);
-  expect(new Set(await scrollYAcrossFrames(page)), "nothing moves the page after Back settles").toEqual(new Set([held]));
+  expect(new Set(await scrollYAcrossWindow(page, inPageTimerWindow())), "nothing moves the page after Back settles").toEqual(new Set([held]));
 }
 async function scrollHolds(page, url) {
   await blockOffsiteRequests(page);
@@ -186,15 +196,13 @@ async function scrollHolds(page, url) {
   await page.waitForFunction(() => document.documentElement.hasAttribute("data-pin-live"));
   await styleRow(page).locator("a", { hasText: "Modals" }).click();
   await page.waitForFunction(() => location.hash === "#modals");
-  await landed(page, 1);
+  // Right after the jump's end: its scrollend after the last aim.
+  await jumpEnded(page, 1);
   await page.evaluate(() => window.scrollBy({ top: -300, behavior: "instant" }));
   const held = await page.evaluate(() => window.scrollY);
-  // A jump still running would aim again on this scroll. The module is done once every jump
-  // it started has ended; after that it listens for nothing. Then thirty frames hold.
-  await jumpEnded(page, 1);
-  await navAtRest(page);
-  expect(await page.evaluate(() => window.scrollY)).toBe(held);
-  expect(new Set(await scrollYAcrossFrames(page)), "the reader's scroll holds").toEqual(new Set([held]));
+  // A negative proof: nothing fires for a move that does not happen, so every frame of the
+  // module's own timer window must read the reader's place.
+  expect(new Set(await scrollYAcrossWindow(page, inPageTimerWindow())), "the reader's scroll holds").toEqual(new Set([held]));
 }
 test("a tab's jump shows the section's title under the row, on the right bar and tab, without Turbo", async ({ page }) => tabJump(page, STYLE));
 test("a tab's jump shows the section's title under the row, on the right bar and tab, under Turbo", async ({ page }) => tabJump(page, `${STYLE}?turbo=1`));

@@ -1,7 +1,7 @@
 const { test, expect } = require("@playwright/test");
 const {
   watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive, navAtRest,
-  watchInPageJumps, traversed, scrollYAcrossFrames,
+  watchInPageJumps, traversed, scrollYAcrossWindow, inPageTimerWindow,
 } = require("./helpers");
 
 // [e2e] IN-PAGE LINKS (studio/in_page_links, docs/PAGE_HEADER.md "In-page links"). Alex
@@ -18,6 +18,15 @@ const {
 // five Turbo visits, reduced motion on its visit, and the Turbo-free page on the frames
 // mid-scroll (none: a cut). The highlight and cross-page tests stay green: an instant jump
 // passes no tab, and a cross-page link is Turbo's either way.
+//
+// THE WAITS READ REAL CONDITIONS (engine-anchor-scroll-waits). A click settles at the module's
+// own end event (its scrollend after the last aim), or, with the module gone, at the Turbo
+// visit's turbo:load or the browser's scrollend; then the navbar at rest. Back and Forward
+// read the place they restored two frames after their popstate (helpers traversed), since a
+// Back that does not move fires no scroll and no scrollend. Controls, each red under the new
+// spec: the module's end event never sent, red 3/3 (the old 1s fallback hid it: 2 of 3 green);
+// the install line removed, red 4/6 on the assertions above; Back's restore smooth, red; Back's
+// restore removed, red at once on the place, not a hang.
 
 const DESKTOP = { width: 1280, height: 800 };
 const TURBO = "/lab/style_chrome?turbo=1&direction=left";
@@ -169,7 +178,7 @@ test("Back returns to where the reader was, and Forward to the section, with no 
   const moves = (await seen(page)).moves;
   expect(await traversed(page, () => page.goBack()), "Back to the place held: the top").toBe(0);
   expect(await page.evaluate(() => location.hash)).toBe("");
-  expect(new Set(await scrollYAcrossFrames(page)), "the page holds the top").toEqual(new Set([0]));
+  expect(new Set(await scrollYAcrossWindow(page, inPageTimerWindow())), "the page holds the top").toEqual(new Set([0]));
   expect((await seen(page)).moves, "the Back moved nothing").toBe(moves);
 
   const result = await seen(page);

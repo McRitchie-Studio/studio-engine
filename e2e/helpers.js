@@ -223,14 +223,32 @@ async function traversed(page, go) {
   }));
 }
 
-// Every scrollY across `frames` frames, from the next one on. A check that the page holds its
-// place reads each frame, so a move and a move back cannot pass as stillness.
-function scrollYAcrossFrames(page, frames = 30) {
-  return sampleAcrossFrames(page, { perturb: () => {}, read: () => window.scrollY, frames });
+// A NEGATIVE PROOF, so it has a window: every scrollY, each frame, for at least `ms` and at
+// least 30 frames. Nothing fires for a move that does not happen, so the window is the app's
+// own: callers pass the in-page module's longest timer, twice (inPageTimerWindow). A move
+// and a move back cannot pass as stillness, since every frame is read.
+function scrollYAcrossWindow(page, ms) {
+  return page.evaluate((span) => new Promise((done) => {
+    const ys = [];
+    const start = performance.now();
+    const tick = () => {
+      ys.push(window.scrollY);
+      if (ys.length >= 30 && performance.now() - start >= span) done(ys);
+      else requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }), ms);
+}
+
+// The in-page module's longest timer (START_CAP_MS), twice, read from its source so the
+// window follows the module.
+function inPageTimerWindow() {
+  const source = require("fs").readFileSync(require("path").join(__dirname, "../app/javascript/studio/in_page_links.js"), "utf8");
+  return 2 * Number(source.match(/export const START_CAP_MS = (\d+)/)[1]);
 }
 
 module.exports = {
   watchPageErrors, expectStickyChromeIsLive, sampleAcrossFrames, blockOffsiteRequests,
   scrolledTo, navAtRest, slidIn, transitionsDone,
-  watchInPageJumps, jumpEnded, traversed, scrollYAcrossFrames,
+  watchInPageJumps, jumpEnded, traversed, scrollYAcrossWindow, inPageTimerWindow,
 };
