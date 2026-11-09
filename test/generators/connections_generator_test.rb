@@ -40,6 +40,8 @@ class ConnectionsGeneratorTest < Rails::Generators::TestCase
 
     body = File.read(File.join(destination_root, "config/initializers/studio_connections.rb"))
     assert_includes body, "Studio.define_connection :files"
+    assert_includes body, "Studio.enable_integration :quickbooks"
+    assert(body.lines.grep(/enable_integration/).all? { _1.lstrip.start_with?("#") }, "the integration line is a comment too")
     assert(body.lines.grep(/define_connection/).all? { _1.lstrip.start_with?("#") }, "every provider line is a comment")
     assert_match(/account_format: \/\\A\\d\{1,20\}\\z\//, body, "the example's regexp survives the heredoc")
   end

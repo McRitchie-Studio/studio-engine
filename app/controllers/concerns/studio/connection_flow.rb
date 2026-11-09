@@ -49,7 +49,7 @@ module Studio
       account = nil
       if provider.account_source == :connect
         account = provider.normalize_account(params[provider.account_param]) or
-          return redirect_to(back, alert: "That is not a #{provider.label} account. Check what you entered, then press Connect again.")
+          return redirect_to(back, alert: "That is not a valid #{provider.label} account. Check what you entered, then press Connect again.")
       end
       url = provider.authorize_url(redirect_uri: connection_callback_url, state: new_connection_state, account:)
       session[connection_session_key(:account)] = account

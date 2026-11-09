@@ -1,0 +1,1 @@
+- **Connect's refusal of a mistyped account now reads "That is not a valid <label> account."** It read "not a Egnyte account" for a label that starts with a vowel. A host test that matched the old text matches the new one.

@@ -1,10 +1,15 @@
 # Connections
 
 Generic tooling to connect a third-party account to a host app over OAuth 2.0.
-The engine knows no provider. A host declares each provider it connects, and the
+The tooling knows no provider. A host declares each provider it connects, and the
 engine gives it the table, the OAuth plumbing, the admin actions, the routes and
 the log filter. Provider details (endpoints, scopes, quirks, readers and the admin
 page's live read) stay in the host.
+
+The engine also ships ready connection definitions for QuickBooks, Egnyte and
+Microsoft 365, built on this tooling, and an admin page for them:
+[`INTEGRATIONS.md`](INTEGRATIONS.md). A host enables one with
+`Studio.enable_integration` instead of declaring it here.
 
 | Part | What it is |
 |------|------------|
@@ -87,6 +92,7 @@ stand-in is installed.
 | `rate_limited_statuses:` | `[429]` | These statuses raise `RateLimited`. |
 | `filter_keys:` | `[]` | Request keys kept out of the logs by exact key (see Logs). |
 | `revoke_note:` | generic | Shown when the provider cannot or did not confirm a revoke. |
+| `trace_header:` | `nil` | A response header that names each call for the provider's support (Intuit's `intuit_tid`). It is read from every token, refresh and revoke answer, logged with the call (`[studio_connection] provider=… call=… status=… <header>=…`, never a token), kept as `provider.last_trace_id`, and put on every error the call raises: `error.trace_id`, and `[<header>: <id>]` at the end of its message, so the error log and the page carry it. A host reader calls `provider.record_trace(response, call: "read", status:)` on its own answers. A stand-in may answer `[status, body, { "<header>" => "…" }]`. |
 
 ### Refresh policies
 

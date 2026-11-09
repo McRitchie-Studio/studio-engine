@@ -9,7 +9,7 @@ require "set"
 
 module Studio
   # CONNECTIONS: the generic tooling a host app uses to connect a third-party
-  # account over OAuth 2.0 (docs/CONNECTIONS.md). The engine knows no provider.
+  # account over OAuth 2.0 (docs/CONNECTIONS.md). The tooling knows no provider.
   # A host declares each one in an initializer, and the engine gives it:
   #
   #   * Studio::Connection, one table (studio_connections) holding one row per
@@ -30,7 +30,8 @@ module Studio
   #     account: :connect, account_param: "domain", account_format: /\A[a-z0-9-]{1,63}\z/
   #
   # Provider specifics (endpoints, scopes, quirks, readers, the admin page's
-  # live read) belong to the host. Nothing here is named after a vendor.
+  # live read) belong to the host. Nothing in this file is named after a vendor:
+  # the engine's own definitions live in Studio::Integrations (docs/INTEGRATIONS.md).
   module Connections
     # What reaching a provider can raise below HTTP: TLS, refused, timed out, DNS.
     NETWORK_ERRORS = [OpenSSL::SSL::SSLError, SocketError, SystemCallError, Net::OpenTimeout, Net::ReadTimeout].freeze
@@ -38,7 +39,18 @@ module Studio
     ENCRYPTION_ENV = %w[ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY
                         ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT].freeze
 
-    class Error < StandardError; end
+    # Every refusal below. A provider that names a trace_header (Intuit's
+    # intuit_tid) puts the answering call's trace id on the error: as #trace_id,
+    # and in the message, so the error log and the page carry it. Never a token.
+    class Error < StandardError
+      attr_reader :trace_header, :trace_id
+
+      def initialize(message = nil, trace_header: nil, trace_id: nil)
+        @trace_header = trace_header
+        @trace_id = trace_id.to_s.strip.presence
+        super(@trace_id && message ? "#{message} [#{@trace_header}: #{@trace_id}]" : message)
+      end
+    end
     # The provider's client id or secret is not set on this server.
     class NotConfigured < Error; end
     # The provider no longer honours the stored grant: revoked, expired, superseded.
@@ -175,7 +187,7 @@ module Studio
                   :revoke_format, :account_source, :account_param, :account_format, :private_account,
                   :authorize_params, :exchange_params, :rotation, :refresh_expires_in_key, :declined_errors,
                   :refusal_hint, :revoked_errors, :revoked_pattern, :rate_limited_statuses, :filter_keys,
-                  :revoke_note, :callback_check, :describe
+                  :revoke_note, :callback_check, :describe, :trace_header
 
       # Stand-in for the provider's token and revoke endpoints:
       # (url, form, headers) -> [status, body]. nil means the provider itself.
@@ -195,7 +207,7 @@ module Studio
                      rotation: nil, refresh_expires_in_key: nil, declined_errors: %w[access_denied],
                      refusal_hint: "Check the app's redirect URI, then start again.", revoked_errors: %w[invalid_grant],
                      revoked_pattern: nil, rate_limited_statuses: [429], filter_keys: [], revoke_note: nil,
-                     callback_check: nil, describe: nil)
+                     callback_check: nil, describe: nil, trace_header: nil)
         @key = key.to_s
         raise ArgumentError, "a connection key is lower-case letters, digits and underscores: #{@key.inspect}" unless @key.match?(/\A[a-z][a-z0-9_]*\z/)
 
@@ -240,6 +252,10 @@ module Studio
         @revoke_note = revoke_note || "Remove this app's access in #{@label} to revoke it there."
         @callback_check = callback_check
         @describe = describe
+        # A response header naming the call for the provider's support (Intuit:
+        # intuit_tid). Read from every token, refresh and revoke answer, logged
+        # with the call, kept as #last_trace_id and put on every error raised.
+        @trace_header = trace_header&.to_s
         @cache = {}
         @cache_lock = Mutex.new
       end
@@ -349,6 +365,27 @@ module Studio
         @cache_lock.synchronize { account ? @cache.delete(account.to_s.downcase) : @cache.clear }
       end
 
+      # The trace_header value of this thread's latest call to the provider, or nil.
+      def last_trace_id = (Thread.current[:studio_connection_traces] ||= {})[key]
+
+      # Reads trace_header from a response's headers (a Hash or a Net::HTTPResponse),
+      # remembers it as last_trace_id, and logs it with the call (no token, no body).
+      # Host readers call it on their own responses too.
+      def record_trace(headers, call:, status:)
+        return nil unless trace_header
+
+        value = case headers
+                when Hash then headers.find { |name, _| name.to_s.casecmp?(trace_header) }&.last
+                else headers.respond_to?(:[]) ? headers[trace_header] : nil
+                end
+        value = Array(value).first.to_s.strip.presence
+        (Thread.current[:studio_connection_traces] ||= {})[key] = value
+        if defined?(::Rails) && ::Rails.respond_to?(:logger) && ::Rails.logger
+          ::Rails.logger.info("[studio_connection] provider=#{key} call=#{call} status=#{status} #{trace_header}=#{value || '-'}")
+        end
+        value
+      end
+
       # How many accounts have a token cached in this process (:memory).
       def cached_count = @cache_lock.synchronize { @cache.size }
 
@@ -433,22 +470,24 @@ module Studio
         when :secret_only then form = form.merge(client_secret:)
         when :basic then headers["Authorization"] = "Basic #{Base64.strict_encode64("#{client_id}:#{client_secret}")}"
         end
-        status, body = call(url, form, headers)
+        status, body, answered = call(url, form, headers)
+        trace = record_trace(answered, call: form.key?(:token) ? "revoke" : form[:grant_type].to_s, status:)
         json = parse(body)
         # A revoke (allow_empty) is confirmed by any 2xx, a 204 included; a token answer must be a 200 with a body.
         return json if allow_empty ? (200..299).cover?(status) : (status == 200 && json.any?)
 
-        raise_for(status, json)
+        raise_for(status, json, trace)
       end
 
-      def raise_for(status, json)
+      def raise_for(status, json, trace = nil)
         detail = json["error_description"].to_s.lines.first.to_s.strip
         detail = (json["error"] || json["message"] || json["errorMessage"]).to_s if detail.empty?
         detail = "no detail" if detail.empty?
-        raise RateLimited, "#{label} is throttling this app (#{status}); try again in a few minutes" if rate_limited_statuses.include?(status)
-        raise Revoked, "#{label} no longer accepts this connection (#{detail}); connect again" if revoked?(status, json, detail)
+        traced = { trace_header:, trace_id: trace }
+        raise RateLimited.new("#{label} is throttling this app (#{status}); try again in a few minutes", **traced) if rate_limited_statuses.include?(status)
+        raise Revoked.new("#{label} no longer accepts this connection (#{detail}); connect again", **traced) if revoked?(status, json, detail)
 
-        raise Error, "#{label} answered #{status}: #{detail}"
+        raise Error.new("#{label} answered #{status}: #{detail}", **traced)
       end
 
       def revoked?(status, json, detail)
@@ -464,6 +503,8 @@ module Studio
         {}
       end
 
+      # [status, body, response headers]. A stand-in may answer [status, body]
+      # or [status, body, { "header" => "value" }].
       def call(url, form, headers)
         return http.call(url, form, headers) if http
 
@@ -474,7 +515,7 @@ module Studio
         headers.each { |name, value| request[name] = value }
         request.body = headers["Content-Type"] == "application/json" ? JSON.generate(form) : URI.encode_www_form(form)
         response = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 10, read_timeout: 20) { _1.request(request) }
-        [response.code.to_i, response.body]
+        [response.code.to_i, response.body, response]
       rescue *NETWORK_ERRORS => e
         raise Error, "#{label} could not be reached: #{e.class}"
       end
