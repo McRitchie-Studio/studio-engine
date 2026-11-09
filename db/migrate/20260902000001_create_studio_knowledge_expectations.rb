@@ -5,7 +5,8 @@
 #
 # STYLE NOTE: reference migrations are written omakase-rubocop-compatible
 # (spaces inside array brackets) because the installed copy is linted by the
-# CONSUMER's rubocop, not this gem's.
+# CONSUMER's rubocop. test/lib/migrations_host_lint_test.rb runs that omakase
+# config over db/migrate, so a lint-red migration fails here first.
 class CreateStudioKnowledgeExpectations < ActiveRecord::Migration[7.2]
   def change
     create_table :studio_knowledge_expectations do |t|
