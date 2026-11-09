@@ -110,8 +110,8 @@ async function expectNoSideScroll(page) {
   expect(scroll, "no horizontal page scroll").toBeLessThanOrEqual(inner);
 }
 
-for (const theme of ["dark", "light"]) {
-  test(`${theme}: five in view, the middle card in front and on top, the rest hidden`, async ({ page }) => {
+// The lane's census counts bare test( declarations, so each theme is its own spec.
+async function expectFiveInView(page, theme) {
     await page.setViewportSize(DESKTOP);
     const errors = await open(page, { theme });
     expect(await page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(theme === "dark");
@@ -130,8 +130,15 @@ for (const theme of ["dark", "light"]) {
     await expect(region(page).locator(".carousel-dot:visible")).toHaveCount(7);
     await expectNoSideScroll(page);
     expect(errors).toEqual([]);
-  });
 }
+
+test("dark: five in view, the middle card in front and on top, the rest hidden", async ({ page }) => {
+  await expectFiveInView(page, "dark");
+});
+
+test("light: five in view, the middle card in front and on top, the rest hidden", async ({ page }) => {
+  await expectFiveInView(page, "light");
+});
 
 test("the arrows and the dots move the stack, and the status line says where", async ({ page }) => {
   await page.setViewportSize(DESKTOP);
