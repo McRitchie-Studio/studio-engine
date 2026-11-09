@@ -1,0 +1,22 @@
+<%# /admin/integrations: every integration the host enabled
+    (Studio.enable_integration), with its status and Connect
+    (Studio::IntegrationsController#index). %>
+<% content_for(:title, "Integrations") %>
+<div class="max-w-4xl mx-auto px-4 py-6" data-studio-integrations>
+  <%= render "studio/page_header", title: "Integrations" %>
+  <p class="text-sm text-secondary mt-1 mb-6">Connect an account once. Each integration's page shows its connections and what this app reads.</p>
+
+  <% if @integrations.empty? %>
+    <div class="empty-state">
+      <p class="text-heading font-semibold mb-1">No integrations enabled</p>
+      <p class="text-sm text-muted">Enable one with <code>Studio.enable_integration</code>; see the engine's docs/INTEGRATIONS.md.</p>
+    </div>
+  <% else %>
+    <div class="grid gap-4">
+      <% @integrations.each do |integration| %>
+        <%= render "studio/integrations/card", integration:, connections: integration.connections,
+                                               return_to: integrations_index_path, linked: true %>
+      <% end %>
+    </div>
+  <% end %>
+</div>

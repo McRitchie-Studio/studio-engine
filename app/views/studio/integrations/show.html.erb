@@ -1,0 +1,24 @@
+<%# /admin/integrations/<key>: one enabled integration, its connections and
+    Disconnect, the redirect URI to register, and the host's own panel
+    (Studio.enable_integration panel:), rendered with locals integration: and
+    connections: (Studio::IntegrationsController#show). %>
+<% content_for(:title, @integration.label) %>
+<div class="max-w-4xl mx-auto px-4 py-6" data-studio-integration="<%= @integration.key %>">
+  <%= render "studio/page_header", title: @integration.label %>
+  <p class="text-sm mt-1 mb-6"><a href="<%= integrations_index_path %>" class="text-secondary hover:underline">All integrations</a></p>
+
+  <%= render "studio/integrations/card", integration: @integration, connections: @connections,
+                                         return_to: integration_path_for(@integration), linked: false %>
+
+  <div class="card p-4 mt-4" data-studio-integration-redirect>
+    <p class="label-upper mb-1">Redirect URI</p>
+    <p class="text-sm text-secondary mb-2">Register this exact URL on the <%= @integration.label %> app as its redirect (callback) URI.</p>
+    <code class="text-sm break-all"><%= integration_callback_url(@integration) %></code>
+  </div>
+
+  <% if @integration.panel %>
+    <div class="mt-6" data-studio-integration-panel>
+      <%= render partial: @integration.panel, locals: { integration: @integration, connections: @connections } %>
+    </div>
+  <% end %>
+</div>

@@ -77,6 +77,10 @@ require "studio/redis"
 require "studio/cable"
 require "studio/connections"
 require "studio/connections/stand_in"
+require "studio/integrations"
+require "studio/integrations/quickbooks"
+require "studio/integrations/egnyte"
+require "studio/integrations/microsoft_365"
 require "studio/survey"
 require "studio/survey/breakdown"
 require "studio/survey/export"
@@ -1256,6 +1260,58 @@ module Studio
       match "#{path}/connect", to: "#{controller}#connect", as: "#{as}_connect", via: connect_via, defaults: defaults
       get "#{path}/callback", to: "#{controller}#callback", as: "#{as}_callback", defaults: defaults
       delete "#{path}/connections/:id", to: "#{controller}#disconnect", as: "#{as}_disconnect", defaults: defaults
+    end
+  end
+
+  # ---- Integrations (docs/INTEGRATIONS.md) -----------------------------------
+  #
+  # The engine's own connection definitions (Studio::Integrations): QuickBooks,
+  # Egnyte and Microsoft 365. Connection only; a host writes its readers.
+  #
+  #   # config/initializers/studio_integrations.rb
+  #   Studio.enable_integration :quickbooks,
+  #     env: { client_id: "INTUIT_CLIENT_ID", client_secret: "INTUIT_CLIENT_SECRET", environment: "INTUIT_ENVIRONMENT" },
+  #     panel: "admin/integrations/quickbooks_panel"
+  #   # config/routes.rb
+  #   Studio.draw_integrations_routes(self)
+  #
+  # env: names the host's env vars (never values); the integration stays off
+  # until its client id and secret are set. panel: a host partial rendered on
+  # the integration's page with locals integration: and connections:.
+  def self.enable_integration(key, env:, panel: nil, label: nil, scopes: nil)
+    Integrations.enable(key, env:, panel:, label:, scopes:)
+  end
+
+  def self.integration(key)
+    Integrations.fetch(key)
+  end
+
+  def self.integrations
+    Integrations.all
+  end
+
+  # Draws the admin integrations page and, for every enabled integration, its
+  # page and connection routes (Studio.draw_connection_routes), all served by
+  # Studio::IntegrationsController unless the host names its own:
+  #
+  #   GET    /<path>                            <as>                    the list
+  #   GET    /<path>/<key>                      <as>_<key>              one integration's page
+  #   POST   /<path>/<key>/connect              <as>_<key>_connect      (also GET when it takes no account at Connect)
+  #   GET    /<path>/<key>/callback             <as>_<key>_callback     the redirect URI to register
+  #   DELETE /<path>/<key>/connections/:id      <as>_<key>_disconnect
+  #
+  # path: defaults to admin/integrations, so QuickBooks's redirect URI is
+  # /admin/integrations/quickbooks/callback. Call it after every
+  # enable_integration (an initializer runs before the routes load).
+  def self.draw_integrations_routes(router, path: "admin/integrations", controller: "studio/integrations", as: nil)
+    path = path.to_s.delete_prefix("/").delete_suffix("/")
+    controller = controller.to_s.delete_prefix("/")
+    as = (as || path.tr("/-", "__")).to_s
+    Integrations.mount_path = path
+    router.instance_exec { get path, to: "#{controller}#index", as: as }
+    Integrations.all.each do |integration|
+      draw_connection_routes(router, integration.key, path: "#{path}/#{integration.key}", controller:, as: "#{as}_#{integration.key}",
+                                                      show: true, return_to: ["/#{path}/#{integration.key}", "/#{path}"])
     end
   end
 
