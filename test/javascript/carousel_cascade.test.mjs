@@ -102,7 +102,7 @@ test("autoplay steps one slide on, round a looping set, and stops at the end of 
   assert.equal(autoplayStop(6, 7, true), 0)
 })
 
-const { CHANGE_EVENT, changeDetail, clickedSlide } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
+const { CHANGE_EVENT, changeDetail, clickedSlide, markedSlide } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 test("the change event is named once and documented", () => {
   assert.equal(CHANGE_EVENT, "studio:carousel:change")
@@ -120,6 +120,26 @@ test("no change, no detail: the same slide, an index off the set, or no slides",
   assert.equal(changeDetail(0, -1, ["a", "b"]), null)
   assert.equal(changeDetail(0, Number.NaN, ["a", "b"]), null)
   assert.equal(changeDetail(null, 0, []), null)
+})
+
+// A slide stand-in: the attributes it carries.
+const slide = (...names) => ({ hasAttribute: (name) => names.includes(name) })
+
+test("the marked slide is the real slide carrying data-current, counted among the real slides", () => {
+  assert.equal(markedSlide([slide(), slide(), slide("data-current"), slide()]), 2)
+  assert.equal(markedSlide([slide("data-current")]), 0)
+})
+
+test("a looping row's copies are not counted, even one that carries the mark", () => {
+  const copy = (...names) => slide("data-carousel-clone", ...names)
+  assert.equal(markedSlide([copy(), copy(), slide(), slide("data-current"), copy()]), 1)
+  assert.equal(markedSlide([copy("data-current"), slide(), slide()]), -1)
+})
+
+test("no mark, no slide: a standard row, or no slides at all", () => {
+  assert.equal(markedSlide([slide(), slide()]), -1)
+  assert.equal(markedSlide([]), -1)
+  assert.equal(markedSlide(null), -1)
 })
 
 test("a click with no press (Enter on a link) is the slide it lands in, whatever a press left", () => {

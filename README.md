@@ -464,7 +464,7 @@ grid cell. The engine's `carousel-captions` controller (lazy) marks the open one
   <% end %>
   <div class="grid pt-4 text-center">
     <% @apps.each_with_index do |app, index| %>
-      <div class="col-start-1 row-start-1 opacity-0 invisible transition-opacity data-current:opacity-100 data-current:visible"
+      <div class="col-start-1 row-start-1 opacity-0 invisible transition-opacity motion-reduce:transition-none data-current:opacity-100 data-current:visible"
            data-carousel-captions-target="caption"<%= " data-current".html_safe if index.zero? %><%= ' aria-hidden="true"'.html_safe unless index.zero? %>>
         <h2 class="type-h4 text-heading"><%= app.name %></h2>
         <p class="text-sm text-secondary"><%= app.blurb %></p>
@@ -475,10 +475,27 @@ grid cell. The engine's `carousel-captions` controller (lazy) marks the open one
 ```
 
 The server marks the caption of the slide the row opens on (`start:`; index 0 for a
-looping row). The ring keys on `data-current`, which the cascade and the spotlight set on
-the open slide (`in-data-current:` matches the card inside it). The row's status line
+looping row). Both controllers load lazily, so a row that opens elsewhere (a `#fragment`)
+may announce it before the captions connect: `carousel-captions` reads the row's open slide
+(`data-current`) when it connects, then follows the change event. The ring keys on
+`data-current`, which the cascade and the spotlight set on the open slide
+(`in-data-current:` matches the card inside it). The row's status line
 already says which slide is open, so the caption stack is not a live region. A host that
 needs more than a caption listens for `studio:carousel:change` itself.
+
+**One row per caption wrapper.** The captions follow the wrapper's own row: the region
+marked `data-carousel-captions-target="carousel"` (pass `data: { carousel_captions_target:
+"carousel" }` to the partial), else the first carousel inside the wrapper. A change event
+from any other row inside it moves nothing. Keep the caption fade's
+`motion-reduce:transition-none`: under reduced motion the caption swaps at once, as the
+stack does.
+
+**A shadow under a narrow stack.** A narrow region's cascade fades its side cards at the
+track's edge with a mask, and a mask paints only inside the track's box. The track keeps
+`--carousel-cascade-shadow-room` (2.5rem, Tailwind's `shadow-xl`) of room under the cards
+for the open card's shadow and gives it back with a negative margin, so nothing moves. A
+deeper shadow (`shadow-2xl`) raises it: `[--carousel-cascade-shadow-room:4rem]` on the
+partial's `class_name:`.
 
 ### The "at" time stamp — `at_time_tag`
 

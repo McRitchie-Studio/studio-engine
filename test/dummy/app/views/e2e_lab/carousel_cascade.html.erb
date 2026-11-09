@@ -10,8 +10,8 @@
     the open card wears a ring, and one caption under the stack follows the open
     card on the carousel's change event (studio:carousel:change); each card has an
     id (portfolio-app-<n>), so a #fragment opens the row on it. "scoped" is a
-    caption wrapper holding two rows: the captions follow the first ("scoped"),
-    never the second ("scoped-other").
+    caption wrapper holding two rows: the captions follow the one marked as their
+    carousel target ("scoped"), never the first row ("scoped-other").
     window.__carouselChanges logs every change event on the page. %>
 <% cards = (1..7).to_a %>
 <% picture = lambda do |n| %>
@@ -76,13 +76,18 @@
     </div>
   </div>
 
-  <%# ONE CAROUSEL PER CAPTION WRAPPER. The captions follow the wrapper's own row (its
-      carousel target, else the first row inside it); a second row inside the same
-      wrapper moves nothing here. %>
+  <%# ONE CAROUSEL PER CAPTION WRAPPER. The captions follow the wrapper's own row: its
+      carousel target here (the portfolio stage above takes the default, the first row
+      inside it). The other row inside the same wrapper moves nothing. %>
   <div data-studio-controller="carousel-captions" data-lab-stage="scoped">
     <%= render layout: "studio/carousel",
+          locals: { label: "Scoped other", items: cards.first(3), style: :cascade, start: 0, dots: false,
+                    slide_label: ->(n) { "Other #{n}" }, data: { lab: "scoped-other" } } do |n| %>
+      <%= capture { card.call(n, "other") } %>
+    <% end %>
+    <%= render layout: "studio/carousel",
           locals: { label: "Scoped", items: cards.first(3), style: :cascade, start: 0, dots: false,
-                    slide_label: ->(n) { "Scoped #{n}" }, data: { lab: "scoped" } } do |n| %>
+                    slide_label: ->(n) { "Scoped #{n}" }, data: { lab: "scoped", carousel_captions_target: "carousel" } } do |n| %>
       <%= capture { card.call(n, "scoped") } %>
     <% end %>
     <div class="grid pt-4 text-center">
@@ -91,11 +96,6 @@
            data-carousel-captions-target="caption"<%= " data-current".html_safe if index.zero? %><%= ' aria-hidden="true"'.html_safe unless index.zero? %>>Scoped caption <%= n %></p>
       <% end %>
     </div>
-    <%= render layout: "studio/carousel",
-          locals: { label: "Scoped other", items: cards.first(3), style: :cascade, start: 0, dots: false,
-                    slide_label: ->(n) { "Other #{n}" }, data: { lab: "scoped-other" } } do |n| %>
-      <%= capture { card.call(n, "other") } %>
-    <% end %>
   </div>
 </main>
 
