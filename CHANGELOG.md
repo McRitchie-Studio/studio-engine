@@ -4,6 +4,19 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.141.0 — 2026-11-09
+
+### Changed
+
+- **The shared reveal waits need a selector.** `revealed`, `settled` and `arrivalSettled` in `e2e_helpers.js` now refuse a call with no selector. Right after a click the old page is still the document and has revealed too, so a wait with nothing of the new page's to find first read the old page and returned at once. Pass a selector that only the new page has.
+
+### Fixed
+
+- **A caption stage opened on a `#fragment` shows the open slide's caption.** Both carousel controllers load lazily, so a row could open on the fragment's slide and announce it before `carousel-captions` listened, leaving the first slide's caption up. The captions controller now reads the row's open slide (`data-current`, a looping row's copies not counted: `studio/carousel` `markedSlide`) when it connects, then follows `studio:carousel:change`. Nothing to change in a host.
+- **A caption wrapper follows only its own row.** A change event from a second carousel inside the wrapper moved its captions. The captions now follow the row marked `data-carousel-captions-target="carousel"`, else the first carousel inside the wrapper; the README says one row per caption wrapper.
+- **A narrow cascade no longer cuts the open card's shadow.** The narrow region's edge mask paints only inside the track's box, so a `shadow-xl` under the front card ended in a hard line at phone width. The track now keeps `--carousel-cascade-shadow-room` (2.5rem) under the cards and gives it back with a negative margin, so nothing moves, and the controls over that room keep their presses. A deeper shadow raises the variable.
+- **The image-only pattern respects reduced motion.** The README pattern and the style guide specimen carry `motion-reduce:transition-none` on each caption and on the card ring; copy it into a host's markup.
+
 ## 0.140.0 — 2026-11-09
 
 ### Fixed
