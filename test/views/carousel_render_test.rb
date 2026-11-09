@@ -505,4 +505,33 @@ class CarouselRenderTest < Minitest::Test
     assert_equal BYTE_IDENTITY_DIGESTS, digests
   end
 
+  # dots: false draws no dot group on any style: nothing for Tab or a screen
+  # reader to meet. The arrows, the status line and the slides stay.
+  def test_dots_false_draws_no_dots_on_any_style
+    %i[standard spotlight cascade].each do |style|
+      doc = render_carousel(items: SEVEN, style: style, dots: false)
+
+      assert_nil doc.at_css(".carousel-dots"), "#{style}: no dot group"
+      assert_empty doc.css("[data-carousel-target='dot']"), "#{style}: no dot targets"
+      assert_equal 2, doc.css(".carousel-arrows > [data-carousel-target='prev'], .carousel-arrows > [data-carousel-target='next']").size, "#{style}: arrows stay"
+      assert doc.at_css("[data-carousel-target='status'][role='status']"), "#{style}: the status line stays"
+      assert_equal 7, doc.css(".carousel-slide").size
+      focusable = doc.css("button, a, [tabindex]").reject { |el| el["tabindex"] == "-1" }
+      assert focusable.none? { |el| el["class"].to_s.include?("carousel-dot") }, "#{style}: no dot in the tab order"
+    end
+  end
+
+  # dots: true is the default: passing it renders byte for byte what leaving it out does.
+  def test_dots_true_renders_as_leaving_dots_out
+    BYTE_IDENTITY.each do |items, locals|
+      assert_equal raw(items, locals), raw(items, locals.merge(dots: true)), "dots: true on #{locals.inspect}"
+    end
+  end
+
+  def test_dots_false_keeps_the_rest_of_the_output
+    without = raw(SEVEN, { style: :cascade, loop: true, dots: false })
+    with = raw(SEVEN, { style: :cascade, loop: true })
+
+    assert_equal with.sub(%r{\s*<div class="carousel-dots".*?</div>\n}m, "\n"), without
+  end
 end

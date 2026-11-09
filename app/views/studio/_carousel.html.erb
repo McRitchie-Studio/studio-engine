@@ -1,4 +1,4 @@
-<%# locals: (label:, items:, per_view: 3, id: nil, slide_label: nil, data: {}, class_name: nil, style: :standard, caption: nil, start: nil, autoplay: nil, loop: false, visible: nil) %>
+<%# locals: (label:, items:, per_view: 3, id: nil, slide_label: nil, data: {}, class_name: nil, style: :standard, caption: nil, start: nil, autoplay: nil, loop: false, visible: nil, dots: true) %>
 <%# THE CAROUSEL: one sideways row of slides, the apps' standard for a set too
     long to grid. Render it as a layout, so each slide is your own block:
 
@@ -51,6 +51,9 @@
                    so a screen reader and Tab meet each slide once, a #fragment
                    finds the real slide, and the dots and "slide N of M" count the
                    real slides. Every slide of a looping row is a stop.
+      dots         true (the default) draws a dot per slide under the row; false
+                   draws none, so the row has no dot group in the tab order or the
+                   accessibility tree. The arrows, keys, swipe and status line stay.
       autoplay     seconds between moves (a number above 0); nil, the default, is
                    off. The row moves one slide each interval and holds still while
                    the pointer is over the slides, while keyboard focus is in it,
@@ -164,6 +167,7 @@
     <% end %>
   </div>
   <div class="carousel-controls">
+    <% if dots %>
     <div class="carousel-dots" role="group" aria-label="Choose a slide">
       <% total.times do |index| %>
         <button type="button" class="carousel-dot" aria-label="Go to slide <%= index + 1 %>"
@@ -172,6 +176,7 @@
                 data-studio-action="click->carousel#goTo"></button>
       <% end %>
     </div>
+    <% end %>
     <div class="carousel-arrows">
       <% if autoplay %>
         <%# The pause button (WCAG 2.2.2). The controller renames it "Play slideshow"
