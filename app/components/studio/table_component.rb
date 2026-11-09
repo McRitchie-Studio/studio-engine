@@ -140,7 +140,7 @@ module Studio
       column = column.to_h.symbolize_keys
       unknown = column.keys - Column.members
       raise ArgumentError, "unknown column key #{unknown.first.inspect}; expected #{Column.members.join(', ')}" if unknown.any?
-      raise ArgumentError, "a column needs key: and label:" if column[:key].blank? || column[:label].blank?
+      raise ArgumentError, "Studio::TableComponent: every column takes key: and label:" if column[:key].blank? || column[:label].blank?
 
       align = (column[:align] || :left).to_sym
       raise ArgumentError, "unknown align #{align.inspect}; expected one of #{ALIGN.keys.join(', ')}" unless ALIGN.key?(align)

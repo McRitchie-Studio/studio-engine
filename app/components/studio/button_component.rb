@@ -41,7 +41,8 @@ module Studio
   # Every class string is written out whole: Tailwind finds utilities by scanning
   # source text, and engine.css adds app/components to every host's scan.
   class ButtonComponent < ViewComponent::Base
-    # studio_loader_pending, the loader the aria-busy contract shows. Included,
+    # studio_loader_pending, the loader the aria-busy contract shows (the plain
+    # spinner at 16px, in the label's colour). Included,
     # not reached through helpers, so the button works in a host whose
     # controllers never mixed the engine's helpers in.
     include Studio::LoaderHelper

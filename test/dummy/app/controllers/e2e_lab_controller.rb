@@ -869,6 +869,10 @@ class E2eLabController < ActionController::Base
   # The style guide's Tints and shades group (style/_scrims). `?palette=<name>`
   # paints the page in one consumer palette through the resolver's own CSS, as
   # #chips does, so a custom dark or light base reaches --color-shade/-tint.
+  # The style guide's UI primitives (style/_primitives), for the screenshot check
+  # (e2e/ui_primitives_screenshots.spec.js). No knobs: the spec flips the theme.
+  def ui_primitives = render(:ui_primitives)
+
   def scrims
     require_relative "../../../support/consumer_palettes"
     palette = ConsumerPalettes::ALL[params[:palette].to_s]

@@ -136,7 +136,15 @@ class ComponentGalleryTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
-  test "/admin/style lists the badge preview and links each state into the gallery" do
+  # Each component's preview and the states it shows, as the gallery lists them.
+  PREVIEW_STATES = {
+    "studio/badge" => %w[tones schemes default board_count],
+    "studio/button" => %w[tones sizes disabled loading icon_and_link],
+    "studio/empty_state" => %w[message with_detail with_icon_and_action bare],
+    "studio/table" => %w[rows sorted_ascending sorted_descending empty]
+  }.freeze
+
+  test "/admin/style lists every component preview and links each state into the gallery" do
     sign_in @admin
     get "/admin/style"
 
@@ -145,12 +153,31 @@ class ComponentGalleryTest < ActionDispatch::IntegrationTest
     nav = html.at_css("nav[aria-label='Style guide sections']")
     assert nav.at_css("a[href='#components']"), "the section nav has no Components pill"
 
-    preview = html.at_css("#components [data-component-preview='studio/badge']")
-    refute_nil preview, "the Components section does not list the badge preview"
-    hrefs = preview.css("a").map { |a| a["href"] }
-    %w[tones schemes default board_count].each do |state|
-      assert_includes hrefs, "#{GALLERY}/inspect/studio/badge/#{state}"
+    PREVIEW_STATES.each do |path, states|
+      preview = html.at_css("#components [data-component-preview='#{path}']")
+      refute_nil preview, "the Components section does not list the #{path} preview"
+      hrefs = preview.css("a").map { |a| a["href"] }
+      states.each { |state| assert_includes hrefs, "#{GALLERY}/inspect/#{path}/#{state}" }
     end
+  end
+
+  test "each new component's states render in the gallery" do
+    sign_in @admin
+    PREVIEW_STATES.except("studio/badge").each do |path, states|
+      states.each do |state|
+        get "#{GALLERY}/preview/#{path}/#{state}"
+        assert_response :success, "#{path}/#{state}"
+      end
+    end
+  end
+
+  test "/admin/style draws the UI primitives live, a specimen for each" do
+    sign_in @admin
+    get "/admin/style"
+
+    html = Nokogiri::HTML(response.body)
+    specimens = html.css("#components [data-specimen]").map { |n| n["data-specimen"] }
+    assert_equal %w[button-tones button-sizes button-states empty-state empty-state-action table table-empty], specimens
   end
 
   # --- 2. everyone else --------------------------------------------------------

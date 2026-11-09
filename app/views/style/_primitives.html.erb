@@ -1,0 +1,106 @@
+<%# locals: () -%>
+<%# The engine's UI primitives, drawn live: every tone, size and state of
+    Studio::ButtonComponent, Studio::EmptyStateComponent and
+    Studio::TableComponent. Rendered from the components themselves, never a
+    copy of their markup, so a change to a component changes its specimen.
+
+    LIGHT AND DARK. Each specimen renders once and follows the page's theme: the
+    theme tokens are scoped to html and html.dark (Studio::ThemeResolver), and
+    nothing scopes a panel back to light inside a dark page. Flip the theme to
+    see the other one; e2e/ui_primitives_screenshots.spec.js captures both.
+
+    e2e/ui_primitives_screenshots.spec.js screenshots each [data-specimen] block
+    (the lab page /lab/ui_primitives renders this partial). Renaming one moves a
+    baseline. -%>
+<%
+  tones = Studio::ButtonComponent::TONES.keys
+  sizes = Studio::ButtonComponent::SIZES.keys
+  plus = tag.svg(tag.path(d: "M10 4a1 1 0 0 1 1 1v4h4a1 1 0 1 1 0 2h-4v4a1 1 0 1 1-2 0v-4H5a1 1 0 1 1 0-2h4V5a1 1 0 0 1 1-1Z"),
+                 class: "h-4 w-4", viewBox: "0 0 20 20", fill: "currentColor", aria: { hidden: true })
+  people = [
+    { name: "Ada Lovelace", role: "Admin", tasks: 12, status: "passed" },
+    { name: "Grace Hopper", role: "Builder", tasks: 7, status: "blocked" },
+    { name: "Katherine Johnson", role: "Reviewer", tasks: 3, status: "waiting" }
+  ]
+  status_tones = { "passed" => :success, "blocked" => :danger, "waiting" => :warning }
+  columns = [
+    { key: :name, label: "Member", sortable: true },
+    { key: :role, label: "Role" },
+    { key: :tasks, label: "Tasks", sortable: true, align: :right },
+    { key: :status, label: "Status", align: :center,
+      cell: ->(row) { render Studio::BadgeComponent.new(text: row[:status], tone: status_tones.fetch(row[:status])) } }
+  ]
+  sort_url = ->(key, direction) { "?sort=#{key}&direction=#{direction}#components" }
+-%>
+<div class="space-y-6" data-primitives>
+  <div class="card p-5 space-y-3" data-specimen="button-tones">
+    <h3 class="type-h4 text-heading">Button · tones</h3>
+    <div class="flex flex-wrap items-center gap-3">
+      <% tones.each do |tone| %>
+        <%= render Studio::ButtonComponent.new(label: tone.to_s.capitalize, tone: tone) %>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="card p-5 space-y-3" data-specimen="button-sizes">
+    <h3 class="type-h4 text-heading">Button · sizes</h3>
+    <% tones.each do |tone| %>
+      <div class="flex flex-wrap items-center gap-3">
+        <% sizes.each do |size| %>
+          <%= render Studio::ButtonComponent.new(label: "#{tone.to_s.capitalize} #{size}", tone: tone, size: size) %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="card p-5 space-y-3" data-specimen="button-states">
+    <h3 class="type-h4 text-heading">Button · disabled, loading, icon, link</h3>
+    <div class="flex flex-wrap items-center gap-3">
+      <% tones.each do |tone| %>
+        <%= render Studio::ButtonComponent.new(label: tone.to_s.capitalize, tone: tone, disabled: true) %>
+      <% end %>
+    </div>
+    <div class="flex flex-wrap items-center gap-3">
+      <% tones.each do |tone| %>
+        <%= render Studio::ButtonComponent.new(label: tone.to_s.capitalize, tone: tone, loading: true) %>
+      <% end %>
+      <%= render Studio::ButtonComponent.new(label: "Save", type: "submit", loading: true, busy_label: "Saving…") %>
+    </div>
+    <div class="flex flex-wrap items-center gap-3">
+      <%= render(Studio::ButtonComponent.new(label: "New task")) { |button| button.with_icon { plus } } %>
+      <%= render Studio::ButtonComponent.new(label: "Read the docs", tone: :quiet, href: "#components") %>
+      <%= render Studio::ButtonComponent.new(label: "Disabled link", tone: :quiet, href: "#components", disabled: true) %>
+    </div>
+  </div>
+
+  <div class="grid gap-6 md:grid-cols-2">
+    <div class="space-y-3" data-specimen="empty-state">
+      <h3 class="type-h4 text-heading">Empty state · message and detail</h3>
+      <%= render Studio::EmptyStateComponent.new(message: "No errors logged yet.",
+            detail: "Errors appear here when ErrorLog.capture! records one.") %>
+    </div>
+    <div class="space-y-3" data-specimen="empty-state-action">
+      <h3 class="type-h4 text-heading">Empty state · icon and action</h3>
+      <%= render(Studio::EmptyStateComponent.new(detail: "Invite someone to start the team.")) do |empty| %>
+        <% empty.with_icon { plus } %>
+        <% empty.with_action(label: "Invite a member", href: "#components") %>
+        No members yet.
+      <% end %>
+    </div>
+  </div>
+
+  <div class="space-y-3" data-specimen="table">
+    <h3 class="type-h4 text-heading">Table · sorted by member, a badge cell</h3>
+    <div class="card overflow-hidden">
+      <%= render Studio::TableComponent.new(rows: people, columns: columns, sort: "name", direction: "asc",
+            sort_url: sort_url, min_width: 520) %>
+    </div>
+  </div>
+
+  <div class="space-y-3" data-specimen="table-empty">
+    <h3 class="type-h4 text-heading">Table · no rows</h3>
+    <div class="card overflow-hidden">
+      <%= render Studio::TableComponent.new(rows: [], columns: columns, sort_url: sort_url, empty: "No members yet.") %>
+    </div>
+  </div>
+</div>

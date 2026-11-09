@@ -1,0 +1,10 @@
+<%# The style guide's UI primitives (style/_primitives): Studio::ButtonComponent,
+    Studio::EmptyStateComponent and Studio::TableComponent in every tone, size
+    and state, as /admin/style draws them. The gallery is admin-only, so the
+    screenshot check (e2e/ui_primitives_screenshots.spec.js) reads them here.
+
+    THE LAB RULE (see E2eLabController): a lab page sets up a partial's inputs
+    and nothing else. The lab layout is dark; the spec flips html.dark for light. %>
+<main class="max-w-5xl mx-auto px-4 py-10" data-primitives-lab>
+  <%= render "style/primitives" %>
+</main>

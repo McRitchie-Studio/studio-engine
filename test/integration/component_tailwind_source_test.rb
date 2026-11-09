@@ -80,14 +80,24 @@ class ComponentTailwindSourceTest < Minitest::Test
     end
   end
 
-  # Classes the badge component emits that no engine view mentions, so only
+  # Classes the components emit (the badge's tones, and the button's, empty
+  # state's and table's class constants) that no engine view mentions, so only
   # the components @source line can bring them into the build.
   def component_only_classes
-    unless defined?(Studio::BadgeComponent)
+    unless defined?(Studio::TableComponent)
       require "view_component"
       require_relative "../../app/components/studio/badge_component"
+      require_relative "../../app/helpers/studio/loader_helper"
+      require_relative "../../app/components/studio/button_component"
+      require_relative "../../app/components/studio/empty_state_component"
+      require_relative "../../app/components/studio/table_component"
     end
-    classes = Studio::BadgeComponent::TONES.values.flat_map(&:split).uniq
+    strings = Studio::BadgeComponent::TONES.values +
+              [Studio::ButtonComponent::LAYOUT, Studio::ButtonComponent::DISABLED_LINK] +
+              %w[BARE MESSAGE DETAIL ICON ACTION].map { |c| Studio::EmptyStateComponent.const_get(c) } +
+              %w[WRAPPER TABLE HEAD BODY ROW HEADER_CELL CELL SORT_LINK SORT_ARROW].map { |c| Studio::TableComponent.const_get(c) } +
+              Studio::TableComponent::ALIGN.values
+    classes = strings.flat_map(&:split).uniq
     views = Dir[File.join(B::ROOT, "app/views/**/*.erb")].map { |path| File.read(path) }.join("\n")
     classes.reject { |name| views.include?(name) }
   end

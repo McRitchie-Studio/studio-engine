@@ -4,10 +4,13 @@
     The previews ARE the specimens, so this list cannot drift from the components.
     An app that does not draw the gallery here (lookbook not in its bundle, or
     production without Studio.lookbook_in_production) says so instead of linking
-    to a 404. -%>
+    to a 404. Above the list, style/_primitives draws the Button, EmptyState and
+    Table components live on every app, gallery or not. -%>
 <section id="components" class="section-target space-y-6">
   <%= render "studio/section_header", title: "Components" %>
-  <p class="text-muted text-sm max-w-2xl">One preview per state, in the component gallery.</p>
+  <p class="text-muted text-sm max-w-2xl">The UI primitives every app renders, live, then one preview per state in the component gallery.</p>
+
+  <%= render "style/primitives" %>
 
   <% if Studio.lookbook_mounted? %>
     <ul class="grid gap-4 sm:grid-cols-2" data-component-previews>
