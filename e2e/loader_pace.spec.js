@@ -150,10 +150,15 @@ test("StudioLoader.hide ends the wait at once", async ({ page }) => {
   expect(t.loaderOut - t.loaderIn).toBeLessThan(400);
 });
 
+// Timed from the visit's own start, turbo:visit, which is when studio/loader starts its clock
+// (350ms, then at least 750ms shown), not from before Playwright's click: on a loaded machine
+// the click alone took over 250ms to land (787ms against 700). A held reload comes at 1100ms or
+// later on that clock, so the limit still catches the wait.
 test("a response that asks for a full load, as a signing page does, gains no wait", async ({ page }) => {
   await timeline(page, "direction=left&strict=1&control=reload&slow=450");
   await page.evaluate(() => {
-    document.addEventListener("turbo:reload", () => sessionStorage.setItem("pt-reload-at", String(Math.round(performance.now() - window.__t.click))));
+    document.addEventListener("turbo:visit", () => { window.__visitAt = performance.now(); }, { once: true });
+    document.addEventListener("turbo:reload", () => sessionStorage.setItem("pt-reload-at", String(Math.round(performance.now() - window.__visitAt))));
   });
   await click(page);
   await expect(page.locator('[data-test="page-b"]')).toBeVisible();
