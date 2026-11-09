@@ -33,9 +33,13 @@ the engine when a second app needs it.
 
 **Today.** ViewComponent is a runtime dependency of the engine, so every app
 has it through the engine and lists it nowhere else. Lookbook, the gallery, is
-opt-in by bundle (below). The badge is the first component: `Studio::BadgeComponent`, with its
-unit test in `test/components/studio` and its preview in
-`app/components/previews/studio`. The rest are still ERB partials, 17 in
+opt-in by bundle (below). Four components ship: `Studio::BadgeComponent`,
+`Studio::ButtonComponent`, `Studio::EmptyStateComponent` and
+`Studio::TableComponent`, each with its unit test in `test/components/studio` and
+its preview in `app/components/previews/studio`. `/admin/style` draws the button,
+empty state and table live (`style/_primitives`), and
+`e2e/ui_primitives_screenshots.spec.js` compares each specimen to a Linux baseline
+at 390 and 1280 px in both themes. The rest are still ERB partials, 17 in
 `app/views/components/` and more under `app/views/studio/` (the board, the hold
 button, modals, banners); each documents its locals in a header comment. View
 tests in `test/views` render partials, and `/admin/style` frames hand-written

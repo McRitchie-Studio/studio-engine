@@ -461,6 +461,41 @@ Also not covered:
   `javascript_import_module_tag` then boots `studio/application` through it. When
   adding to `AssetDelivery`, serve only what a HOST would serve and the engine does not.
 
+## Screenshot baselines
+
+`e2e/ui_primitives_screenshots.spec.js` is the lane's one pixel comparison. It
+screenshots each specimen of `style/_primitives` (the lab page
+`/lab/ui_primitives`) at 390 and 1280 px, light and dark, and compares it to a
+baseline in `e2e/ui_primitives_screenshots.spec.js-snapshots/`.
+
+**The baselines are Linux.** Fonts rasterise differently on macOS, so a baseline
+drawn on a Mac fails in CI. Off Linux the spec still loads the page and checks the
+specimen list, but compares no pixels (it is not a skip: the lane refuses those).
+
+**To update them** after a deliberate visual change, draw them in the lane's own
+image with Docker. Boot the lab on the Mac, copy the tree without its linked
+`node_modules`, and run Playwright in the image against it through a loopback
+proxy (`blockOffsiteRequests` only lets 127.0.0.1 through):
+
+```bash
+E2E_PORT=3627 bundle exec ruby e2e/boot.rb &          # the lab, on the Mac
+W=$(mktemp -d) && rsync -a --exclude node_modules --exclude .git --exclude .npmrc ./ "$W/"
+cat > "$W/proxy.js" <<'JS'
+const net = require("node:net");
+net.createServer((c) => { const u = net.connect(3627, "host.docker.internal"); c.pipe(u); u.pipe(c); })
+  .listen(3627, "127.0.0.1");
+JS
+docker run --rm --platform linux/amd64 --shm-size=2g --init \
+  --add-host=host.docker.internal:host-gateway -v "$W":/work -w /work \
+  -e PW_BASE_URL=http://127.0.0.1:3627 ghcr.io/mcritchie-studio/ci-rails:24.04 bash -lc \
+  '(node proxy.js &); npm ci --ignore-scripts && npx playwright install chromium &&
+   npx playwright test e2e/ui_primitives_screenshots.spec.js --update-snapshots=all'
+cp "$W"/e2e/ui_primitives_screenshots.spec.js-snapshots/*.png e2e/ui_primitives_screenshots.spec.js-snapshots/
+```
+
+Look at every changed PNG before you commit it: an updated baseline is a claim
+that the new look is right.
+
 ## Cost
 
 Measured on `ubuntu-latest`, from this lane's own first CI run
