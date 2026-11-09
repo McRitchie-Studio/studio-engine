@@ -2114,7 +2114,7 @@ html[data-theme-flip]::view-transition-new(*) {
       margin-block: auto;
       width: 2rem;
       height: 2rem;
-      z-index: 1;
+      z-index: 20;
       pointer-events: none;
     }
     [data-nav-avatar-badge] > * {
