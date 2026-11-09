@@ -4,6 +4,21 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.139.0 — 2026-11-08
+
+### Added
+
+- **`studio/_carousel` dispatches `studio:carousel:change`.** Every style (standard, spotlight, cascade) dispatches it from the region, bubbling, once each time the open slide changes, after `data-current` has moved. `event.detail` is `{ index, previous, slide, total }`. A host that follows the open slide (a caption under the row, a counter) listens for it instead of a `MutationObserver` on `data-current`. The first paint's slide fires nothing; a looping row fires once, for the real slide, when it lands home off the seam copy.
+- **`studio/_carousel` takes `dots:`.** `dots: false` draws no dot group, so nothing for Tab or a screen reader to meet; the arrows, keys, swipe and status line stay. The default, `dots: true`, renders byte for byte what leaving it out does (render digests for standard, spotlight and cascade). A host that hid the dots with CSS passes `dots: false` instead.
+- **The image-only cascade pattern is documented and on `/admin/style`.** Each card is only its picture, the open card wears a ring (`in-data-current:`), and one caption under the stack follows the open card. The new lazy `carousel-captions` controller does the following: wrap the row and its captions in `data-studio-controller="carousel-captions"` and mark each caption `data-carousel-captions-target="caption"`; no page script. The README gives the markup to copy.
+
+### Fixed
+
+- **A cascade press released off the track no longer hijacks Enter.** A mouse press on a side card that let go outside the track left its card recorded, so Enter on the front card's link later moved the stack to that card instead of following the link. A click with no press (Enter or Space) now reads only the card it lands in, and the next press replaces a stale one.
+- **A cascade card that crosses a looping stack's seam fades in on every move.** Next then Previous on a five-card loop took the same card round the seam twice, and the second jump did not fade in. The fade now replays each time and leaves no finished animation behind.
+- **A narrow cascade fades its side cards at the track's edge** instead of cutting them hard; a wide stack and a failed controller's scrolling row keep no mask.
+- **The cascade's Tab wording is exact.** The partial, the controller and the README now say that Tab skips the cards past the window, and that a cascade which does not loop and opens mid-row reaches the cards before the window by Shift+Tab, Home, the arrow keys, Previous and the dots.
+
 ## 0.138.0 — 2026-11-08
 
 ### Added
