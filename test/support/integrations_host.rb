@@ -90,9 +90,9 @@ module IntegrationsHost
   TENANT = "0000000a-0000-0000-0000-0000000000b2"
 
   def self.enable!
+    # Enabling again replaces each integration (and its provider) in place:
+    # the routes drawn once below keep pointing at them.
     Studio::Integrations.all.each(&:uninstall_stand_in!)
-    Studio::Connections.reset!
-    Studio::Integrations.reset!
     Studio.enable_integration :quickbooks, env: ENV_NAMES[:quickbooks], panel: "admin/integrations/quickbooks_panel"
     Studio.enable_integration :egnyte, env: ENV_NAMES[:egnyte]
     Studio.enable_integration :microsoft_365, env: ENV_NAMES[:microsoft_365]

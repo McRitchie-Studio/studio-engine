@@ -243,7 +243,7 @@ class ConnectionsFlowTest < ActionDispatch::IntegrationTest
       post "/admin/drive/connect", params: { drive_domain: "evil.example/x" }
 
       assert_redirected_to "/admin/drive"
-      assert_includes flash[:alert], "That is not a Drive account"
+      assert_includes flash[:alert], "That is not a valid Drive account"
     end
   end
 
