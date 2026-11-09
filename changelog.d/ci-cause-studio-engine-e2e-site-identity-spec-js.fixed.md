@@ -1,0 +1,1 @@
+- **The link-preview card shows text typed before its controller loads.** The `link-preview-card` controller is registered lazily, so an operator could type in /admin/link_preview before it listened, and the card kept the saved title. `connect()` now paints the card from the fields as they stand (`paintAll` in `studio/link_preview_card`). No host change.

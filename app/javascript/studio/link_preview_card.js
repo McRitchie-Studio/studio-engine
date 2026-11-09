@@ -32,3 +32,11 @@ export function paintCard(page, input) {
   target.textContent = text
   return text
 }
+
+// Repaints the card from every [data-link-preview-input] on the page, as each
+// field stands now. The controller calls it on connect: it is registered
+// lazily, so an operator can type before it listens, and that input event is
+// gone.
+export function paintAll(page) {
+  page.querySelectorAll("[data-link-preview-input]").forEach((input) => paintCard(page, input))
+}
