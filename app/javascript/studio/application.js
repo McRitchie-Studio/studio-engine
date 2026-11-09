@@ -21,6 +21,7 @@ import { installAlpineShims } from "studio/alpine_shims"
 import { installStudioLoader } from "studio/loader"
 import "studio/reload_visits"
 import "studio/in_page_links"
+import "studio/sign_out_prefetch"
 
 installAlpineShims()
 startPinnedStack()

@@ -157,7 +157,10 @@
 <% footer_html = capture do %>
   <% if logged_in? %>
     <div class="border-t border-subtle p-2"<% if glass %> data-sidebar-glass-foot<% end %>>
+      <%# Never prefetched: Turbo 8 fetches a link the pointer rests on, and a GET
+          /logout fetched is a sign-out (docs/DEVICE_SESSIONS.md, "Prefetch"). %>
       <%= link_to logout_path,
+            data: { turbo_prefetch: "false" },
             class: "flex items-center gap-3 rounded-md px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ink transition",
             "@click": close_action do %>
         <% if glass %><span class="flex-shrink-0" data-sidebar-row-icon><%= studio_icon("log-out") %></span><% else %><span>👋</span><% end %><span>Log out</span>
