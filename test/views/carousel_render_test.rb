@@ -476,16 +476,21 @@ class CarouselRenderTest < Minitest::Test
   # The cascade lives beside the other styles, not in them: each renders byte for
   # byte what it rendered before the cascade was added. These digests were taken on
   # the release before it (0.137.0) and pin the whole output, so a change to the
-  # standard or spotlight markup has to change them on purpose.
+  # standard or spotlight markup has to change them on purpose. The three cascade
+  # digests were taken on accepted at dc5f72be, before dots: was added: a row that
+  # does not pass dots: renders byte for byte as it did.
   BYTE_IDENTITY = [
     [ITEMS, {}],
     [ITEMS, { style: :standard, caption: ->(i) { "Cap #{i.name}" } }],
     [ITEMS, { style: :spotlight }],
     [SEVEN, { style: :spotlight, caption: ->(i) { "Cap #{i.name}" } }],
     [SEVEN, { style: :spotlight, loop: true, autoplay: 3.5, start: 1 }],
-    [SEVEN, { start: :middle, per_view: 2.5, loop: true, slide_label: ->(i) { i.name } }]
+    [SEVEN, { start: :middle, per_view: 2.5, loop: true, slide_label: ->(i) { i.name } }],
+    [SEVEN, { style: :cascade }],
+    [SEVEN, { style: :cascade, loop: true, autoplay: 4, caption: ->(i) { "Cap #{i.name}" } }],
+    [ITEMS, { style: :cascade, visible: 3, start: 0, slide_label: ->(i) { i.name } }]
   ].freeze
-  BYTE_IDENTITY_DIGESTS = %w[3490a0179a62aa1a 202ca6983533a326 e6d195e03de08832 f221ee2dc38d062e b7634921dd03c65b 417bfdb4bb325e7f].freeze
+  BYTE_IDENTITY_DIGESTS = %w[3490a0179a62aa1a 202ca6983533a326 e6d195e03de08832 f221ee2dc38d062e b7634921dd03c65b 417bfdb4bb325e7f 395ec1cb0bf98381 24f1456b41397788 d254ab24e65b8806].freeze
 
   def raw(items, locals)
     view = ActionView::Base.with_empty_template_cache.new(ActionView::LookupContext.new([VIEWS]), {}, nil)
