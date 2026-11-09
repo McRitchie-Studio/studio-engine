@@ -166,3 +166,40 @@ test("the sidebar opens and closes when the boot fails to load", async ({ page }
   await expect(panel(page)).toBeHidden();
   expect(errors).toEqual([]);
 });
+
+// A page refresh by morph (the hub's /build queued page after an admin claim: a
+// same-URL redirect under turbo-refresh-method morph) set the closed panel's style
+// back to the server's, which has no display. The flag stayed false, x-show never
+// ran again, and the panel was drawn open. studio/link_sidebar keeps the panel's
+// style through the morph (keepPanelDisplay; task engine-logout-never-prefetched).
+// CONTROL: drop the turbo:before-morph-attribute listener: the closed panel is
+// visible after the morph and the first assertion fails.
+test("a morph refresh leaves a closed panel closed and an open one open", async ({ page }) => {
+  const errors = watchPageErrors(page);
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/sidebar_panels_turbo?sidebar=1&signed_in=1&refresh=morph");
+  await expect.poll(() => page.evaluate(() => Boolean(window.Turbo)), { message: "Turbo started" }).toBe(true);
+  await expect(panel(page)).toBeHidden();
+  await page.evaluate(() => {
+    window.__morphs = 0;
+    document.addEventListener("turbo:morph", () => { window.__morphs += 1; });
+  });
+  const morph = async (count) => {
+    await page.evaluate(() => window.Turbo.visit(location.href, { action: "replace" }));
+    await expect.poll(() => page.evaluate(() => window.__morphs), { message: "the refresh morphed" }).toBe(count);
+  };
+
+  await morph(1);
+  expect(await flag(page)).toBe(false);
+  await expect(panel(page), "closed before the morph, closed after it").toBeHidden();
+
+  await trigger(page).click();
+  await expect(panel(page)).toBeVisible();
+  await morph(2);
+  expect(await flag(page)).toBe(true);
+  await expect(panel(page), "open before the morph, open after it").toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(panel(page)).toBeHidden();
+  expect(errors).toEqual([]);
+});

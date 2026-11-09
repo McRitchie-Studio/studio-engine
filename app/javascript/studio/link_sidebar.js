@@ -31,6 +31,15 @@
 // click that lands before Alpine has bound it. They are installed once, on
 // every page, and do nothing where no link sidebar is rendered.
 //
+// A MORPH KEEPS THE PANEL'S STATE. A page refresh by morph (turbo-refresh-method
+// morph: a same-URL redirect, or Turbo.visit(location.href, { action: "replace" }))
+// sets every attribute back to the server's. The server's style has no display, so
+// Idiomorph stripped the display:none Alpine had put on a closed panel; the flag did
+// not change, so x-show never ran again, and the panel was drawn open while
+// linkTreeOpen read false (the hub's /build queued page, task
+// engine-logout-never-prefetched). keepPanelDisplay refuses the morph of a panel's
+// style, so the display Alpine set stays.
+//
 // WHY THIS IS ITS OWN ENTRY POINT. layouts/studio/_head imports this module by
 // its own nonced module tag as well as through the boot graph, like
 // studio/alpine_stores. It imports nothing, and
@@ -82,6 +91,17 @@ export function ensureLinkSidebarStore(Alpine) {
 export function linkSidebarStore(Alpine) {
   if (!Alpine || typeof Alpine.store !== "function") return null
   return Alpine.store("sidebars") || null
+}
+
+// The turbo:before-morph-attribute listener: a link sidebar panel keeps its style
+// (Alpine's display for x-show) through a morph. Every other attribute morphs.
+export function keepPanelDisplay(event) {
+  const target = event && event.target
+  if (!target || typeof target.matches !== "function") return false
+  if (!event.detail || event.detail.attributeName !== "style") return false
+  if (!target.matches(LINK_SIDEBAR_PANELS)) return false
+  event.preventDefault()
+  return true
 }
 
 export function closeLinkSidebar(Alpine) {
@@ -174,6 +194,7 @@ export function installLinkSidebar({ win, doc, now = () => new Date() } = {}) {
   })
   // A page restored from Turbo's cache or the bfcache comes back closed.
   root.addEventListener("turbo:before-cache", () => closeLinkSidebar(host.Alpine))
+  root.addEventListener("turbo:before-morph-attribute", keepPanelDisplay)
   host.addEventListener("pageshow", (event) => {
     if (!event.persisted) return
     closeLinkSidebar(host.Alpine)
