@@ -21,10 +21,12 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 // decision itself.
 //
 // CONTROLS, each run against this file:
-//   - drop data-turbo-prefetch from the Log out row: the first spec sees a GET
-//     /logout with X-Sec-Purpose: prefetch.
+//   - drop data-turbo-prefetch from the Log out row: the first spec reads Turbo
+//     asking about /logout (the listener still cancels it, so no request goes).
 //   - drop `import "studio/sign_out_prefetch"` from studio/application: the second
 //     spec reads prevented: false and sees the prefetch.
+//   - drop both: the first spec sees GET /logout with X-Sec-Purpose: prefetch, the
+//     defect itself.
 
 const REST_MS = 500;
 const PAGE = "/lab/sidebar_panels_turbo?sidebar=1&signed_in=1";
@@ -47,11 +49,22 @@ function requestWithin(page, pathname, ms) {
     .then((request) => request.headers()["x-sec-purpose"] || "visit", () => null);
 }
 
+// Each turbo:before-prefetch, as { href, prevented }. Turbo dispatches it at
+// mouseenter for a link it may prefetch, and never for one that opts out. Recorded
+// after the engine's listener has run, so `prevented` is the engine's verdict.
 async function visitWithTurbo(page) {
   await blockOffsiteRequests(page);
   await page.goto(PAGE);
   await expect.poll(() => page.evaluate(() => Boolean(window.Turbo)), { message: "Turbo started" }).toBe(true);
+  await page.evaluate(() => {
+    window.__prefetchAsks = [];
+    document.addEventListener("turbo:before-prefetch", (event) => {
+      window.__prefetchAsks.push({ href: event.target.getAttribute("href"), prevented: event.defaultPrevented });
+    });
+  });
 }
+
+const prefetchAsks = (page) => page.evaluate(() => window.__prefetchAsks);
 
 async function openSidebar(page) {
   await visitWithTurbo(page);
@@ -72,11 +85,10 @@ test("resting the pointer on the engine's Log out sends no request to /logout", 
     .poll(() => rowAsks, { message: "Turbo prefetches a row the pointer rests on", timeout: REST_MS })
     .toContain("prefetch");
 
-  const logOut = panel(page).locator('a[href="/logout"]');
-  await expect(logOut).toHaveAttribute("data-turbo-prefetch", "false");
-  await logOut.hover();
+  await panel(page).locator('a[href="/logout"]').hover();
   expect(await requestWithin(page, "/logout", REST_MS), `a ${REST_MS}ms rest on Log out asks /logout nothing`).toBeNull();
   expect(signOuts).toEqual([]);
+  expect((await prefetchAsks(page)).map((ask) => ask.href), "Turbo never considers Log out").not.toContain("/logout");
   expect(errors).toEqual([]);
 });
 
@@ -85,10 +97,6 @@ test("a host's own /logout link without the opt-out is not prefetched either", a
   await visitWithTurbo(page);
   const signOuts = recordRequests(page, "/logout");
   await page.evaluate(() => {
-    window.__prefetchAsks = [];
-    document.addEventListener("turbo:before-prefetch", (event) => {
-      window.__prefetchAsks.push({ href: event.target.getAttribute("href"), prevented: event.defaultPrevented });
-    });
     // A host's sign-out, drawn its own way: a plain link, no data-turbo-prefetch.
     const link = document.createElement("a");
     link.href = "/logout";
@@ -101,7 +109,7 @@ test("a host's own /logout link without the opt-out is not prefetched either", a
   await page.locator("[data-test='host-logout']").hover();
 
   await expect
-    .poll(() => page.evaluate(() => window.__prefetchAsks), { message: "Turbo asked, and the engine said no" })
+    .poll(() => prefetchAsks(page), { message: "Turbo asked, and the engine said no" })
     .toContainEqual({ href: "/logout", prevented: true });
   expect(signOuts, "no request reached /logout").toEqual([]);
   expect(errors).toEqual([]);
