@@ -136,7 +136,8 @@ test("a page that answers 500 gains no wait", async ({ page }) => {
   await expect(page.locator('h1[data-test="page-b"]')).toBeVisible();
   const t = await page.evaluate(() => window.__t);
   report("500 once the loader shows", t);
-  expect(t.render).toBeLessThan(700);
+  // From the answer: a 500 held for the loader's minimum renders 750ms after it.
+  expect(t.render - t.answered, "the error page waited on something after the answer").toBeLessThan(350);
 });
 
 test("a visit the network drops clears the loader at once", async ({ page }) => {
@@ -175,7 +176,8 @@ test("StudioLoader.hide ends the wait at once", async ({ page }) => {
 test("a response that asks for a full load, as a signing page does, gains no wait", async ({ page }) => {
   await timeline(page, "direction=left&strict=1&control=reload");
   await page.evaluate(() => {
-    document.addEventListener("turbo:reload", () => sessionStorage.setItem("pt-reload-at", String(Math.round(performance.now() - window.__t.visit))));
+    // On the visit's clock, less the answer's own time on it: how long the full load waited.
+    document.addEventListener("turbo:reload", () => sessionStorage.setItem("pt-reload-after-answer", String(Math.round(performance.now() - window.__t.visit - window.__t.answered))));
   });
   // The visit's answer is fetched at once and handed over once the loader shows, so the wait
   // under test is certain to be on offer, and the server's own speed stays outside the window
@@ -190,7 +192,7 @@ test("a response that asks for a full load, as a signing page does, gains no wai
   });
   await click(page);
   await expect(page.locator('[data-test="page-b"]')).toBeVisible();
-  expect(Number(await page.evaluate(() => sessionStorage.getItem("pt-reload-at")))).toBeLessThan(700);
+  expect(Number(await page.evaluate(() => sessionStorage.getItem("pt-reload-after-answer")))).toBeLessThan(350);
 });
 
 test("the strict page itself raises no violation when its overlay shows", async ({ page }) => {
