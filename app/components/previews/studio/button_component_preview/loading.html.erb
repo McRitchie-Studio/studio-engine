@@ -1,0 +1,12 @@
+<div class="space-y-3" data-specimen="button-loading">
+  <div class="flex flex-wrap items-center gap-3">
+    <% tones.each do |tone| %>
+      <%= render Studio::ButtonComponent.new(label: tone.to_s.capitalize, tone: tone, loading: true) %>
+    <% end %>
+  </div>
+  <div class="flex flex-wrap items-center gap-3">
+    <%= render Studio::ButtonComponent.new(label: "Save", type: "submit", loading: true, busy_label: "Saving…") %>
+    <%= render Studio::ButtonComponent.new(label: "Save", type: "submit", size: :sm, loading: true, busy_label: "Saving…") %>
+    <%= render Studio::ButtonComponent.new(label: "Save", type: "submit", size: :lg, loading: true, busy_label: "Saving…") %>
+  </div>
+</div>

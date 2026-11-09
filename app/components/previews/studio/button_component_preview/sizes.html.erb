@@ -1,0 +1,9 @@
+<div class="space-y-3" data-specimen="button-sizes">
+  <% tones.each do |tone| %>
+    <div class="flex flex-wrap items-center gap-3">
+      <% sizes.each do |size| %>
+        <%= render Studio::ButtonComponent.new(label: "#{tone.to_s.capitalize} #{size}", tone: tone, size: size) %>
+      <% end %>
+    </div>
+  <% end %>
+</div>

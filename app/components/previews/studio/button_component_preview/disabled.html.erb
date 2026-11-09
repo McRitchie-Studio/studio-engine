@@ -1,0 +1,12 @@
+<div class="space-y-3" data-specimen="button-disabled">
+  <div class="flex flex-wrap items-center gap-3">
+    <% tones.each do |tone| %>
+      <%= render Studio::ButtonComponent.new(label: tone.to_s.capitalize, tone: tone, disabled: true) %>
+    <% end %>
+  </div>
+  <div class="flex flex-wrap items-center gap-3">
+    <% tones.each do |tone| %>
+      <%= render Studio::ButtonComponent.new(label: "#{tone.to_s.capitalize} link", tone: tone, href: "#", disabled: true) %>
+    <% end %>
+  </div>
+</div>
