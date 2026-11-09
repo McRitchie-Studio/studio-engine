@@ -36,8 +36,9 @@ const {
 // of the module's own timer window (twice START_CAP_MS): nothing moves after Back, and the
 // reader's scroll right after a jump holds. Controls, each red under the new spec: the end
 // event never sent, red 3/3; Back's restore smooth or removed, red; a late aim 300ms after
-// the end, red 2/2; the stuck bar never set, red (inner target); no tab highlighted, red
-// (load with a hash).
+// the end, red 2/2; the stuck bar never set, red (inner target, and headers below the fold,
+// whose 200ms pause was red 4 in 10 at 8x CPU and is now the stack's settle, 10/10); no tab
+// highlighted, red (load with a hash).
 
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
@@ -327,8 +328,9 @@ test("headers below the fold do not move the stack, and only one is stuck at a t
   expect(atTop.layers.section.h).toBe(0);
   expect(atTop.bottom).toBeLessThan(400);
 
-  await page.evaluate(() => window.scrollTo({ top: 5000, behavior: "instant" }));
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 200))));
+  await scrolledTo(page, 5000);
+  await navAtRest(page);
+  await stackSettled(page);
   expect(await page.locator("[data-pin-section][data-stuck]").count()).toBe(1);
   await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--pin-section-h"))).not.toBe("0px");
 });
