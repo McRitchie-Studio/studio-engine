@@ -390,6 +390,17 @@ with the gem, from no npm registry.
   `blockOffsiteRequests` from `e2e_helpers.js`; a `node --test` register file
   calls `registerImportmapHooks` from `node_test/register.mjs` with its own
   importmap prefixes.
+- **One server per tree.** Locally the base reuses a server already on the
+  e2e port only when that server's working directory is inside this tree
+  (read with `lsof`). A sibling desk's server on the shared default port, or a
+  server whose root cannot be read, is refused: Playwright stops with "is
+  already used", and a warning names that server's root. Give the run its own
+  port with `E2E_PORT=<free port>`. CI never reuses a server.
+- **Page transition specs.** A spec about full-load page transitions takes
+  `watchReveal`, `revealed`, `settled`, `arrivalSettled`, `frames`,
+  `sessionLog` and `logOnRed` from `e2e_helpers.js`. They wait on the new
+  page's `pagereveal` and its view transition, never on a pause, and a red
+  prints and attaches the spec's event log.
 - **The check.** `bin/rails studio:node:check` exits 1 and names each pin the
   app drifts from. The engine holds itself to the same check
   (`test/lib/studio/node_tooling_test.rb`).

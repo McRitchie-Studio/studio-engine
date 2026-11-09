@@ -1,5 +1,7 @@
 const { test, expect, chromium } = require("@playwright/test");
 const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
+// The reveal waits and the log-on-red hook are shared with every host's own transition spec.
+const shared = require("../lib/studio/node_tooling/e2e_helpers.js");
 
 // [e2e] A full page load plays the app's page transition (docs/PAGE_TRANSITIONS.md, "Full page
 // loads"). A log in sessionStorage outlives each document, so one spec reads both sides of a
@@ -8,7 +10,8 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 const LAB = "/lab/page_transitions";
 const STRICT = "direction=left&strict=1";
 
-function installRecorder(context) {
+async function installRecorder(context) {
+  await shared.watchReveal(context);
   return context.addInitScript(() => {
     const log = (line) => {
       const lines = JSON.parse(sessionStorage.getItem("pt-log") || "[]");
@@ -19,14 +22,13 @@ function installRecorder(context) {
     // The state each side of a load was in, for the event log a red prints (afterEach below).
     // Lines start "swap-" and "reveal-", so the specs that count "page..." lines never see them.
     window.__ticks = 0;
-    window.__revealed = false;
     window.addEventListener("pageswap", (event) => {
       log(`pageswap ${event.viewTransition ? "transition" : "plain"}`);
       log(`swap-state ${JSON.stringify({
         type: event.activation ? event.activation.navigationType : null,
         to: event.activation && event.activation.entry ? new URL(event.activation.entry.url).pathname : null,
         visibility: document.visibilityState,
-        revealed: window.__revealed,
+        revealed: !!(window.__studioReveal && window.__studioReveal.revealed),
         frames: window.__ticks,
         ready: document.readyState,
         module: !!document.documentElement.dataset.pageTransitionDirection,
@@ -37,7 +39,6 @@ function installRecorder(context) {
       log(`swap-left ${sessionStorage.getItem("studio-page-transition-style")}`);
     }));
     window.addEventListener("pagereveal", (event) => {
-      window.__revealed = true;
       log(`pagereveal ${event.viewTransition ? "transition" : "plain"}`);
       log(`reveal-state ${JSON.stringify({ visibility: document.visibilityState, style: sessionStorage.getItem("studio-page-transition-style") })}`);
     });
@@ -81,38 +82,20 @@ async function open(page, query) {
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
 }
 
-const logged = (page) => page.evaluate(() => JSON.parse(sessionStorage.getItem("pt-log") || "[]"));
+const logged = (page) => shared.sessionLog(page, "pt-log");
 
 // A red carries its evidence: the whole event log, printed and attached to the JSON report
-// the CI uploads for every shard. A red with no log once left its cause unprovable.
-test.afterEach(async ({ page }, testInfo) => {
-  if (testInfo.status === testInfo.expectedStatus) return;
-  const lines = await logged(page).catch((error) => [`(the log could not be read: ${error.message})`]);
-  console.log(`pt-log for "${testInfo.title}":\n${lines.join("\n")}`);
-  await testInfo.attach("pt-log", { body: lines.join("\n"), contentType: "text/plain" });
-});
+// the CI uploads for every shard (shared.logOnRed).
+shared.logOnRed(test, logged);
 const rootMotion = (lines) => lines.filter((line) => /-(old|new)\(root\) /.test(line));
 
-// Past the whole motion: the document's own marks are gone when this returns.
-//
-// FIRST THE NEW PAGE'S REVEAL. Its DOM parses, and Playwright sees it as visible, before its
-// first render: a render-blocking sheet, or the reveal script's own hold to the end of parse,
-// keeps pagereveal back. Until then no mark is set and no pseudo runs, so "no marks, no
-// animations" also holds BEFORE the motion. Without the reveal wait the spec read an empty
-// log and went red in 312 ms (Engine CI run 42503970890).
-async function settled(page, testId) {
-  await expect(page.locator(`[data-test="page-${testId}"]`)).toBeVisible();
-  await page.waitForFunction(() => window.__revealed === true
-    && document.documentElement.dataset.pageTransition === undefined
-    && !document.getAnimations().some((a) => (a.effect?.pseudoElement || "").startsWith("::view-transition")));
-}
-
-// The new page has revealed, for a spec that reads its pagereveal or asserts that nothing
-// played: visible is not revealed (settled, above).
-async function revealed(page, testId = "b") {
-  await expect(page.locator(`[data-test="page-${testId}"]`)).toBeVisible();
-  await page.waitForFunction(() => window.__revealed === true);
-}
+// The waits, by the lab page's test id. Why visible is not revealed, and why "nothing
+// played" waits for the arrival's transition and two frames rather than a pause: the shared
+// helpers' comments (lib/studio/node_tooling/e2e_helpers.js).
+const pageSelector = (testId) => `[data-test="page-${testId}"]`;
+const settled = (page, testId) => shared.settled(page, pageSelector(testId));
+const revealed = (page, testId = "b") => shared.revealed(page, pageSelector(testId));
+const arrivalSettled = (page, testId = "b") => shared.arrivalSettled(page, pageSelector(testId));
 
 function expectOneMotion(lines, oldName, newName) {
   expect(rootMotion(lines).sort(), `the event log:\n${lines.join("\n")}`).toEqual([
@@ -284,8 +267,7 @@ test("a reload plays nothing and leaves no name", async ({ page }) => {
   await open(page, STRICT);
   await page.reload();
   await page.waitForFunction(() => window.Turbo && document.documentElement.dataset.pageTransitionDirection);
-  await revealed(page, "a");
-  await page.waitForTimeout(200);
+  await arrivalSettled(page, "a");
   const lines = await logged(page);
   expect(lines).toEqual(expect.arrayContaining(["pageswap plain", "pagereveal plain"]));
   expect(lines.filter((line) => line.startsWith("::view-transition"))).toEqual([]);
@@ -297,8 +279,7 @@ test("a full load of the same path plays nothing", async ({ page }) => {
   await open(page, STRICT);
   await fullLoad(page, "same-full");
   await page.waitForFunction(() => window.Turbo && document.documentElement.dataset.pageTransitionDirection);
-  await revealed(page, "a");
-  await page.waitForTimeout(200);
+  await arrivalSettled(page, "a");
   const lines = await logged(page);
   expect(lines).toContain("pageswap transition");
   expect(lines).toContain("pagereveal plain");
@@ -357,8 +338,7 @@ test("a click before the old page's module has run gets the plain load, not the 
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
   await page.unroute("**/e2e/modules/studio/page_transitions*");
   await fullLoad(page);
-  await revealed(page);
-  await page.waitForTimeout(300);
+  await arrivalSettled(page);
   const lines = await logged(page);
   expect(lines).toContain("pagereveal transition");
   expect(rootMotion(lines)).toEqual([]);
@@ -539,15 +519,32 @@ test("a body that arrives in two chunks is whole before the new page's picture",
   expect(lines.filter((line) => line.includes("studio-header") && /-(old|new)\(/.test(line))).toEqual([]);
 });
 
+// Timed from the hold's own start, not from navigation start: the reveal script starts the
+// 3-second timer when it adds the render-blocking link, and everything before that (the
+// server's answer, the head's parse) is the host's speed, not the cap. From navigation start
+// a loaded Mac read 4428 ms against 4000. The link is seen by a MutationObserver, whose
+// callback runs at the end of the script that added it.
 test("a body slower than the cap paints at the cap, and the motion still plays", async ({ page }) => {
   await open(page, `${STRICT}&split=5000`);
   await page.addInitScript(() => window.addEventListener("pagereveal", () => {
     window.ptLog(`revealed ${!!document.querySelector('[data-test="page-b"]')}`);
   }));
+  await page.addInitScript(() => new MutationObserver((records) => {
+    for (const record of records) {
+      for (const node of record.addedNodes) {
+        if (node.nodeName === "LINK" && node.rel === "expect" && window.__holdAt === undefined) window.__holdAt = performance.now();
+      }
+    }
+  }).observe(document, { childList: true, subtree: true }));
   await fullLoad(page);
   await page.locator('[data-test="page-b"]').waitFor({ timeout: 10000 });
   await settled(page, "b");
-  const paint = await page.evaluate(() => performance.getEntriesByName("first-contentful-paint")[0].startTime);
+  const { holdAt, firstPaint } = await page.evaluate(() => ({
+    holdAt: window.__holdAt,
+    firstPaint: performance.getEntriesByName("first-contentful-paint")[0].startTime,
+  }));
+  expect(holdAt, "the reveal script never held the first render, so this measured nothing").toBeDefined();
+  const paint = firstPaint - holdAt;
   expect(paint).toBeGreaterThan(2500);
   expect(paint).toBeLessThan(4000);
   const lines = await logged(page);
@@ -588,7 +585,9 @@ test("a browser without cross-document view transitions loads plainly and throws
   const supported = await page.evaluate(() => "onpagereveal" in window);
   await fullLoad(page);
   await expect(page.locator('[data-test="page-b"]')).toBeVisible();
-  await page.waitForTimeout(200);
+  // No pagereveal here to wait on: past the load and page b's modules, then two frames.
+  await page.waitForFunction(() => document.readyState === "complete" && window.Turbo);
+  await shared.frames(page);
   const lines = await logged(page);
   const left = await page.evaluate(() => sessionStorage.getItem("studio-page-transition-style"));
   await browser.close();
@@ -606,8 +605,9 @@ test.describe("with reduced motion", () => {
     const errors = watchPageErrors(page);
     await open(page, STRICT);
     await fullLoad(page);
-    await revealed(page);
-    await page.waitForTimeout(200);
+    // Past page b's modules too, so a motion its own script started would be in the log.
+    await page.waitForFunction(() => window.Turbo);
+    await arrivalSettled(page);
     const lines = await logged(page);
     expect(lines).toEqual(expect.arrayContaining(["pageswap plain", "pagereveal plain"]));
     expect(lines.filter((line) => line.startsWith("::view-transition"))).toEqual([]);
