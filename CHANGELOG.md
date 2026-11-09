@@ -4,6 +4,13 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.140.0 — 2026-11-09
+
+### Fixed
+
+- **`AddUsersRoleKnownCheck` no longer sets `users.role` NOT NULL, and writes its CHECK in the stable form.** The 0.138.0 migration's NOT NULL changed `t.string "role", default: "viewer"` in six consumers' schema dumps, which the release's schema-dump guard refuses, and an old dyno inserting a user without a role would fail during a rollback. It still fills NULL roles with `viewer` and adds CHECK `users_role_known`, now spelled `(role)::text = ANY (ARRAY['viewer'::character varying::text, ...])` on Postgres, so a dump after `db:migrate` equals the dump after `db:schema:load`. The migration was edited in place: 0.138.0 published it, but no app had installed it. Install it with `bin/rails studio_engine:install:migrations`; NOT NULL comes in a later migration.
+- **`RequireSlugsOnEngineTables` no longer makes `slug` NOT NULL.** 0.138.0's migration set `slug` NOT NULL on `error_logs`, `theme_settings`, `studio_geo_settings` and `studio_site_identities`. Heroku runs the migration while old dynos still serve, and 0.137.0's `ErrorLog.capture!` inserts a NULL slug and sets it after, so every error write raised until the restart and again after a `heroku rollback`. The migration (edited in place; no host had installed 0.138.0) still backfills NULL and blank slugs, de-dupes, and adds the unique index, which allows many NULLs. Its `down` now changes nothing. A host adopts in one release: `bin/rails studio_engine:install:migrations && bin/rails db:migrate`, then commit `db/schema.rb`; the two-release note under 0.138.0 no longer applies. NOT NULL comes in a later engine migration, in the release after every host runs the Sluggable `ErrorLog`.
+
 ## 0.139.0 — 2026-11-08
 
 ### Added
