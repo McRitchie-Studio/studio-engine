@@ -199,13 +199,14 @@ test("a click on a side card brings it to the front and opens nothing; a click o
   await expect.poll(() => new URL(page.url()).hash).toBe("#cascade-open-6");
 });
 
-test("Tab into a side card brings it to the front, and Tab walks the set", async ({ page }) => {
+test("Tab into a side card brings it to the front, and each Tab moves one card on", async ({ page }) => {
   await page.setViewportSize(DESKTOP);
   await open(page);
   await region(page).locator(".carousel-track").focus();
 
-  // The first card's link is hidden (past the window), so Tab lands on the first
-  // card in view, two left of the open one.
+  // The first card's link is hidden (past the window), so Tab skips it and lands on
+  // the first card in view, two left of the open one. Shift+Tab reaches card 1 from
+  // there (the next spec but three).
   await page.keyboard.press("Tab");
   await expect(slides(page).nth(1).locator("a")).toBeFocused();
   await rest(page);
