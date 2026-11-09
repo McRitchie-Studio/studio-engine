@@ -56,6 +56,20 @@ class LinkSidebarHeaderRenderTest < ActionDispatch::IntegrationTest
     refute_nil page.at_css('#studio-link-sidebar a[href="/logout"] svg')
   end
 
+  # Turbo 8 prefetches a link the pointer rests on, and a prefetched GET /logout
+  # signed the browser out (docs/DEVICE_SESSIONS.md, "Prefetch").
+  test "Log out is never prefetched, in the drawer and in glass" do
+    Studio.sidebar_sections = DECLARED
+    [:default, :glass].each do |style|
+      Studio.sidebar_style = style
+      page = Nokogiri::HTML5(NavbarRenderHost.render_navbar(signed_in: true))
+      logout = page.at_css('#studio-link-sidebar a[href="/logout"]')
+
+      refute_nil logout, "#{style}: the panel draws Log out"
+      assert_equal "false", logout["data-turbo-prefetch"], "#{style}: Log out opts out of Turbo's prefetch"
+    end
+  end
+
   test "a host's header: true reaches the panel, and only for the sections that opted in" do
     Studio.sidebar_sections = DECLARED
     page = Nokogiri::HTML5(NavbarRenderHost.render_navbar(signed_in: true, admin: true))

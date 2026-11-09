@@ -26,6 +26,9 @@ module Studio
       # First, ahead of every host filter: a revoked device session is signed out
       # before anything reads current_user (docs/DEVICE_SESSIONS.md).
       prepend_before_action :end_revoked_device_session
+      # Ahead of that: a prefetched sign-out is answered before any filter reads or
+      # writes the session (docs/DEVICE_SESSIONS.md, "Prefetch").
+      prepend_before_action :refuse_prefetched_sign_out, if: :sign_out_action?
       before_action :require_authentication
       after_action :track_user_session
 
@@ -34,6 +37,28 @@ module Studio
     end
 
     private
+
+    # The sign-out action: the engine's SessionsController#destroy, or a host's
+    # own SessionsController that replaces it (Turf's). Both answer /logout.
+    def sign_out_action?
+      controller_path == "sessions" && action_name == "destroy"
+    end
+
+    # A speculative fetch never signs anyone out. Turbo 8 prefetches a link the
+    # pointer rests on for 100ms (X-Sec-Purpose: prefetch), and a GET /logout
+    # prefetch ran the sign-out: its Set-Cookie dropped the session while the page
+    # on screen still drew the user (hub task build-funnel-held-message-cause).
+    # The answer is 204 and no-store, with the session left unwritten: no cookie is
+    # sent, the device session stays live, and no after_action runs. The Log out
+    # link opts out of prefetch too (components/_link_sidebar), so this answers
+    # only a prefetch that still arrives.
+    def refuse_prefetched_sign_out
+      return unless Studio.prefetch_request?(request)
+
+      response.headers["Cache-Control"] = "no-store"
+      request.session_options[:skip] = true
+      head :no_content
+    end
 
     # The signed-in person, not whoever an admin is impersonating. A signed-out
     # request stops at the cookie: it runs no query it would not otherwise run. A

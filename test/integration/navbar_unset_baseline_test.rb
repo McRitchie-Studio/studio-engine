@@ -20,7 +20,9 @@
 # to one line each at rest (/tasks/sidebar-greeting-and-no-labels); the link sidebar's
 # panels gained data-sidebar-edge for their blurred edge (/tasks/sidebar-edge-blur); the
 # sidebar's focus ring became ring-primary-ink, 3:1 beside every surface
-# (/tasks/engine-ui-polish-follow-ups).
+# (/tasks/engine-ui-polish-follow-ups); the Log out row gained
+# data-turbo-prefetch="false", so a pointer resting on it is not a sign-out
+# (/tasks/engine-logout-never-prefetched).
 
 require "bundler/setup"
 

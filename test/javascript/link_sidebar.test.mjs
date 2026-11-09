@@ -11,7 +11,7 @@ const source = readFileSync(new URL("../../app/javascript/studio/link_sidebar.js
 const {
   LINK_SIDEBAR_PANELS, LINK_SIDEBAR_TRIGGERS, ensureLinkSidebarStore, linkSidebarStore, closeLinkSidebar,
   rendersLinkSidebar, registerLinkSidebar, clickIntent, handleLinkSidebarClick, handleLinkSidebarKeydown,
-  installLinkSidebar, greetingFor, paintGreetings
+  installLinkSidebar, greetingFor, paintGreetings, keepPanelDisplay
 } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 // Alpine.store as Alpine has it: one argument reads, two register.
@@ -406,4 +406,35 @@ test("the trigger paints as it opens the panel; another click does not", () => {
 
 test("install: no document, no install", () => {
   assert.equal(installLinkSidebar({ win: fakeWindow(), doc: null }), false)
+})
+
+// A morph sets a closed panel's style back to the server's, which has no display:
+// the panel was drawn open while the flag read false (task engine-logout-never-prefetched).
+const morphOf = (attributeName, matches) => ({
+  target: { matches: (selector) => selector === LINK_SIDEBAR_PANELS && matches },
+  detail: { attributeName, mutationType: "update" },
+  defaultPrevented: false,
+  preventDefault() { this.defaultPrevented = true },
+})
+
+test("a morph keeps a link sidebar panel's style, and morphs everything else", () => {
+  const panelStyle = morphOf("style", true)
+  assert.equal(keepPanelDisplay(panelStyle), true)
+  assert.equal(panelStyle.defaultPrevented, true)
+
+  for (const event of [morphOf("class", true), morphOf("x-cloak", true), morphOf("style", false)]) {
+    assert.equal(keepPanelDisplay(event), false)
+    assert.equal(event.defaultPrevented, false)
+  }
+  assert.equal(keepPanelDisplay({}), false)
+  assert.equal(keepPanelDisplay({ target: {}, detail: { attributeName: "style" } }), false)
+})
+
+test("install: the morph guard listens for turbo:before-morph-attribute", () => {
+  const doc = fakeDocument()
+  installLinkSidebar({ win: fakeWindow(), doc })
+
+  const event = morphOf("style", true)
+  doc.fire("turbo:before-morph-attribute", event)
+  assert.equal(event.defaultPrevented, true)
 })

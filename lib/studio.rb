@@ -2135,6 +2135,17 @@ module Studio
     ProfileSections.resolve(profile_sections, view, page: page)
   end
 
+  # The purpose headers a speculative fetch carries: Turbo's X-Sec-Purpose, the
+  # browser's Sec-Purpose (link prefetch, speculation rules) and the older
+  # Purpose. A prefetch must not act: Studio::ErrorHandling refuses a prefetched
+  # sign-out with it, and a host can ask it of any other GET that writes.
+  PREFETCH_PURPOSE = /\bprefetch\b/i
+  PREFETCH_HEADERS = %w[X-Sec-Purpose Sec-Purpose Purpose].freeze
+
+  def self.prefetch_request?(request)
+    PREFETCH_HEADERS.any? { |name| request.headers[name].to_s.match?(PREFETCH_PURPOSE) }
+  end
+
   def self.env_truthy?(value)
     %w[1 true yes on].include?(value.to_s.strip.downcase)
   end
@@ -2154,7 +2165,10 @@ module Studio
 
       post "sso_continue", to: "sessions#sso_continue"
       get  "sso_login",    to: "sessions#sso_login"
-      get  "logout", to: "sessions#destroy"
+      # Sign-out answers GET (every host's Log out link) and DELETE (a button_to
+      # form). A prefetch of either is refused before the action runs
+      # (Studio::ErrorHandling#refuse_prefetched_sign_out).
+      match "logout", to: "sessions#destroy", via: %i[get delete], as: :logout
       get  "signup", to: "registrations#new"
       post "signup", to: "registrations#create"
       get  "auth/:provider/callback", to: "omniauth_callbacks#create"

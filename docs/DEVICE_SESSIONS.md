@@ -23,7 +23,7 @@ Tests: `test/integration/user_session_revocation_test.rb` (unit) and
 | Sign-in | `set_app_session` | `Studio::UserSession.start!` writes a `studio_user_sessions` row with a random `sid` (24 bytes, URL-safe) and puts the sid in this app's mark (`session[:"<session_key>_session_mark"]`). A re-auth by the same user keeps the sid only while the sid is live: `start!` reads it again first (one query), and a revoked sid, or one with no row, gets a new sid. |
 | Every signed-in request | `prepend_before_action :end_revoked_device_session` | `Studio::UserSession.verdict` reads the cookie's sid on the `sid` index: one query. Any revoked row of the sid, or no row: the request is signed out through the host's own `clear_app_session`, and runs as a visitor. |
 | Tracking | `after_action :track_user_session` | Reuses the row the check read, so it adds no read. At most one write per 5 minutes, as before. After 30 idle minutes a new row starts with the **same** sid. |
-| Logout | `clear_app_session` (the engine's `GET /logout`) and `reset_session` (Turf's logout, and a sign-in by a different identity) | `Studio::UserSession.revoke!` stamps `revoked_at` on every row of the sid and drops the mark. |
+| Logout | `clear_app_session` (the engine's `GET` or `DELETE /logout`) and `reset_session` (Turf's logout, and a sign-in by a different identity) | `Studio::UserSession.revoke!` stamps `revoked_at` on every row of the sid and drops the mark. |
 | Pruning | `Studio::UserSession.prune_due!`, run when a row is created | Deletes up to 1,000 rows last seen more than 90 days ago, at most once an hour per process. No host job. |
 
 A failed revoke or start is written to `ErrorLog` and the logout or sign-in goes
@@ -58,6 +58,30 @@ the current SSO behaviour:
   device. Its sid is its own and is not revoked.
 - On a shared cookie, Turf's `reset_session` deletes every app's keys from the
   browser (as before), but it revokes only Turf's sid.
+
+## Prefetch
+
+A prefetch never signs anyone out. Turbo 8 prefetches a same-origin link the
+pointer rests on for 100ms, and sends `X-Sec-Purpose: prefetch`. The sign-out is
+`GET /logout`, so a pointer that only passed over Log out ran the sign-out: its
+`Set-Cookie` dropped the session while the page on screen still drew the user.
+The hub measured it (task `build-funnel-held-message-cause`): an admin's next
+`/build` message went in signed out.
+
+| Cover | Where | What |
+|-------|-------|------|
+| The link | `components/_link_sidebar` | The engine's Log out carries `data-turbo-prefetch="false"`, so Turbo never asks. |
+| The browser | `studio/sign_out_prefetch` (in the boot) | A `turbo:before-prefetch` listener cancels the prefetch of any same-origin `/logout` link, so a Log out a host draws its own way is covered too. |
+| The server | `Studio::ErrorHandling#refuse_prefetched_sign_out` | A sign-out request (`sessions#destroy`, the engine's or a host's own) that carries `prefetch` in `X-Sec-Purpose`, `Sec-Purpose` or `Purpose` gets `204 No Content` and `Cache-Control: no-store`, before any other filter. The session is not written, so no cookie is sent and the device session stays live. `Studio.prefetch_request?(request)` is the same test, for a host's own GET that writes. |
+
+A host that wants a sign-out no fetch can reach can draw it as a form:
+`button_to "Log out", logout_path, method: :delete`. The route answers `DELETE` as
+well as `GET`.
+
+Tests: `test/integration/logout_ends_device_session_test.rb` (the 204),
+`test/integration/link_sidebar_header_render_test.rb` (the link),
+`test/javascript/sign_out_prefetch.test.mjs` (the listener) and
+`e2e/sign_out_prefetch.spec.js` (a 500ms rest on Log out sends nothing).
 
 ## Off switches
 

@@ -228,6 +228,51 @@ class LogoutEndsDeviceSessionTest < ActionDispatch::IntegrationTest
     Studio::UserSession.check_failure_logged_at = nil
   end
 
+  # A speculative fetch never signs anyone out (docs/DEVICE_SESSIONS.md, "Prefetch").
+  # Turbo 8 prefetches a link the pointer rests on for 100ms, with X-Sec-Purpose:
+  # prefetch; the browser's own prefetch sends Sec-Purpose. A prefetch of /logout
+  # ran the sign-out and its Set-Cookie signed the browser out while the page still
+  # drew the user (hub task build-funnel-held-message-cause).
+  {
+    "X-Sec-Purpose" => "prefetch",
+    "Sec-Purpose" => "prefetch;prerender",
+    "Purpose" => "prefetch"
+  }.each do |header, value|
+    test "a GET /logout prefetch (#{header}: #{value}) answers 204 and signs nobody out" do
+      captured = sign_in_on(self)
+
+      get "/logout", headers: { header => value }
+
+      assert_response :no_content
+      assert_nil response.headers["Set-Cookie"], "a prefetch writes no cookie"
+      assert_equal "no-store", response.headers["Cache-Control"]
+      get "/device_session/whoami"
+      assert_equal "user:#{@user.id}", response.body, "this browser is still signed in"
+      assert_nil Studio::UserSession.where.not(sid: nil).pick(:revoked_at), "the device session is not revoked"
+      assert_equal "user:#{@user.id}", replay(captured).response.body
+    end
+  end
+
+  test "a prefetch of another page is answered as before" do
+    sign_in_on(self)
+
+    get "/device_session/whoami", headers: { "X-Sec-Purpose" => "prefetch" }
+
+    assert_response :ok
+    assert_equal "user:#{@user.id}", response.body
+  end
+
+  test "DELETE /logout signs out and ends the device session, as GET does" do
+    captured = sign_in_on(self)
+
+    delete "/logout"
+    assert_redirected_to "/login"
+
+    get "/device_session/whoami"
+    assert_equal "visitor", response.body
+    assert_equal "visitor", replay(captured).response.body
+  end
+
   test "a sign-in on a logged-out device's copied cookie starts a new sid, and the copy stays ended" do
     captured = sign_in_on(self)
     old_sid = Studio::UserSession.where.not(sid: nil).pick(:sid)
