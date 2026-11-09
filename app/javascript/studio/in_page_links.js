@@ -42,7 +42,18 @@ export const FOCUS_MARK = "data-in-page-focus"
 // jump at its first frame. Then the target moved and nothing aimed again.
 export const SETTLE_MS = 150
 // A scroll the reader never sees move still ends: the cap for a scroll that never starts.
+// Where the browser has scrollend, it is also the backstop after each scroll event: a scroll
+// that scrollend never follows (a page that shortens, and the browser pulls the scroll back
+// with one scroll event and no scrollend) still ends. A slow frame (260ms at 8x CPU) does not.
 export const START_CAP_MS = 400
+// After the end, the target holds its place on the screen for this long: content above it
+// that grows or shrinks (a lazy frame the scroll passed, whose page lands later) moves the
+// page by the same amount, as scroll anchoring would. The body has anchoring off
+// (studio/_head: with it on, the navbar's collapse made the scroll bounce). The reader's own
+// input or any scroll the module did not make ends the hold at once. Growth later than this
+// is not followed: the window is bounded so a page that reflows long after a jump is the
+// reader's, not the jump's. At 8x CPU the lab's feed landed 0.5 to 1.7s after the end.
+export const HOLD_MS = 3000
 // A scroll aims again at a target that moved more than this, at most this many times.
 export const AIM_SLACK_PX = 2
 export const MAX_AIMS = 6
@@ -186,13 +197,55 @@ export function installInPageLinks(doc) {
     if (margin !== null) target.style.scrollMarginTop = inline
   }
   const pageTop = (target) => target.getBoundingClientRect().top + win.scrollY
+  const INPUTS = ["wheel", "touchstart", "keydown", "pointerdown"]
+
+  // After a jump's end: each frame for HOLD_MS, a target that moved on the page moves the page
+  // with it, at once, so its place on the screen stays (scroll anchoring, for this one
+  // element). The check runs in an animation frame, after the growth's layout and before its
+  // paint, so the reader sees no frame with the target out of place. It lets go at the first
+  // input, at any scroll that is not its own (the reader's scrollbar, an app's scrollTo, a
+  // clamp), at the next jump, at a Back or Forward, after MAX_AIMS moves, or at HOLD_MS.
+  const hold = (target) => {
+    if (!win.requestAnimationFrame) return
+    let held = win.scrollY
+    let top = target.getBoundingClientRect().top
+    let moves = 0
+    let frame = null
+    let timer = null
+    const release = () => {
+      win.cancelAnimationFrame(frame)
+      win.clearTimeout(timer)
+      for (const name of INPUTS) win.removeEventListener(name, release, true)
+      if (settling === release) settling = null
+    }
+    const check = () => {
+      // A scroll the hold did not make is the reader's or the app's: it lets go first.
+      if (Math.abs(win.scrollY - held) > AIM_SLACK_PX) return release()
+      // A target a render took out of the page has no place to keep.
+      if (target.isConnected === false) return release()
+      const now = target.getBoundingClientRect().top
+      if (Math.abs(now - top) > AIM_SLACK_PX) {
+        if (moves >= MAX_AIMS) return release()
+        moves += 1
+        win.scrollBy({ top: now - top, behavior: "instant" })
+        held = win.scrollY
+        top = target.getBoundingClientRect().top
+      }
+      frame = win.requestAnimationFrame(check)
+    }
+    settling = release
+    for (const name of INPUTS) win.addEventListener(name, release, { capture: true, passive: true })
+    timer = win.setTimeout(release, HOLD_MS)
+    frame = win.requestAnimationFrame(check)
+  }
 
   // One jump, from its start to its end. The browser fixes a smooth scroll's end where the
   // target was at the start. Content that grows on the way (a lazy frame the scroll passes,
   // the navbar's collapse) moves the target, so the scroll aims again, up to MAX_AIMS times,
   // until the reader takes over (a wheel, a touch, a key, a press). The end is the browser's
   // scrollend where it has one, a quiet spell where not; then the end event, once. A scroll
-  // that never starts ends at the cap either way.
+  // that never starts ends at the cap either way. Then, unless the reader took over, the
+  // target holds its place for HOLD_MS (hold, above).
   const jump = (target, behavior) => {
     if (settling) settling()
     const hasScrollend = "onscrollend" in win
@@ -203,7 +256,6 @@ export function installInPageLinks(doc) {
     let live = true
     let aimed = pageTop(target)
     const takeOver = () => { reader = true }
-    const INPUTS = ["wheel", "touchstart", "keydown", "pointerdown"]
     const reaim = () => {
       if (reader || aims >= MAX_AIMS || Math.abs(pageTop(target) - aimed) <= AIM_SLACK_PX) return false
       aims += 1
@@ -226,14 +278,15 @@ export function installInPageLinks(doc) {
       win.clearTimeout(cap)
       live = false
       if (settling === stop) settling = null
+      if (!reader) hold(target)
       doc.dispatchEvent(new win.CustomEvent(SCROLL_END_EVENT))
     }
     const onScroll = () => {
       win.clearTimeout(cap)
       reaim()
-      // The scroll has started: with scrollend, it alone ends it (an aim's cap is spent too).
-      if (hasScrollend) win.clearTimeout(quiet)
-      else wait(SETTLE_MS)
+      // The scroll has started. With scrollend, scrollend ends it, and START_CAP_MS after the
+      // last scroll event is the backstop for a scroll that scrollend never follows.
+      wait(hasScrollend ? START_CAP_MS : SETTLE_MS)
     }
     const stop = () => {
       reader = true
@@ -286,6 +339,8 @@ export function installInPageLinks(doc) {
       return
     }
     shownUrl = url
+    // The traversal's place wins over a jump or a hold still running.
+    if (settling) settling()
     // Turbo would start a restore visit; without Turbo the browser restores the scroll itself.
     if (event.state && event.state.turbo) {
       event.stopImmediatePropagation()

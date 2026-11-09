@@ -148,6 +148,7 @@ function fakeWindow({ scrollend }) {
   const listeners = {}
   const docListeners = {}
   const dispatched = []
+  const scrolledBy = []
   const on = (bag) => (name, fn) => { (bag[name] ||= []).push(fn) }
   const off = (bag) => (name, fn) => { bag[name] = (bag[name] || []).filter((f) => f !== fn) }
   let top = 900
@@ -169,6 +170,15 @@ function fakeWindow({ scrollend }) {
     getComputedStyle: () => ({ scrollMarginTop: "100px" }),
     setTimeout: (fn, ms) => { const id = next++; timers.set(id, { fn, at: now + ms }); return id },
     clearTimeout: (id) => { timers.delete(id) },
+    // A frame every 16ms. A scroll's event comes in a later task, as a browser sends it.
+    requestAnimationFrame: (fn) => win.setTimeout(fn, 16),
+    cancelAnimationFrame: (id) => win.clearTimeout(id),
+    scrollBy: ({ top: dy }) => {
+      win.scrollY += dy
+      top -= dy
+      scrolledBy.push(dy)
+      win.setTimeout(() => fire(listeners, "scroll"), 0)
+    },
     addEventListener: on(listeners),
     removeEventListener: off(listeners),
     dispatchEvent: () => {},
@@ -201,6 +211,11 @@ function fakeWindow({ scrollend }) {
     click: () => fire(docListeners, "click", { ...click(), target: { closest: () => link }, preventDefault() {} }),
     frame: (dy) => { win.scrollY += dy; top -= dy; fire(listeners, "scroll") },
     scrollend: () => fire(listeners, "scrollend"),
+    // Content above the target grows by dy: the target moves down, scrollY stays (no anchoring).
+    grow: (dy) => { top += dy },
+    input: (name) => fire(listeners, name),
+    top: () => top,
+    scrolledBy,
     advance,
   }
 }
@@ -244,4 +259,79 @@ test("a jump that never scrolls still ends at its cap, with scrollend or without
     page.advance(START_CAP_MS)
     assert.equal(page.ends(), 1, `scrollend ${scrollend}`)
   }
+})
+
+test("with scrollend, a scroll that scrollend never follows ends at the backstop, START_CAP_MS after its last scroll", async () => {
+  const { START_CAP_MS } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
+  const install = await freshInstall("no-scrollend-after-scroll")
+  const page = fakeWindow({ scrollend: true })
+  install(page.doc)
+  page.click()
+  // A page that shortens: the browser pulls the scroll back, one scroll event, no scrollend.
+  page.frame(-40)
+  page.advance(START_CAP_MS - 1)
+  assert.equal(page.ends(), 0, "a frame shorter than the backstop is still the scroll")
+  page.advance(1)
+  assert.equal(page.ends(), 1, "the backstop ends it")
+})
+
+// THE HOLD AFTER THE END (engine-anchor-late-growth). A lazy frame above the target lands
+// after the jump's end. With anchoring off, scrollY stays and the target slides down.
+async function landedJump(tag) {
+  const install = await freshInstall(tag)
+  const page = fakeWindow({ scrollend: true })
+  install(page.doc)
+  page.click()
+  page.frame(800)
+  page.scrollend()
+  assert.equal(page.ends(), 1)
+  return page
+}
+
+test("after the end, growth above the target moves the page with it, and the target keeps its place", async () => {
+  const page = await landedJump("hold-follows")
+  const place = page.top()
+  page.advance(500)
+  page.grow(88)
+  page.advance(32)
+  assert.deepEqual(page.scrolledBy, [88], "one move, by the growth")
+  assert.equal(page.top(), place, "the target is where the jump left it")
+  page.advance(500)
+  page.grow(40)
+  page.advance(32)
+  assert.deepEqual(page.scrolledBy, [88, 40], "its own scroll did not end the hold")
+})
+
+test("the hold ends at HOLD_MS: growth after it is the reader's page, not the jump's", async () => {
+  const { HOLD_MS } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
+  const page = await landedJump("hold-window")
+  page.advance(HOLD_MS)
+  page.grow(88)
+  page.advance(100)
+  assert.deepEqual(page.scrolledBy, [])
+})
+
+test("the reader's scroll or input after the end lets go: growth then moves nothing", async () => {
+  for (const how of ["scroll", "wheel", "touchstart", "keydown", "pointerdown"]) {
+    const page = await landedJump(`hold-release-${how}`)
+    page.advance(100)
+    if (how === "scroll") page.frame(-300)
+    else page.input(how)
+    page.grow(88)
+    page.advance(100)
+    assert.deepEqual(page.scrolledBy, [], how)
+  }
+})
+
+test("a jump the reader took over holds nothing after it", async () => {
+  const install = await freshInstall("reader-no-hold")
+  const page = fakeWindow({ scrollend: true })
+  install(page.doc)
+  page.click()
+  page.frame(300)
+  page.input("wheel")
+  page.scrollend()
+  page.grow(88)
+  page.advance(100)
+  assert.deepEqual(page.scrolledBy, [])
 })
