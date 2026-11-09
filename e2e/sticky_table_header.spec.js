@@ -229,8 +229,10 @@ const READ_LEAVING = () => {
   };
 };
 
-for (const [label, size] of [["1280px", DESKTOP], ["390px", PHONE]]) {
-  test(`${label}: a short table leaving under the page header never draws its clone over the title`, async ({ page }) => {
+// Each viewport is its own bare test(...): the lane's census counts bare
+// declarations, so a spec written in a loop runs a set the census cannot see.
+async function expectLeavesUnderPageHeader(page, size) {
+  {
     await blockOffsiteRequests(page);
     const errors = watchPageErrors(page);
     await page.setViewportSize(size);
@@ -277,5 +279,13 @@ for (const [label, size] of [["1280px", DESKTOP], ["390px", PHONE]]) {
     }));
     expect(z.clone, `clone z ${z.clone} vs page header z ${z.row}`).toBeLessThan(z.row);
     expect(errors).toEqual([]);
-  });
+  }
 }
+
+test("1280px: a short table leaving under the page header never draws its clone over the title", async ({ page }) => {
+  await expectLeavesUnderPageHeader(page, DESKTOP);
+});
+
+test("390px: a short table leaving under the page header never draws its clone over the title", async ({ page }) => {
+  await expectLeavesUnderPageHeader(page, PHONE);
+});
