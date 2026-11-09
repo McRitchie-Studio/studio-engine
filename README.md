@@ -458,7 +458,7 @@ grid cell. The engine's `carousel-captions` controller (lazy) marks the open one
         locals: { label: "Portfolio", items: @apps, style: :cascade, loop: true, dots: false,
                   slide_label: ->(app) { app.name } } do |app| %>
     <%= link_to app.url, aria: { label: app.name },
-          class: "block aspect-[4/3] overflow-hidden rounded-2xl transition-shadow duration-300 in-data-current:ring-2 in-data-current:ring-primary" do %>
+          class: "block aspect-[4/3] overflow-hidden rounded-2xl transition-shadow duration-300 motion-reduce:transition-none in-data-current:ring-2 in-data-current:ring-primary" do %>
       <%= image_tag app.image, alt: "", class: "h-full w-full object-cover" %>
     <% end %>
   <% end %>
@@ -486,9 +486,9 @@ needs more than a caption listens for `studio:carousel:change` itself.
 **One row per caption wrapper.** The captions follow the wrapper's own row: the region
 marked `data-carousel-captions-target="carousel"` (pass `data: { carousel_captions_target:
 "carousel" }` to the partial), else the first carousel inside the wrapper. A change event
-from any other row inside it moves nothing. Keep the caption fade's
-`motion-reduce:transition-none`: under reduced motion the caption swaps at once, as the
-stack does.
+from any other row inside it moves nothing. Keep `motion-reduce:transition-none` on the
+caption fade and the card's ring: under reduced motion both swap at once, as the stack
+does.
 
 **A shadow under a narrow stack.** A narrow region's cascade fades its side cards at the
 track's edge with a mask, and a mask paints only inside the track's box. The track keeps

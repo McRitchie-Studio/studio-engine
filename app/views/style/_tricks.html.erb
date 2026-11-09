@@ -291,7 +291,7 @@
               locals: { label: "Image-only specimen", items: (1..5).to_a, style: :cascade, loop: true, dots: false,
                         id: "style-carousel-image-only-specimen", slide_label: ->(n) { "Picture #{n}" } } do |n| %>
           <div role="img" aria-label="Picture <%= n %>"
-               class="aspect-[4/3] overflow-hidden rounded-2xl transition-shadow duration-300 in-data-current:ring-2 in-data-current:ring-primary"
+               class="aspect-[4/3] overflow-hidden rounded-2xl transition-shadow duration-300 motion-reduce:transition-none in-data-current:ring-2 in-data-current:ring-primary"
                style="background-image: linear-gradient(<%= 120 + n * 30 %>deg, rgb(var(--color-primary-rgb) / <%= 0.25 + n * 0.12 %>), rgb(var(--color-primary-rgb) / 0.08))"></div>
         <% end %>
         <div class="grid pt-3 text-center">

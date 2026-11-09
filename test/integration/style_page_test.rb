@@ -158,6 +158,9 @@ class StylePageTest < ActiveSupport::TestCase
     assert_equal 5, captions.size
     assert_equal [true, false, false, false, false], captions.map { |caption| caption.key?("data-current") }
     assert_equal [nil, "true", "true", "true", "true"], captions.map { |caption| caption["aria-hidden"] }
+    assert captions.all? { |caption| caption["class"].split.include?("motion-reduce:transition-none") }, "reduced motion swaps the caption with no fade"
+    rings = row.css("[role='img']")
+    assert rings.all? { |card| card["class"].split.include?("motion-reduce:transition-none") }, "reduced motion moves the ring with no fade"
     assert_empty stage.parent.css("script"), "the carousel-captions controller follows the row; no inline script"
   end
 

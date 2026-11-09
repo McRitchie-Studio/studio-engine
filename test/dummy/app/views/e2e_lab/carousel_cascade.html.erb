@@ -61,7 +61,7 @@
           locals: { label: "Portfolio", items: cards, style: :cascade, loop: true, dots: false,
                     slide_label: ->(n) { "App #{n}" }, data: { lab: "cascade-portfolio" } } do |n| %>
       <a href="#portfolio-open-<%= n %>" id="portfolio-app-<%= n %>" aria-label="App <%= n %>" data-test="portfolio-card" data-lab-card="<%= n %>"
-         class="block aspect-[4/3] overflow-hidden rounded-2xl bg-surface-alt transition-shadow duration-300 in-data-current:ring-2 in-data-current:ring-primary in-data-current:shadow-xl">
+         class="block aspect-[4/3] overflow-hidden rounded-2xl bg-surface-alt transition-shadow duration-300 motion-reduce:transition-none in-data-current:ring-2 in-data-current:ring-primary in-data-current:shadow-xl">
         <img src="<%= capture { picture.call(n) }.strip %>" alt="" class="h-full w-full object-cover">
       </a>
     <% end %>
