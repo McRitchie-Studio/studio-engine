@@ -40,8 +40,7 @@ class AddEngineStateChecks < ActiveRecord::Migration[7.2]
       next if check_constraint_exists?(table, name: self.class.constraint_name(key))
 
       refuse_strays!(table, column, values)
-      add_check_constraint table, "#{connection.quote_column_name(column)} IN (#{list(values)})",
-                           name: self.class.constraint_name(key)
+      add_check_constraint table, expression(column, values), name: self.class.constraint_name(key)
     end
   end
 
@@ -57,12 +56,27 @@ class AddEngineStateChecks < ActiveRecord::Migration[7.2]
   private
 
   def set_lock_timeout
-    return unless connection.adapter_name.downcase.include?("postgres")
+    return unless postgres?
 
     execute "SET LOCAL lock_timeout = '#{LOCK_TIMEOUT}'"
   end
 
   def list(values) = values.map { |value| connection.quote(value) }.join(", ")
+
+  # On Postgres, the spelling Postgres itself settles on once a schema.rb is
+  # loaded (`'x'::character varying::text`), so a host's schema dump after this
+  # migrate equals the dump after a load, byte for byte. An `IN (...)` list
+  # dumps as `ARRAY[...]::text[]` first and changes on the next load. Anywhere
+  # else (the engine's SQLite test host), the plain IN list.
+  def expression(column, values)
+    col = connection.quote_column_name(column)
+    return "#{col} IN (#{list(values)})" unless postgres?
+
+    array = values.map { |value| "#{connection.quote(value)}::character varying::text" }.join(", ")
+    "(#{col})::text = ANY (ARRAY[#{array}])"
+  end
+
+  def postgres? = connection.adapter_name.downcase.include?("postgres")
 
   def refuse_strays!(table, column, values)
     col = connection.quote_column_name(column)
