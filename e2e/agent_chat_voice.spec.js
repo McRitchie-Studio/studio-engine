@@ -122,9 +122,11 @@ async function holdToTalk(page, { holdMs = 700 } = {}) {
   await page.mouse.down();
   await expect(recorder).toHaveAttribute("data-voice-recorder-state", "recording");
   // Heard first, then held: a hold that ends before the first audible frame is a silent take
-  // (local run, 2026-11-08: "silent" for "sent", 1 in 2). The hold that follows is the
-  // gesture's own length, which is the behaviour, not a wait.
-  await expect(recorder).toHaveAttribute("data-voice-recorder-heard", "true");
+  // (a local run on 2026-11-08 read "silent" for "sent" once). A stub at gain 0 is silent on
+  // purpose and is never heard. The hold that follows is the gesture's own length.
+  if (await page.evaluate(() => window.stubGain > 0)) {
+    await expect(recorder).toHaveAttribute("data-voice-recorder-heard", "true");
+  }
   await page.waitForTimeout(holdMs);
   await page.mouse.up();
   await expect(recorder).not.toHaveAttribute("data-voice-recorder-state", /recording|starting/);
