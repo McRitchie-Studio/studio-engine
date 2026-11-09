@@ -736,45 +736,51 @@ const shadowReach = (shadow) => Math.max(0, ...shadow.split(/,(?![^(]*\))/).map(
   return px.length >= 2 ? px[1] + (px[2] || 0) + (px[3] || 0) : 0;
 }));
 
-for (const theme of ["dark", "light"]) {
-  test(`${theme}, a phone (390px): the edge mask leaves room for the front card's shadow`, async ({ browser }) => {
-    const context = await browser.newContext({ ...devices["iPhone 13"] });
-    const page = await context.newPage();
-    try {
-      const errors = await open(page, { lab: "cascade-portfolio", theme });
-      expect(await page.evaluate(() => window.innerWidth)).toBe(390);
-      const row = region(page, "cascade-portfolio");
-      const look = await row.evaluate((section) => {
-        const track = section.querySelector(".carousel-track");
-        const style = getComputedStyle(track);
-        const card = track.querySelector(".carousel-slide[data-current] [data-test='portfolio-card']");
-        return {
-          mask: style.maskImage || style.webkitMaskImage,
-          shadow: getComputedStyle(card).boxShadow,
-          below: track.getBoundingClientRect().bottom - card.getBoundingClientRect().bottom
-        };
-      });
-      expect(look.mask, "the edge still fades the sides").toMatch(/^linear-gradient\(to right, /);
-      const reach = shadowReach(look.shadow);
-      expect(reach, "the open card wears its shadow-xl").toBeGreaterThanOrEqual(30);
-      // The mask paints only inside the track's box, so the box must reach past the shadow.
-      expect(look.below, `the track's box reaches ${reach}px below the card`).toBeGreaterThanOrEqual(reach);
-      // The room changes no layout, and the arrows over it still take a press: the
-      // point at each arrow's centre hits the arrow, not the track's room.
-      const hits = await row.locator(".carousel-arrows .carousel-button").evaluateAll((buttons) => buttons.map((button) => {
-        const box = button.getBoundingClientRect();
-        return button.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2));
-      }));
-      expect(hits, "each arrow is the element at its own centre").toEqual([true, true]);
-      await row.getByRole("button", { name: "Next slide", exact: true }).click();
-      await expect(row.locator(".carousel-slide[data-current]")).toHaveAttribute("aria-label", "App 2");
-      await expectNoSideScroll(page);
-      expect(errors).toEqual([]);
-    } finally {
-      await context.close();
-    }
-  });
+async function expectShadowRoom(browser, theme) {
+  const context = await browser.newContext({ ...devices["iPhone 13"] });
+  const page = await context.newPage();
+  try {
+    const errors = await open(page, { lab: "cascade-portfolio", theme });
+    expect(await page.evaluate(() => window.innerWidth)).toBe(390);
+    const row = region(page, "cascade-portfolio");
+    const look = await row.evaluate((section) => {
+      const track = section.querySelector(".carousel-track");
+      const style = getComputedStyle(track);
+      const card = track.querySelector(".carousel-slide[data-current] [data-test='portfolio-card']");
+      return {
+        mask: style.maskImage || style.webkitMaskImage,
+        shadow: getComputedStyle(card).boxShadow,
+        below: track.getBoundingClientRect().bottom - card.getBoundingClientRect().bottom
+      };
+    });
+    expect(look.mask, "the edge still fades the sides").toMatch(/^linear-gradient\(to right, /);
+    const reach = shadowReach(look.shadow);
+    expect(reach, "the open card wears its shadow-xl").toBeGreaterThanOrEqual(30);
+    // The mask paints only inside the track's box, so the box must reach past the shadow.
+    expect(look.below, `the track's box reaches ${reach}px below the card`).toBeGreaterThanOrEqual(reach);
+    // The room changes no layout, and the arrows over it still take a press: the
+    // point at each arrow's centre hits the arrow, not the track's room.
+    const hits = await row.locator(".carousel-arrows .carousel-button").evaluateAll((buttons) => buttons.map((button) => {
+      const box = button.getBoundingClientRect();
+      return button.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2));
+    }));
+    expect(hits, "each arrow is the element at its own centre").toEqual([true, true]);
+    await row.getByRole("button", { name: "Next slide", exact: true }).click();
+    await expect(row.locator(".carousel-slide[data-current]")).toHaveAttribute("aria-label", "App 2");
+    await expectNoSideScroll(page);
+    expect(errors).toEqual([]);
+  } finally {
+    await context.close();
+  }
 }
+
+test("dark, a phone (390px): the edge mask leaves room for the front card's shadow", async ({ browser }) => {
+  await expectShadowRoom(browser, "dark");
+});
+
+test("light, a phone (390px): the edge mask leaves room for the front card's shadow", async ({ browser }) => {
+  await expectShadowRoom(browser, "light");
+});
 
 test("under reduced motion the style guide's caption swaps with no fade", async ({ page }) => {
   await page.setViewportSize(DESKTOP);
