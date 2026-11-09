@@ -52,17 +52,20 @@ test("a background replace visit never shows the overlay; a user's slow navigati
 test("a Turbo link to a download with no extension leaves no overlay up", async ({ page }) => {
   await page.goto("/lab/loader_visits");
   await page.waitForFunction(() => window.Turbo);
-  // Past the overlay's own delay, on its own clock: a timer queued on turbo:visit after
-  // studio/loader's (its listener runs first) with the same delay fires after its show would.
-  await page.evaluate(() => document.addEventListener("turbo:visit", () => {
-    const delay = parseInt(document.querySelector("[data-studio-loader-overlay]").getAttribute("data-delay"), 10);
-    setTimeout(() => { window.__pastDelay = true; }, delay >= 0 ? delay : 350);
-  }, { once: true }));
+  // The answer is held until the overlay shows. Answered sooner, it cancels the overlay's
+  // 100ms show before it happens, and the test saw no overlay to clear: green with every hide
+  // path removed (2026-11-08). Held, the overlay is up, and only a hide can take it down.
+  // Turbo's fetch only: the browser's own request for the file, after the visit, passes.
+  let held = false;
+  await page.route("**/lab/loader_download", async (route) => {
+    if (held) return route.continue();
+    held = true;
+    await page.waitForFunction(() => !document.querySelector("[data-studio-loader-overlay]").hidden);
+    return route.continue();
+  });
   const download = page.waitForEvent("download");
   await page.locator('[data-test="download-link"]').click();
   await download;
-  await page.waitForFunction(() => window.__pastDelay === true);
-  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   await expect(overlay(page)).toBeHidden();
   await expect(page).toHaveURL(/\/lab\/loader_visits$/);
 });
