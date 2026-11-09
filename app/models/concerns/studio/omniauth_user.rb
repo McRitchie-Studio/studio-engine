@@ -69,15 +69,14 @@ module Studio
         create_with_free_slug(model, attributes, email_verified: email_verified)
       end
 
+      # Kept under these names for callers that predate Studio::Account, which
+      # now owns the one safe lookup: a blank address finds nobody.
       def normalize_email(value)
-        email = value.to_s.strip.downcase
-        email.empty? ? nil : email
+        Studio::Account.normalize_email(value)
       end
 
       def find_by_email(model, email)
-        return nil unless column?(model, "email")
-
-        model.where(model.arel_table[:email].lower.eq(email)).first
+        Studio::Account.find_by_email(model, email)
       end
 
       private
@@ -99,13 +98,15 @@ module Studio
             # verified it, the same rule as step 2 above. An unverified address
             # that collides with someone else's row hands that row to nobody.
             found = model.find_by(provider: assignable[:provider], uid: assignable[:uid])
-            found ||= find_by_email(model, assignable[:email]) if email_verified && assignable[:email]
+            found ||= find_by_email(model, assignable[:email]) if email_verified
             return found if found
           end
         end
 
-        log_unmatched_collision(last_error)
-        nil
+        # Nobody to find on either attempt: Studio::Account.race_winner logs it.
+        Studio::Account.race_winner(model, provider: attributes[:provider], uid: attributes[:uid],
+                                           email: attributes[:email], email_verified: email_verified,
+                                           error: last_error)
       end
 
       def slug_needs_fallback?(model, record)
@@ -124,15 +125,6 @@ module Studio
       def install_fallback_slug(record)
         token = SecureRandom.hex(4)
         record.define_singleton_method(:name_slug) { id ? "user-#{id}" : "user-#{token}" }
-      end
-
-      def log_unmatched_collision(error)
-        return unless error
-
-        Rails.logger.warn("[omniauth] Google sign-in collided with nobody to find: #{error.class}: #{error.message.to_s[0, 300]}")
-        ErrorLog.capture!(error) if defined?(::ErrorLog) && ::ErrorLog.respond_to?(:capture!)
-      rescue StandardError => e
-        Rails.logger.warn("[omniauth] could not log the collision: #{e.class}")
       end
 
       def column?(model, name)
