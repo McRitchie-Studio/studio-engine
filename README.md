@@ -350,6 +350,10 @@ as a layout; the block draws each slide. `per_view:` is the wide row's count
 
 `caption:` (a callable on the item) writes a small line under each slide.
 
+`dots: false` draws no dots: the row has no dot group in the tab order or the
+accessibility tree, and the arrows, keys, swipe and status line stay. The default,
+`dots: true`, renders exactly what leaving it out does.
+
 `style: :spotlight` snaps each slide to the centre: the centred slide is full size and
 colour, with its caption under it (the spotlight shows the centred slide's only), and its
 neighbours are smaller, faded and grey. The arrows ("Previous slide", "Next slide") and
@@ -412,7 +416,15 @@ status line says "Slide N of M". `start:`, `caption:` (under the open slide only
 `autoplay:` and `loop:` behave as on the spotlight; a looping cascade needs no clones,
 since the steps wrap round the set. Under reduced motion the stack lays flat as a spotlight
 row, the neighbours only dimmed, and a move swaps at once. A controller that fails leaves
-a plain scrolling row.
+a plain scrolling row. A region under 36rem wide fades its side cards at the track's edge
+instead of cutting them, and a card that crosses a looping stack round the seam fades in at
+its new place on every move.
+
+Tab skips the cards past the window (they are hidden). Tab from the track lands on the
+first card in view and brings it to the front, and each Tab after moves one card on. A
+cascade that does not loop and opens mid-row (the default) has cards before the window that
+forward Tab never reaches: Shift+Tab from the first card in view, Home, the arrow keys,
+Previous and the dots reach them.
 
 ```erb
 <%= render layout: "studio/carousel",
@@ -420,6 +432,53 @@ a plain scrolling row.
   <%= render "apps/card", app: app %>
 <% end %>
 ```
+
+**The change event.** Every style dispatches `studio:carousel:change` from the region
+(`section.carousel`), bubbling, once each time the open slide changes, after the
+controller has moved `data-current`. `event.detail` is `{ index, previous, slide, total }`:
+the open slide's index among the real slides (from 0), the one open before, its element
+(never a looping row's copy) and the count. Follow the open slide with it; do not observe
+`data-current`. The first paint's slide fires nothing, and a row that opens elsewhere
+when its controller connects (a `#fragment`, a restored scroll) fires once. A cascade
+fires once per move. A scrolling row (standard or spotlight) fires for each slide its
+glide passes, as its `data-current` moves; a looping one fires for the real slide once it
+has jumped home off the seam copy. A standard row's open slide is the one at its first
+stop, and it marks none `data-current`.
+
+**The image-only pattern** (the hub Portfolio, `/lab/carousel_cascade`, `/admin/style`):
+each card is only its picture, filling the card; the open card wears a ring; and one caption
+sits under the stack and follows the open card. A caption inside each slide would ride the
+slide's 3D move, so the captions live outside the row, one per item in item order, all in one
+grid cell. The engine's `carousel-captions` controller (lazy) marks the open one
+`data-current` and the rest `aria-hidden` on each change event; the page needs no script:
+
+```erb
+<div data-studio-controller="carousel-captions">
+  <%= render layout: "studio/carousel",
+        locals: { label: "Portfolio", items: @apps, style: :cascade, loop: true, dots: false,
+                  slide_label: ->(app) { app.name } } do |app| %>
+    <%= link_to app.url, aria: { label: app.name },
+          class: "block aspect-[4/3] overflow-hidden rounded-2xl transition-shadow duration-300 in-data-current:ring-2 in-data-current:ring-primary" do %>
+      <%= image_tag app.image, alt: "", class: "h-full w-full object-cover" %>
+    <% end %>
+  <% end %>
+  <div class="grid pt-4 text-center">
+    <% @apps.each_with_index do |app, index| %>
+      <div class="col-start-1 row-start-1 opacity-0 invisible transition-opacity data-current:opacity-100 data-current:visible"
+           data-carousel-captions-target="caption"<%= " data-current".html_safe if index.zero? %><%= ' aria-hidden="true"'.html_safe unless index.zero? %>>
+        <h2 class="type-h4 text-heading"><%= app.name %></h2>
+        <p class="text-sm text-secondary"><%= app.blurb %></p>
+      </div>
+    <% end %>
+  </div>
+</div>
+```
+
+The server marks the caption of the slide the row opens on (`start:`; index 0 for a
+looping row). The ring keys on `data-current`, which the cascade and the spotlight set on
+the open slide (`in-data-current:` matches the card inside it). The row's status line
+already says which slide is open, so the caption stack is not a live region. A host that
+needs more than a caption listens for `studio:carousel:change` itself.
 
 ### The "at" time stamp — `at_time_tag`
 

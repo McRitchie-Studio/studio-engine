@@ -1,4 +1,4 @@
-<%# locals: (label:, items:, per_view: 3, id: nil, slide_label: nil, data: {}, class_name: nil, style: :standard, caption: nil, start: nil, autoplay: nil, loop: false, visible: nil) %>
+<%# locals: (label:, items:, per_view: 3, id: nil, slide_label: nil, data: {}, class_name: nil, style: :standard, caption: nil, start: nil, autoplay: nil, loop: false, visible: nil, dots: true) %>
 <%# THE CAROUSEL: one sideways row of slides, the apps' standard for a set too
     long to grid. Render it as a layout, so each slide is your own block:
 
@@ -51,6 +51,9 @@
                    so a screen reader and Tab meet each slide once, a #fragment
                    finds the real slide, and the dots and "slide N of M" count the
                    real slides. Every slide of a looping row is a stop.
+      dots         true (the default) draws a dot per slide under the row; false
+                   draws none, so the row has no dot group in the tab order or the
+                   accessibility tree. The arrows, keys, swipe and status line stay.
       autoplay     seconds between moves (a number above 0); nil, the default, is
                    off. The row moves one slide each interval and holds still while
                    the pointer is over the slides, while keyboard focus is in it,
@@ -74,10 +77,21 @@
     lays the stack out (perspective, translateZ, a slight turn toward the centre)
     and transitions it. An arrow, a dot, a key, a swipe or drag, autoplay, a click
     on a side slide and keyboard focus in one bring that slide to the front; a
-    click on a side slide opens nothing. A looping cascade needs no clones: the
-    steps wrap round the set, so the window is never wider than the set. Under
-    reduced motion it lays flat, as a spotlight does, and swaps with no glide. If
-    its controller fails it falls back to a plain scrolling row.
+    click on a side slide opens nothing. Tab skips the slides past the window (they
+    are hidden): it lands on the first slide in view and moves one on each press.
+    A cascade that does not loop and opens mid-row has slides before the window
+    that forward Tab never reaches; Shift+Tab from the first slide in view, Home,
+    the arrow keys, Previous and the dots do. A looping cascade needs no clones: the
+    steps wrap round the set, so the window is never wider than the set. A narrow
+    region fades its side slides at the track's edge. Under reduced motion it lays
+    flat, as a spotlight does, and swaps with no glide. If its controller fails it
+    falls back to a plain scrolling row.
+
+    THE CHANGE EVENT. Every style dispatches "studio:carousel:change" from the
+    region, bubbling, once each time the open slide changes, after data-current
+    has moved: detail { index, previous, slide, total }. A host that follows the
+    open slide listens for it. One caption under the row needs no script: the
+    carousel-captions controller follows it (README, the image-only pattern).
 
     THE TRACK IS A NATIVE SCROLL-SNAP ROW (engine.css, carousel). A swipe, a
     trackpad, a wheel and a focused link move it with no script. The carousel
@@ -164,6 +178,7 @@
     <% end %>
   </div>
   <div class="carousel-controls">
+    <% if dots %>
     <div class="carousel-dots" role="group" aria-label="Choose a slide">
       <% total.times do |index| %>
         <button type="button" class="carousel-dot" aria-label="Go to slide <%= index + 1 %>"
@@ -172,6 +187,7 @@
                 data-studio-action="click->carousel#goTo"></button>
       <% end %>
     </div>
+    <% end %>
     <div class="carousel-arrows">
       <% if autoplay %>
         <%# The pause button (WCAG 2.2.2). The controller renames it "Play slideshow"

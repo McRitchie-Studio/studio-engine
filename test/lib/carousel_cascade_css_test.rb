@@ -39,6 +39,18 @@ class CarouselCascadeCssTest < Minitest::Test
     assert_match(/&\[data-carousel-visible="3"\] > \.carousel-track \{\s*--carousel-cascade-reach: 1;/, BLOCK)
   end
 
+  # A phone's side cards run past the track: its edges fade them (a mask), on the
+  # narrow region only, so the wide stack keeps no mask and nothing is cut hard.
+  def test_a_narrow_region_fades_its_edges
+    narrow = BLOCK.scan(NARROW).first
+    fade = "linear-gradient(to right, transparent, #000 var(--carousel-cascade-fade, 10%), #000 calc(100% - var(--carousel-cascade-fade, 10%)), transparent)"
+    assert_includes narrow, "-webkit-mask-image: #{fade}"
+    assert_includes narrow, "mask-image: #{fade}"
+    wide = BLOCK[/^  & > \.carousel-track \{\n.*?\n  \}\n/m]
+    assert_match(/mask-image: none;/, wide, "the wide stack has no mask")
+    assert_match(/&\[data-studio-controller-failed\] > \.carousel-track \{[^}]*mask-image: none;/, BLOCK, "the fallback row drops it")
+  end
+
   def test_reduced_motion_lays_it_flat_with_no_glide
     reduced = BLOCK[REDUCED]
     refute_nil reduced

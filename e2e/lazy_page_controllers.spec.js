@@ -37,6 +37,7 @@ const PAGES = [
   ["copy-text", "/lab/marketing_kit", "copy_text_controller"],
   ["page-header", "/lab/admin_models/users", "page_header_controller"],
   ["carousel", "/lab/carousel", "carousel_controller"],
+  ["carousel-captions", "/lab/carousel_cascade", "carousel_captions_controller"],
   // A signed-in door: the mic is never on a signed-out page.
   ["agent-chat-voice", "/agent_chat_voice_lab/sign_in?as=lazy", "agent_chat_voice_controller"]
 ];

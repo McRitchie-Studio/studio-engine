@@ -101,3 +101,42 @@ test("autoplay steps one slide on, round a looping set, and stops at the end of 
   assert.equal(autoplayStop(6, 7, false), null)
   assert.equal(autoplayStop(6, 7, true), 0)
 })
+
+const { CHANGE_EVENT, changeDetail, clickedSlide } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
+
+test("the change event is named once and documented", () => {
+  assert.equal(CHANGE_EVENT, "studio:carousel:change")
+})
+
+test("a change detail names the open slide, the one before, its element and the count", () => {
+  const slides = ["a", "b", "c"]
+  assert.deepEqual(changeDetail(0, 2, slides), { index: 2, previous: 0, slide: "c", total: 3 })
+  assert.deepEqual(changeDetail(undefined, 1, slides), { index: 1, previous: null, slide: "b", total: 3 })
+})
+
+test("no change, no detail: the same slide, an index off the set, or no slides", () => {
+  assert.equal(changeDetail(1, 1, ["a", "b"]), null)
+  assert.equal(changeDetail(0, 5, ["a", "b"]), null)
+  assert.equal(changeDetail(0, -1, ["a", "b"]), null)
+  assert.equal(changeDetail(0, Number.NaN, ["a", "b"]), null)
+  assert.equal(changeDetail(null, 0, []), null)
+})
+
+test("a click with no press (Enter on a link) is the slide it lands in, whatever a press left", () => {
+  assert.equal(clickedSlide(4, 0, 3), 3, "a stale press on card 5 does not steal Enter on the open card")
+  assert.equal(clickedSlide(null, 0, 2), 2)
+})
+
+test("a mouse click reads its press first, then the slide it lands in", () => {
+  assert.equal(clickedSlide(4, 1, 3), 4)
+  assert.equal(clickedSlide(null, 1, 3), 3)
+  assert.equal(clickedSlide(undefined, 2, -1), -1)
+})
+
+test("Next then Previous round a five-card loop's seam takes the same card across twice", () => {
+  // The controller replays that card's fade each time (e2e/carousel_cascade.spec.js).
+  const first = cascadeJumps(cascadeSteps(5, 0, true), cascadeSteps(5, 1, true), 1)
+  const back = cascadeJumps(cascadeSteps(5, 1, true), cascadeSteps(5, 0, true), 0)
+  assert.deepEqual(first, [false, false, false, true, false])
+  assert.deepEqual(back, [false, false, false, true, false])
+})

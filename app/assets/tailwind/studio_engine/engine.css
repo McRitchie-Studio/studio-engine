@@ -1174,13 +1174,16 @@ body.modal-open .studio-app-banner {
     --cascade-shift: 0.62;
   }
 
-  /* A narrow region shows one each side, on wider cards. */
+  /* A narrow region shows one each side, on wider cards. Those side cards run past
+     the track's edge, so the edge fades them out instead of cutting them hard. */
   @container (width < 36rem) {
     & > .carousel-track {
       --carousel-cascade-reach: 1;
       --cascade-w: 64cqi;
       --cascade-shift: 0.44;
       --cascade-depth: 3.5rem;
+      -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--carousel-cascade-fade, 10%), #000 calc(100% - var(--carousel-cascade-fade, 10%)), transparent);
+              mask-image: linear-gradient(to right, transparent, #000 var(--carousel-cascade-fade, 10%), #000 calc(100% - var(--carousel-cascade-fade, 10%)), transparent);
     }
   }
 
@@ -1264,7 +1267,9 @@ body.modal-open .studio-app-banner {
   /* Round the seam: no glide across the stack, a fade in at the new place. */
   & > .carousel-track > .carousel-slide[data-cascade-jump] {
     transition: none;
-    animation: carousel-cascade-in 320ms ease both;
+    /* backwards, not both: a fade that has ended leaves nothing running, so the
+       slide holds no finished animation until its next move. */
+    animation: carousel-cascade-in 320ms ease backwards;
   }
 
   & > .carousel-track > .carousel-slide[data-cascade-jump]:is([data-cascade-step="before"], [data-cascade-step="after"]) {
@@ -1322,6 +1327,8 @@ body.modal-open .studio-app-banner {
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     perspective: none;
+    -webkit-mask-image: none;
+            mask-image: none;
   }
 
   &[data-studio-controller-failed] > .carousel-track > .carousel-slide {

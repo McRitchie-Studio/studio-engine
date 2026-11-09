@@ -476,16 +476,21 @@ class CarouselRenderTest < Minitest::Test
   # The cascade lives beside the other styles, not in them: each renders byte for
   # byte what it rendered before the cascade was added. These digests were taken on
   # the release before it (0.137.0) and pin the whole output, so a change to the
-  # standard or spotlight markup has to change them on purpose.
+  # standard or spotlight markup has to change them on purpose. The three cascade
+  # digests were taken on accepted at dc5f72be, before dots: was added: a row that
+  # does not pass dots: renders byte for byte as it did.
   BYTE_IDENTITY = [
     [ITEMS, {}],
     [ITEMS, { style: :standard, caption: ->(i) { "Cap #{i.name}" } }],
     [ITEMS, { style: :spotlight }],
     [SEVEN, { style: :spotlight, caption: ->(i) { "Cap #{i.name}" } }],
     [SEVEN, { style: :spotlight, loop: true, autoplay: 3.5, start: 1 }],
-    [SEVEN, { start: :middle, per_view: 2.5, loop: true, slide_label: ->(i) { i.name } }]
+    [SEVEN, { start: :middle, per_view: 2.5, loop: true, slide_label: ->(i) { i.name } }],
+    [SEVEN, { style: :cascade }],
+    [SEVEN, { style: :cascade, loop: true, autoplay: 4, caption: ->(i) { "Cap #{i.name}" } }],
+    [ITEMS, { style: :cascade, visible: 3, start: 0, slide_label: ->(i) { i.name } }]
   ].freeze
-  BYTE_IDENTITY_DIGESTS = %w[3490a0179a62aa1a 202ca6983533a326 e6d195e03de08832 f221ee2dc38d062e b7634921dd03c65b 417bfdb4bb325e7f].freeze
+  BYTE_IDENTITY_DIGESTS = %w[3490a0179a62aa1a 202ca6983533a326 e6d195e03de08832 f221ee2dc38d062e b7634921dd03c65b 417bfdb4bb325e7f 395ec1cb0bf98381 24f1456b41397788 d254ab24e65b8806].freeze
 
   def raw(items, locals)
     view = ActionView::Base.with_empty_template_cache.new(ActionView::LookupContext.new([VIEWS]), {}, nil)
@@ -500,4 +505,33 @@ class CarouselRenderTest < Minitest::Test
     assert_equal BYTE_IDENTITY_DIGESTS, digests
   end
 
+  # dots: false draws no dot group on any style: nothing for Tab or a screen
+  # reader to meet. The arrows, the status line and the slides stay.
+  def test_dots_false_draws_no_dots_on_any_style
+    %i[standard spotlight cascade].each do |style|
+      doc = render_carousel(items: SEVEN, style: style, dots: false)
+
+      assert_nil doc.at_css(".carousel-dots"), "#{style}: no dot group"
+      assert_empty doc.css("[data-carousel-target='dot']"), "#{style}: no dot targets"
+      assert_equal 2, doc.css(".carousel-arrows > [data-carousel-target='prev'], .carousel-arrows > [data-carousel-target='next']").size, "#{style}: arrows stay"
+      assert doc.at_css("[data-carousel-target='status'][role='status']"), "#{style}: the status line stays"
+      assert_equal 7, doc.css(".carousel-slide").size
+      focusable = doc.css("button, a, [tabindex]").reject { |el| el["tabindex"] == "-1" }
+      assert focusable.none? { |el| el["class"].to_s.include?("carousel-dot") }, "#{style}: no dot in the tab order"
+    end
+  end
+
+  # dots: true is the default: passing it renders byte for byte what leaving it out does.
+  def test_dots_true_renders_as_leaving_dots_out
+    BYTE_IDENTITY.each do |items, locals|
+      assert_equal raw(items, locals), raw(items, locals.merge(dots: true)), "dots: true on #{locals.inspect}"
+    end
+  end
+
+  def test_dots_false_keeps_the_rest_of_the_output
+    without = raw(SEVEN, { style: :cascade, loop: true, dots: false })
+    with = raw(SEVEN, { style: :cascade, loop: true })
+
+    assert_equal with.sub(%r{\s*<div class="carousel-dots".*?</div>\n}m, "\n"), without
+  end
 end

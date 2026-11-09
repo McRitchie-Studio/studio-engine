@@ -57,13 +57,24 @@
 // and autoplay move it as they move a spotlight, through the same move() and
 // scrollToStop(). A swipe or a drag (pointer events, past DRAG_THRESHOLD) moves it
 // too; a click on a side slide brings that slide to the front and follows no link,
-// and keyboard focus landing in a side slide does the same, so Tab walks the set. A
-// looping cascade takes no clones: the steps wrap round the set, and a slide that
-// crosses the stack round the seam (cascadeJumps) takes no glide. A focused slide
-// that leaves the window hands focus to the track, so the keys keep working.
+// and keyboard focus landing in a side slide in view does the same. TAB: a slide past
+// the window is hidden, so Tab skips it. Tab from the track lands on the first slide
+// in view and brings it to the front, and each Tab after moves one slide on. A cascade
+// that does not loop and opens mid-row (the default :middle) has slides before the
+// window that forward Tab never reaches: Shift+Tab from the first slide in view (its
+// focus has moved the stack, so the slide before it is in view), Home, the arrow keys,
+// the Previous arrow and the dots reach them. A looping cascade takes no clones: the
+// steps wrap round the set, and a slide that crosses the stack round the seam
+// (cascadeJumps) takes no glide but fades in, every time. A focused slide that leaves
+// the window hands focus to the track, so the keys keep working.
+//
+// THE CHANGE EVENT (studio/carousel CHANGE_EVENT, "studio:carousel:change"): every
+// style dispatches it from the region, bubbling, once per change of the open slide,
+// after data-current has moved (announceChange). detail: { index, previous, slide,
+// total }. A host follows the open slide with it instead of observing data-current.
 import { Controller } from "@hotwired/stimulus"
 import {
-  CLONE_STRIP, TOLERANCE, autoplayRunning, autoplaySeconds, autoplayStop, cascadeJumps, cascadeReach, cascadeSlot,
+  CHANGE_EVENT, CLONE_STRIP, TOLERANCE, autoplayRunning, changeDetail, clickedSlide, autoplaySeconds, autoplayStop, cascadeJumps, cascadeReach, cascadeSlot,
   cascadeStep, cascadeSteps, cascadeTarget, centerStops, cloneCount, cloneLayout, dragSteps,
   currentStop, hiddenEnds, idleDelay, initialReasons, keyAction, loopPositionText, loopStop, nearestVirtual, ownsKey,
   perPage, positionText, seamJump, startStop, stops, targetStop, toggleLabel, withReason, wrapIndex
@@ -95,6 +106,8 @@ export default class extends Controller {
       this.observer.observe(this.trackTarget)
     }
     this.element.setAttribute("data-carousel-ready", "")
+    // The first paint's slide: the change event fires only when the open slide leaves it.
+    this.opened = Math.max(0, Number(this.element.dataset.carouselStart) || 0)
     this.openAtStart()
     this.addClones()
     this.sync()
@@ -107,6 +120,7 @@ export default class extends Controller {
     const slides = this.slideTargets
     const marked = slides.findIndex((slide) => slide.hasAttribute("data-current"))
     this.active = marked >= 0 ? marked : 0
+    this.opened = this.active
     // A #fragment inside a slide opens on that slide.
     const hash = window.location?.hash
     if (hash && hash.length > 1) {
@@ -119,7 +133,7 @@ export default class extends Controller {
       ["pointerdown", (event) => this.dragStart(event)],
       ["pointermove", (event) => this.dragMove(event)],
       ["pointerup", (event) => this.dragEnd(event)],
-      ["pointercancel", () => this.dragCancel()],
+      ["pointercancel", () => { this.pressed = null; this.dragCancel() }],
       ["click", (event) => this.clickSide(event), true],
       ["focusin", (event) => this.focusSide(event)],
       ["dragstart", (event) => event.preventDefault()]
@@ -159,6 +173,14 @@ export default class extends Controller {
     if (this.hasNextTarget) this.nextTarget.setAttribute("aria-disabled", String(!wraps && this.active >= total - 1))
     const steps = cascadeSteps(total, this.active, this.loop)
     const jumps = this.laid ? cascadeJumps(this.laid, steps, this.active) : steps.map(() => false)
+    // A jumping slide's fade replays only if the style saw it without the mark first.
+    // It may still wear the mark from its last jump (Next then Previous round the
+    // seam), or have lost it earlier in this same task (move() syncs before it moves),
+    // which the style never saw: drop the mark, settle the style, then set it.
+    if (jumps.some(Boolean)) {
+      this.slideTargets.forEach((slide, index) => { if (jumps[index]) slide.removeAttribute("data-cascade-jump") })
+      void this.trackTarget.offsetWidth
+    }
     this.slideTargets.forEach((slide, index) => {
       slide.setAttribute("data-cascade-step", cascadeSlot(steps[index]))
       slide.toggleAttribute("data-cascade-jump", jumps[index])
@@ -170,6 +192,16 @@ export default class extends Controller {
       if (index === this.active) dot.setAttribute("aria-current", "true")
       else dot.removeAttribute("aria-current")
     })
+    this.announceChange(this.active)
+  }
+
+  // THE CHANGE EVENT (studio/carousel CHANGE_EVENT): once per change of the open
+  // slide, after data-current has moved, bubbling from the region.
+  announceChange(index) {
+    const detail = changeDetail(this.opened, index, this.slideTargets)
+    if (!detail) return
+    this.opened = index
+    this.element.dispatchEvent(new CustomEvent(CHANGE_EVENT, { bubbles: true, detail }))
   }
 
   // Brings slide `index` to the front. A focused slide that leaves the window hands
@@ -192,7 +224,9 @@ export default class extends Controller {
 
   // A press on a side slide: the click that follows brings it to the front and opens
   // nothing. The slide is read at the press, so a link whose focus already moved the
-  // stack still counts as a side slide's.
+  // stack still counts as a side slide's. A click with no press (event.detail 0:
+  // Enter or Space on a focused link) is read where it lands (clickedSlide), so a
+  // press released off the track leaves nothing behind for Enter on the open card.
   clickSide(event) {
     if (this.dragged) {
       this.dragged = false
@@ -200,7 +234,7 @@ export default class extends Controller {
       event.stopPropagation()
       return
     }
-    const index = this.pressed ?? this.slideAt(event.target)
+    const index = clickedSlide(this.pressed, event.detail, this.slideAt(event.target))
     this.pressed = null
     if (index < 0 || index === this.active) return
     event.preventDefault()
@@ -209,7 +243,8 @@ export default class extends Controller {
     this.scrollToStop(index)
   }
 
-  // Keyboard focus in a side slide brings it to the front, so Tab walks the set. A
+  // Keyboard focus in a side slide brings it to the front, so Tab moves one slide on
+  // from the first slide in view (see TAB above for the slides before the window). A
   // mouse press focuses without :focus-visible and leaves the move to its click.
   focusSide(event) {
     const index = this.slideAt(event.target)
@@ -221,8 +256,10 @@ export default class extends Controller {
     this.scrollToStop(index, { announce: false })
   }
 
+  // A press released off the track sends no pointerup here, so its record is stale:
+  // the next press of the same pointer replaces it. A second finger is ignored.
   dragStart(event) {
-    if (event.button > 0 || this.drag) return
+    if (event.button > 0 || (this.drag && this.drag.id !== event.pointerId)) return
     const index = this.slideAt(event.target)
     this.pressed = index >= 0 && index !== this.active ? index : null
     this.dragged = false
@@ -564,6 +601,9 @@ export default class extends Controller {
       if (index === this.current) dot.setAttribute("aria-current", "true")
       else dot.removeAttribute("aria-current")
     })
+    // A looping row resting on a copy is on its way home (settle): it announces the
+    // real slide once it lands there, so the slide the event names carries the mark.
+    if (!this.cloned || this.virtual === this.current) this.announceChange(this.current)
   }
 
   prev() { this.move("prev") }
