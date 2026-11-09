@@ -60,6 +60,8 @@ class CarouselCascadeCssTest < Minitest::Test
     assert_includes narrow, "padding-block-end: calc(0.75rem + var(--carousel-cascade-shadow-room, 2.5rem));"
     assert_includes narrow, "margin-block-end: calc(-1 * var(--carousel-cascade-shadow-room, 2.5rem));"
     assert_match(/& > \.carousel-controls \{\s*position: relative;\s*z-index: 1;\s*\}/, narrow)
+    # A row with no controls has nothing over the room, so it keeps it (no overlap).
+    assert_match(/&:is\(\[data-carousel-static\], \[data-studio-controller-failed\]\) > \.carousel-track \{\s*margin-block-end: 0;\s*\}/, narrow)
   end
 
   def test_reduced_motion_lays_it_flat_with_no_glide

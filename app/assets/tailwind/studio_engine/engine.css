@@ -1200,6 +1200,12 @@ body.modal-open .studio-app-banner {
       position: relative;
       z-index: 1;
     }
+
+    /* A row with no controls (one slide, or a failed controller) keeps the room: with
+       nothing over it, the track's box would cover what follows and take its presses. */
+    &:is([data-carousel-static], [data-studio-controller-failed]) > .carousel-track {
+      margin-block-end: 0;
+    }
   }
 
   &[data-carousel-dragging] > .carousel-track {
