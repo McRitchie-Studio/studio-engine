@@ -298,7 +298,9 @@ add_column :users, :password_digest, :string, null: false, default: ""
 Do not write these by hand: the engine's migrations above create `error_logs`,
 `theme_settings` (with the `slug` column `ThemeSetting` writes at create) and
 `image_caches`. A later engine migration backfills `slug` and makes it unique on
-`error_logs` and `theme_settings`; NOT NULL follows a release after that.
+`error_logs` and `theme_settings`, and on `studio_geo_settings` and
+`studio_site_identities` when the app has them; NOT NULL follows a release after
+that.
 
 ```bash
 bin/rails db:create db:migrate
