@@ -7,11 +7,32 @@
     scrolls up under the pinned bar and the engine's clone takes its place. The
     table is HOST content on purpose: the primitive enhances whatever table a
     host renders, so the lab renders the kind of table a host does, and nothing
-    of the clone itself. %>
+    of the clone itself.
+
+    ?page_header=1 puts the engine's page header above a SHORT table (three rows),
+    the Turf Monster /contests shape: a My Contests table that leaves under the
+    pinned page header after a small scroll. The clone must leave with it, cut at
+    the page header's bottom edge, never drawn over the title. %>
 <%= render "studio/banners/stack", devnet: @lab_devnet %>
 <%= render "layouts/navbar", balance_html: nil, scroll_timeline: params[:timeline].present? %>
 
 <main class="p-8">
+  <% if params[:page_header].present? %>
+    <%= render "studio/page_header", title: "Contests" %>
+    <div style="height: 120px"></div>
+    <div class="card overflow-x-auto" data-test="short-scroller">
+      <table data-test="short-table" class="w-full text-left">
+        <thead>
+          <tr><th class="px-3 py-2">Contest</th><th class="px-3 py-2">Status</th><th class="px-3 py-2">Entry</th></tr>
+        </thead>
+        <tbody>
+          <% 3.times do |i| %>
+            <tr><td class="px-3 py-2">Contest <%= i + 1 %></td><td class="px-3 py-2">Open</td><td class="px-3 py-2">$19.00</td></tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
   <p data-test="lab-body">sticky table lab</p>
   <div style="height: 240px"></div>
   <div data-test="table-scroller">

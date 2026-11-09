@@ -25,10 +25,14 @@
   display: none;
   overflow: hidden;
   pointer-events: none;
-  /* --z-sticky: it fakes a sticky <thead>, so a side panel or a menu opened over
-     the table still covers it. The old bare 45 sat between the panel and dropdown
-     tiers for no recorded reason. */
-  z-index: var(--z-sticky, 30);
+  /* TWO RUNGS UNDER --z-sticky: under the pinned page header (--z-sticky) and the
+     stuck section header (--z-sticky - 1), and still over --z-raised content. It
+     fakes a sticky <thead>, so a side panel or a menu opened over the table still
+     covers it. At --z-sticky itself it TIED the page header, and a tie goes to the
+     later element: this one is appended to <body>, so it painted over the title.
+     The script also never places it above the stack's bottom edge
+     (sticky_table_header.js, placement), so the rung is the second guard. */
+  z-index: calc(var(--z-sticky, 30) - 2);
 }
 
 .sticky-table-header-clone table {

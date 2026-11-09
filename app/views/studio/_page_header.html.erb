@@ -58,7 +58,9 @@
     IT JOINS THE STACK WITH data-pin="page" AND POSITIONS OFF --pin-page-top, the
     bottom of everything above it. --pin-stack-bottom includes the row's own edge,
     so a row positioned off it would chase itself down the page. Anything below,
-    such as the sticky table header's clone, sits under the row with no edit.
+    such as the sticky table header's clone, sits under the row: the clone starts
+    at the stack's bottom edge, never above it, and stacks two rungs under the
+    row's --z-sticky (studio/sticky_table_header.css).
 
     THE SENTINEL stays at the row's place in the flow, and the row's distance from
     it is what "stuck" means, on every kind of header. It is absolutely positioned,
