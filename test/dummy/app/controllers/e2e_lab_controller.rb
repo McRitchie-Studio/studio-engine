@@ -833,6 +833,11 @@ class E2eLabController < ActionController::Base
   # plus a row that does not loop. e2e/carousel_autoplay.spec.js. A view, no inputs.
   def carousel_autoplay; end
 
+  # studio/_carousel, style: :cascade: seven captioned cards in a 3D stack, five in
+  # view, plus a three-in-view row and a looping row. e2e/carousel_cascade.spec.js.
+  # A view, no inputs.
+  def carousel_cascade; end
+
   # studio/_section_header under the real chrome, with a table inside a section.
   # ?timeline=1 puts the header on the scroll-driven collapse.
   def section_header

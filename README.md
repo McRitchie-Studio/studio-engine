@@ -398,6 +398,29 @@ again from the first.
 <% end %>
 ```
 
+`style: :cascade` is a 3D stack. The open slide sits in front at full size, and the slides
+either side step back behind it: each step further aside, smaller, deeper (`perspective`,
+`translateZ`), dimmer and turned a little toward the centre, with the open slide on top.
+`visible: 5` (the default) shows two each side and `visible: 3` one; a region under 36rem
+wide shows one each side whatever it asks, so a phone keeps its cards legible. `visible:`
+on another style raises. The row does not scroll: each slide wears `data-cascade-step`
+(`-2` to `2` in view, `before` and `after` past the window, hidden), which the partial writes
+for the first paint and the controller rewrites on a move. The arrows, dots, keys
+(arrows, Home, End), a swipe or drag, autoplay, a click on a side slide (which opens
+nothing) and keyboard focus landing in a side slide bring that slide to the front, and the
+status line says "Slide N of M". `start:`, `caption:` (under the open slide only),
+`autoplay:` and `loop:` behave as on the spotlight; a looping cascade needs no clones,
+since the steps wrap round the set. Under reduced motion the stack lays flat as a spotlight
+row, the neighbours only dimmed, and a move swaps at once. A controller that fails leaves
+a plain scrolling row.
+
+```erb
+<%= render layout: "studio/carousel",
+      locals: { label: "Portfolio", items: @apps, style: :cascade, autoplay: 6, loop: true } do |app| %>
+  <%= render "apps/card", app: app %>
+<% end %>
+```
+
 ### The "at" time stamp — `at_time_tag`
 
 Stamps WHEN something happened, on the reader's own clock: `at 3:53p`, gaining a

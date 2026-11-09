@@ -118,7 +118,7 @@ class StylePageTest < ActiveSupport::TestCase
     assert carousel, "the specimen is the real partial"
     assert_equal "carousel", carousel["data-studio-controller"]
     assert_equal 7, carousel.css(".carousel-slide").size
-    assert_equal 2, doc.css("[aria-roledescription='carousel']").size, "the carousel and its spotlight"
+    assert_equal 3, doc.css("[aria-roledescription='carousel']").size, "the carousel, its spotlight and its cascade"
   end
 
   test "the Tricks section shows the spotlight carousel beside it" do
@@ -129,6 +129,17 @@ class StylePageTest < ActiveSupport::TestCase
     assert_equal "carousel", spot["data-studio-controller"]
     assert_equal 7, spot.css(".carousel-slide > .carousel-spotlight-body").size
     assert_equal "Slide 1", spot.at_css(".carousel-caption").text
+  end
+
+  test "the Tricks section shows the cascade carousel beside them" do
+    doc = Nokogiri::HTML.fragment(render_index)
+    cascade = doc.at_css("section#tricks [data-carousel-specimen] [data-carousel-cascade-specimen] section.carousel.carousel-cascade")
+
+    assert cascade, "the cascade specimen is the real partial, style: :cascade"
+    assert_equal "carousel", cascade["data-studio-controller"]
+    assert_equal "5", cascade["data-carousel-visible"]
+    assert_equal 7, cascade.css(".carousel-slide > .carousel-cascade-body").size
+    assert_equal %w[0 1 2 after before -2 -1], cascade.css(".carousel-slide").map { |slide| slide["data-cascade-step"] }
   end
 
   test "every section's title is a section header, first in its section, and joins no data-pin" do
@@ -273,7 +284,7 @@ class StylePageTest < ActiveSupport::TestCase
     btn-neutral btn-outline btn-google btn-sm btn-lg
     card card-hover badge input-field empty-state label-upper
     studio-border-glow spinner loading-dots sheen ping fade-edge progress-meter
-    carousel-spotlight carousel-spotlight-body carousel-caption
+    carousel-spotlight carousel-spotlight-body carousel-caption carousel-cascade carousel-cascade-body
     carousel carousel-track carousel-slide carousel-dot carousel-button
     carousel-controls carousel-dots carousel-arrows
     studio-border-glow--clear

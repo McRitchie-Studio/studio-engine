@@ -1112,6 +1112,234 @@ body.modal-open .studio-app-banner {
   }
 }
 
+/* -- The cascade carousel (studio/_carousel, style: :cascade) ----------------------
+   A 3D stack. The open slide sits in front at full size; the slides either side step
+   back behind it, each step further aside, smaller, deeper and dimmer, turned a
+   little toward the centre. visible: 5 (the default) shows two each side, visible: 3
+   one; a region under 36rem wide shows one each side whatever it asks, so a phone
+   keeps its cards legible.
+
+   THE ROW DOES NOT SCROLL. Every slide sits in one grid cell, so the cell is as tall
+   as the tallest slide, and each wears data-cascade-step: its place from the open
+   slide, -2 to 2 in view, "before" and "after" past the window (hidden). The partial
+   writes the first paint's steps and the controller rewrites them on a move; this
+   block maps a step to --cascade-x (signed) and --cascade-d (its depth) and lays the
+   slide out from the two, with a transition. The track clips sideways, so the stack
+   never widens the page. --carousel-cascade-reach tells the controller how many
+   steps each side are in view.
+
+   A slide that crosses the stack round a looping set's seam (data-cascade-jump)
+   takes no glide; it fades in at its new place. A drag nudges the stack after the
+   pointer (--carousel-cascade-drag) and settles on release.
+
+   UNDER REDUCED MOTION nothing turns, deepens, scales or glides: the stack lays flat
+   as a spotlight row does, the neighbours only dimmed, and a move swaps at once.
+
+   IF THE CONTROLLER FAILS (data-studio-controller-failed) the stack is a plain
+   scrolling row, so every slide can still be reached. */
+@keyframes carousel-cascade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@utility carousel-cascade {
+  & > .carousel-track {
+    --carousel-cascade-reach: 2;
+    --cascade-w: min(34cqi, 22rem);
+    --cascade-shift: 0.52;
+    --cascade-scale: 0.12;
+    --cascade-depth: 6rem;
+    --cascade-turn: 10deg;
+    --cascade-dim: 0.22;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    align-items: start;
+    gap: 0;
+    overflow: visible;
+    overflow-x: clip;
+    scroll-snap-type: none;
+    perspective: 1400px;
+    perspective-origin: 50% 40%;
+    touch-action: pan-y;
+    padding-block: 0.5rem 0.75rem;
+    -webkit-mask-image: none;
+            mask-image: none;
+  }
+
+  &[data-carousel-visible="3"] > .carousel-track {
+    --carousel-cascade-reach: 1;
+    --cascade-w: min(46cqi, 26rem);
+    --cascade-shift: 0.62;
+  }
+
+  /* A narrow region shows one each side, on wider cards. */
+  @container (width < 36rem) {
+    & > .carousel-track {
+      --carousel-cascade-reach: 1;
+      --cascade-w: 64cqi;
+      --cascade-shift: 0.44;
+      --cascade-depth: 3.5rem;
+    }
+  }
+
+  &[data-carousel-dragging] > .carousel-track {
+    cursor: grabbing;
+    user-select: none;
+  }
+
+  & > .carousel-track > .carousel-slide {
+    --cascade-x: 0;
+    --cascade-d: 0;
+    grid-area: 1 / 1;
+    flex: none;
+    width: var(--cascade-w);
+    scroll-snap-align: none;
+    display: flex;
+    flex-direction: column;
+    z-index: calc(10 - var(--cascade-d));
+    transform:
+      translateX(calc(var(--cascade-x) * var(--cascade-w) * var(--cascade-shift)))
+      translateZ(calc(var(--cascade-d) * -1 * var(--cascade-depth)))
+      rotateY(calc(var(--cascade-x) * -1 * var(--cascade-turn)))
+      scale(calc(1 - var(--cascade-d) * var(--cascade-scale)));
+    translate: var(--carousel-cascade-drag, 0px) 0;
+    opacity: 1;
+    transition:
+      transform 480ms cubic-bezier(0.22, 0.8, 0.26, 1),
+      translate 480ms cubic-bezier(0.22, 0.8, 0.26, 1),
+      opacity 320ms ease,
+      visibility 0s linear 0s;
+    -webkit-user-drag: none;
+  }
+
+  & > .carousel-track > .carousel-slide :is(a, img) {
+    -webkit-user-drag: none;
+  }
+
+  /* A side slide is a target: a click brings it to the front. */
+  &[data-carousel-ready] > .carousel-track > .carousel-slide:not([data-current]) {
+    cursor: pointer;
+  }
+
+  &[data-carousel-dragging] > .carousel-track > .carousel-slide {
+    transition-property: transform, opacity, visibility;
+  }
+
+  & > .carousel-track > [data-cascade-step="-1"] { --cascade-x: -1; --cascade-d: 1; }
+  & > .carousel-track > [data-cascade-step="1"] { --cascade-x: 1; --cascade-d: 1; }
+  & > .carousel-track > [data-cascade-step="-2"] { --cascade-x: -2; --cascade-d: 2; }
+  & > .carousel-track > [data-cascade-step="2"] { --cascade-x: 2; --cascade-d: 2; }
+
+  /* Past the window: one more step out, hidden. visibility waits for the fade. */
+  & > .carousel-track > :is([data-cascade-step="before"], [data-cascade-step="after"]) {
+    --cascade-d: 3;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition-delay: 0s, 0s, 0s, 320ms;
+  }
+
+  & > .carousel-track > [data-cascade-step="before"] { --cascade-x: -3; }
+  & > .carousel-track > [data-cascade-step="after"] { --cascade-x: 3; }
+
+  /* Three in view: the second step out is past the window too. */
+  &[data-carousel-visible="3"] > .carousel-track > :is([data-cascade-step="-2"], [data-cascade-step="2"]) {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition-delay: 0s, 0s, 0s, 320ms;
+  }
+
+  @container (width < 36rem) {
+    & > .carousel-track > :is([data-cascade-step="-2"], [data-cascade-step="2"]) {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition-delay: 0s, 0s, 0s, 320ms;
+    }
+  }
+
+  /* Round the seam: no glide across the stack, a fade in at the new place. */
+  & > .carousel-track > .carousel-slide[data-cascade-jump] {
+    transition: none;
+    animation: carousel-cascade-in 320ms ease both;
+  }
+
+  & > .carousel-track > .carousel-slide[data-cascade-jump]:is([data-cascade-step="before"], [data-cascade-step="after"]) {
+    animation: none;
+  }
+
+  /* The dim: brightness and colour fall with depth, so a step back reads as further
+     away on a light page and a dark one, glass or solid, and nothing behind shows
+     through the card in front. */
+  & .carousel-cascade-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    filter: brightness(calc(1 - var(--cascade-d) * var(--cascade-dim))) saturate(calc(1 - var(--cascade-d) * 0.3));
+    transition: filter 320ms ease;
+  }
+
+  & .carousel-slide[data-current] .carousel-cascade-body {
+    filter: none;
+  }
+
+  & .carousel-caption {
+    margin-top: 0.75rem;
+    text-align: center;
+    @apply text-sm text-body;
+    transition: opacity 300ms ease;
+  }
+
+  & .carousel-slide:not([data-current]) .carousel-caption {
+    opacity: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    & > .carousel-track > .carousel-slide {
+      transform: translateX(calc(var(--cascade-x) * (var(--cascade-w) + 0.75rem)));
+      translate: none;
+      transition: none !important;
+      animation: none !important;
+    }
+
+    & .carousel-cascade-body,
+    & .carousel-caption {
+      transition: none !important;
+    }
+
+    & .carousel-slide:not([data-current]) .carousel-cascade-body {
+      filter: none;
+      opacity: 0.45;
+    }
+  }
+
+  /* A controller that failed leaves a plain scrolling row: every slide in reach. */
+  &[data-studio-controller-failed] > .carousel-track {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    perspective: none;
+  }
+
+  &[data-studio-controller-failed] > .carousel-track > .carousel-slide {
+    flex: 0 0 var(--cascade-w);
+    scroll-snap-align: center;
+    transform: none;
+    translate: none;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: none;
+  }
+
+  &[data-studio-controller-failed] .carousel-cascade-body {
+    filter: none;
+  }
+}
+
 /* -- The section header (studio/_section_header, docs/PAGE_HEADER.md) --------
    A section's title that sticks under the rest of the stack, inside its own <section>,
    so the next section's header takes its place with no scroll script. At rest it reads as
