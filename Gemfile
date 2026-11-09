@@ -110,3 +110,14 @@ end
 group :development, :test do
   gem "importmap-rails", ">= 2.0"
 end
+
+# rubocop-rails-omakase lints the engine's MIGRATIONS with the config a host
+# runs. Hosts copy db/migrate/*.rb into their own tree as *.studio_engine.rb, so
+# an engine migration is linted by every host that installs it; moms-app runs
+# this exact omakase config, and a copied migration once turned its release
+# static check red over `["a"]` vs `[ "a" ]`. test/lib/migrations_host_lint_test.rb
+# runs it over db/migrate only. Not a runtime dependency, and not a whole-engine
+# style rule: the rest of the engine keeps its own style.
+group :development, :test do
+  gem "rubocop-rails-omakase", require: false
+end

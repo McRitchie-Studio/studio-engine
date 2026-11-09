@@ -21,7 +21,7 @@ class CreateStudioLinks < ActiveRecord::Migration[7.2]
     add_index :studio_links, :kind
     # Covers both "this owner's links" and "this owner's referral" lookups
     # (referral_for) via the leading columns.
-    add_index :studio_links, [:linkable_type, :linkable_id, :kind],
+    add_index :studio_links, [ :linkable_type, :linkable_id, :kind ],
               name: "idx_studio_links_owner_kind"
   end
 end

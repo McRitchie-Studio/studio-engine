@@ -42,7 +42,7 @@ class RequireSlugsOnEngineTables < ActiveRecord::Migration[7.2]
     "studio_geo_settings" => "geo",
     "studio_site_identities" => "site-identity"
   }.freeze
-  TABLES = (["error_logs"] + NAMED.keys).freeze
+  TABLES = ([ "error_logs" ] + NAMED.keys).freeze
 
   def up
     set_lock_timeout
@@ -111,7 +111,7 @@ class RequireSlugsOnEngineTables < ActiveRecord::Migration[7.2]
   end
 
   def unique_slug_index(table)
-    slug_indexes = connection.indexes(table).select { |index| Array(index.columns) == ["slug"] }
+    slug_indexes = connection.indexes(table).select { |index| Array(index.columns) == [ "slug" ] }
     return if slug_indexes.any?(&:unique)
 
     slug_indexes.each { |index| remove_index table, name: index.name }
