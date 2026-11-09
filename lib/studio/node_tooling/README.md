@@ -11,14 +11,16 @@ host gets it with the engine it already bundles: no npm registry, no token.
 - `e2e_helpers.js`: `watchPageErrors` and `blockOffsiteRequests`; for a page
   transition spec, the reveal waits (`watchReveal`, `revealed`, `settled`,
   `arrivalSettled`, `frames`) and the log-on-red hook (`sessionLog`, `logOnRed`).
-  The waits read events the browser fires, never a clock.
+  The waits read events the browser fires, never a clock. Each wait takes a
+  selector that only the new page has, and refuses without one: right after a
+  click, the old page has revealed too.
+- `node_test/register.mjs` and `node_test/importmap_hooks.mjs`: let `node --test`
+  import a module by the bare name the importmap pins it under.
 
 A local run reuses a server already on the e2e port only when that server's
 working directory is inside this tree (`mayReuseServer` in `playwright_base.js`,
 read with `lsof`). Any other server there is refused, with a warning that names
 its root: give the run its own port with `E2E_PORT=<free port>`.
-- `node_test/register.mjs` and `node_test/importmap_hooks.mjs`: let `node --test`
-  import a module by the bare name the importmap pins it under.
 
 Every file here requires only `node:` builtins and its own siblings, because it
 is loaded from the gem's directory, which has no `node_modules`.

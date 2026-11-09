@@ -1,0 +1,1 @@
+- **The shared reveal waits need a selector.** `revealed`, `settled` and `arrivalSettled` in `e2e_helpers.js` now refuse a call with no selector. Right after a click the old page is still the document and has revealed too, so a wait with nothing of the new page's to find first read the old page and returned at once. Pass a selector that only the new page has.
