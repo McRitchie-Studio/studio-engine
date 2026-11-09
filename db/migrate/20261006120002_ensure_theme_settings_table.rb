@@ -5,8 +5,9 @@
 # Sluggable, whose before_save writes `slug` on every save, and the setup doc's
 # hand-copied migration omitted it, so a theme save raises on any host built
 # from that doc (cyvasse, mcritchie-industries and moms-app when this shipped).
-# The slug is "theme-<app_name>", derived on save; existing rows keep a NULL
-# slug until their next save, and nothing looks a theme up by slug.
+# The slug is "theme-<app_name>", derived on save. Rows this left with a NULL
+# slug are filled, and the column made NOT NULL and unique, by the later
+# RequireSlugsOnEngineTables (20261108160000).
 #
 # A baseline, not a rebuild:
 #
