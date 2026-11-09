@@ -775,8 +775,16 @@ test("under reduced motion the style guide's caption swaps with no fade", async 
   await blockOffsiteRequests(page);
   await page.goto("/lab/style_nav");
   const stage = page.locator("[data-carousel-image-only-specimen]");
-  await expect(stage.locator("section.carousel")).toHaveAttribute("data-carousel-ready", "");
-  const durations = await stage.locator("[data-carousel-captions-target='caption']")
-    .evaluateAll((all) => all.map((caption) => getComputedStyle(caption).transitionDuration));
-  expect(durations.every((duration) => duration.split(",").every((part) => parseFloat(part) === 0)), `durations ${durations}`).toBe(true);
+  const row = stage.locator("section.carousel");
+  await expect(row).toHaveAttribute("data-carousel-ready", "");
+  await row.scrollIntoViewIfNeeded();
+  const captions = stage.locator("[data-carousel-captions-target='caption']");
+  expect(await captions.evaluateAll((all) => all.map((caption) => getComputedStyle(caption).transitionProperty)),
+    "no caption transitions").toEqual(["none", "none", "none", "none", "none"]);
+  await row.getByRole("button", { name: "Next slide", exact: true }).click();
+  await expect(captions.nth(1)).toHaveAttribute("data-current", "");
+  // The moment the caption moves, neither caption is fading.
+  expect(await captions.evaluateAll((all) => all.reduce((count, caption) => count + caption.getAnimations().length, 0)),
+    "no caption animates").toBe(0);
+  expect(await captions.nth(1).evaluate((caption) => getComputedStyle(caption).opacity)).toBe("1");
 });
