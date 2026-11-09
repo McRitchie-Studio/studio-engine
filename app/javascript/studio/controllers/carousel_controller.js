@@ -49,9 +49,22 @@
 // The pause button (WCAG 2.2.2) stops it until pressed again; under reduced motion
 // the row starts stopped. A move by autoplay writes nothing to the status line
 // (APG: a rotating carousel does not announce). Without loop it stops at the end.
+//
+// A CASCADE row (class carousel-cascade) does not scroll. Its slides share one grid
+// cell and each wears data-cascade-step, its place from the open slide (cascadeStep,
+// cascadeSlot); engine.css lays the 3D stack out from it and transitions it. The
+// open slide carries data-current. Every slide is a stop, so the arrows, dots, keys
+// and autoplay move it as they move a spotlight, through the same move() and
+// scrollToStop(). A swipe or a drag (pointer events, past DRAG_THRESHOLD) moves it
+// too; a click on a side slide brings that slide to the front and follows no link,
+// and keyboard focus landing in a side slide does the same, so Tab walks the set. A
+// looping cascade takes no clones: the steps wrap round the set, and a slide that
+// crosses the stack round the seam (cascadeJumps) takes no glide. A focused slide
+// that leaves the window hands focus to the track, so the keys keep working.
 import { Controller } from "@hotwired/stimulus"
 import {
-  CLONE_STRIP, TOLERANCE, autoplayRunning, autoplaySeconds, autoplayStop, centerStops, cloneCount, cloneLayout,
+  CLONE_STRIP, TOLERANCE, autoplayRunning, autoplaySeconds, autoplayStop, cascadeJumps, cascadeReach, cascadeSlot,
+  cascadeStep, cascadeSteps, cascadeTarget, centerStops, cloneCount, cloneLayout, dragSteps,
   currentStop, hiddenEnds, idleDelay, initialReasons, keyAction, loopPositionText, loopStop, nearestVirtual, ownsKey,
   perPage, positionText, seamJump, startStop, stops, targetStop, toggleLabel, withReason, wrapIndex
 } from "studio/carousel"
@@ -66,8 +79,13 @@ export default class extends Controller {
     this.settle = this.settle.bind(this)
     this.clickClone = this.clickClone.bind(this)
     this.loop = this.element.hasAttribute("data-carousel-loop")
+    this.cascade = this.element.classList.contains("carousel-cascade")
     this.cloned = 0
     this.removeClones()
+    if (this.cascade) {
+      this.connectCascade()
+      return
+    }
     this.scrollEnd = "onscrollend" in window
     this.trackTarget.addEventListener("scroll", this.schedule, { passive: true })
     if (this.scrollEnd) this.trackTarget.addEventListener("scrollend", this.settle, { passive: true })
@@ -81,6 +99,179 @@ export default class extends Controller {
     this.addClones()
     this.sync()
     this.startAutoplay()
+  }
+
+  // -- the cascade --------------------------------------------------------------
+
+  connectCascade() {
+    const slides = this.slideTargets
+    const marked = slides.findIndex((slide) => slide.hasAttribute("data-current"))
+    this.active = marked >= 0 ? marked : 0
+    // A #fragment inside a slide opens on that slide.
+    const hash = window.location?.hash
+    if (hash && hash.length > 1) {
+      let target = null
+      try { target = document.getElementById(decodeURIComponent(hash.slice(1))) } catch { target = null }
+      const index = target ? slides.findIndex((slide) => slide.contains(target)) : -1
+      if (index >= 0) this.active = index
+    }
+    this.cascadeListeners = [
+      ["pointerdown", (event) => this.dragStart(event)],
+      ["pointermove", (event) => this.dragMove(event)],
+      ["pointerup", (event) => this.dragEnd(event)],
+      ["pointercancel", () => this.dragCancel()],
+      ["click", (event) => this.clickSide(event), true],
+      ["focusin", (event) => this.focusSide(event)],
+      ["dragstart", (event) => event.preventDefault()]
+    ]
+    this.cascadeListeners.forEach(([type, handler, capture]) => this.trackTarget.addEventListener(type, handler, { capture: !!capture }))
+    if (typeof ResizeObserver === "function") {
+      this.observer = new ResizeObserver(this.schedule)
+      this.observer.observe(this.trackTarget)
+    }
+    this.element.setAttribute("data-carousel-ready", "")
+    this.sync()
+    this.startAutoplay()
+  }
+
+  disconnectCascade() {
+    this.cascadeListeners?.forEach(([type, handler, capture]) => this.trackTarget.removeEventListener(type, handler, { capture: !!capture }))
+    this.cascadeListeners = null
+    this.dragCancel()
+  }
+
+  // The reach CSS lays out: 1 on a three-slide cascade or a narrow region, else 2.
+  reach() {
+    const css = parseFloat(getComputedStyle(this.trackTarget).getPropertyValue("--carousel-cascade-reach"))
+    return css > 0 ? css : cascadeReach(this.element.dataset.carouselVisible)
+  }
+
+  syncCascade() {
+    const total = this.slideTargets.length
+    this.page = 1
+    this.positions = Array.from({ length: Math.max(1, total) }, (_, index) => index)
+    this.full = null
+    this.active = Math.min(Math.max(0, this.active || 0), Math.max(0, total - 1))
+    this.current = this.virtual = this.active
+    this.element.toggleAttribute("data-carousel-static", total < 2)
+    const wraps = this.loop && total > 1
+    if (this.hasPrevTarget) this.prevTarget.setAttribute("aria-disabled", String(!wraps && this.active === 0))
+    if (this.hasNextTarget) this.nextTarget.setAttribute("aria-disabled", String(!wraps && this.active >= total - 1))
+    const steps = cascadeSteps(total, this.active, this.loop)
+    const jumps = this.laid ? cascadeJumps(this.laid, steps, this.active) : steps.map(() => false)
+    this.slideTargets.forEach((slide, index) => {
+      slide.setAttribute("data-cascade-step", cascadeSlot(steps[index]))
+      slide.toggleAttribute("data-cascade-jump", jumps[index])
+      slide.toggleAttribute("data-current", index === this.active)
+    })
+    this.laid = steps
+    this.dotTargets.forEach((dot, index) => {
+      dot.hidden = index >= total
+      if (index === this.active) dot.setAttribute("aria-current", "true")
+      else dot.removeAttribute("aria-current")
+    })
+  }
+
+  // Brings slide `index` to the front. A focused slide that leaves the window hands
+  // focus to the track (a hidden slide cannot hold it), so the keys keep working.
+  activate(index) {
+    const total = this.slideTargets.length
+    if (!(total > 0)) return
+    this.active = Math.min(total - 1, Math.max(0, index))
+    this.sync()
+    const focused = this.slideTargets.findIndex((slide) => slide.contains(document.activeElement))
+    if (focused >= 0 && Math.abs(cascadeStep(focused, this.active, total, this.loop)) > this.reach()) {
+      this.trackTarget.focus({ preventScroll: true })
+    }
+  }
+
+  slideAt(target) {
+    const slide = target?.closest?.(".carousel-slide")
+    return slide && this.trackTarget.contains(slide) ? this.slideTargets.indexOf(slide) : -1
+  }
+
+  // A press on a side slide: the click that follows brings it to the front and opens
+  // nothing. The slide is read at the press, so a link whose focus already moved the
+  // stack still counts as a side slide's.
+  clickSide(event) {
+    if (this.dragged) {
+      this.dragged = false
+      event.preventDefault()
+      event.stopPropagation()
+      return
+    }
+    const index = this.pressed ?? this.slideAt(event.target)
+    this.pressed = null
+    if (index < 0 || index === this.active) return
+    event.preventDefault()
+    event.stopPropagation()
+    this.interacted()
+    this.scrollToStop(index)
+  }
+
+  // Keyboard focus in a side slide brings it to the front, so Tab walks the set. A
+  // mouse press focuses without :focus-visible and leaves the move to its click.
+  focusSide(event) {
+    const index = this.slideAt(event.target)
+    if (index < 0 || index === this.active) return
+    let keyboard = true
+    try { keyboard = event.target.matches(":focus-visible") } catch { keyboard = true }
+    if (!keyboard) return
+    this.interacted()
+    this.scrollToStop(index, { announce: false })
+  }
+
+  dragStart(event) {
+    if (event.button > 0 || this.drag) return
+    const index = this.slideAt(event.target)
+    this.pressed = index >= 0 && index !== this.active ? index : null
+    this.dragged = false
+    this.drag = { id: event.pointerId, x: event.clientX, y: event.clientY, live: false }
+  }
+
+  dragMove(event) {
+    const drag = this.drag
+    if (!drag || event.pointerId !== drag.id) return
+    const dx = event.clientX - drag.x
+    if (!drag.live) {
+      if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(event.clientY - drag.y)) return
+      drag.live = true
+      // Captured only once it is a drag, so a plain click still lands on its link.
+      try { this.trackTarget.setPointerCapture(drag.id) } catch { /* the pointer is gone */ }
+      this.element.setAttribute("data-carousel-dragging", "")
+    }
+    this.trackTarget.style.setProperty("--carousel-cascade-drag", `${Math.round(dx * 0.35)}px`)
+  }
+
+  dragEnd(event) {
+    const drag = this.drag
+    if (!drag || event.pointerId !== drag.id) return
+    const live = drag.live
+    this.dragCancel()
+    if (!live) return
+    const by = dragSteps(event.clientX - drag.x, this.stepWidth())
+    this.pressed = null
+    this.dragged = true
+    // The click a drag ends in is swallowed by clickSide; a touch drag fires none.
+    setTimeout(() => { this.dragged = false }, 0)
+    if (by === 0) return
+    this.interacted()
+    const total = this.slideTargets.length
+    const to = cascadeTarget(this.active, by, total, this.loop)
+    if (to !== this.active) this.scrollToStop(to)
+  }
+
+  dragCancel() {
+    this.drag = null
+    this.element?.removeAttribute("data-carousel-dragging")
+    this.trackTarget?.style.removeProperty("--carousel-cascade-drag")
+  }
+
+  // The width a drag crosses per step: the open slide's, or a fifth of the row.
+  stepWidth() {
+    const open = this.slideTargets[this.active]
+    const width = open ? open.getBoundingClientRect().width : 0
+    return width > 0 ? width * 0.6 : this.trackTarget.clientWidth / 5
   }
 
   openAtStart() {
@@ -101,6 +292,7 @@ export default class extends Controller {
   }
 
   disconnect() {
+    if (this.cascade) this.disconnectCascade()
     this.trackTarget.removeEventListener("scroll", this.schedule)
     this.trackTarget.removeEventListener("scrollend", this.settle)
     this.trackTarget.removeEventListener("click", this.clickClone)
@@ -332,6 +524,10 @@ export default class extends Controller {
   }
 
   sync() {
+    if (this.cascade) {
+      this.syncCascade()
+      return
+    }
     const track = this.trackTarget
     const { positions, page } = this.measure()
     const ends = hiddenEnds(track)
@@ -412,6 +608,12 @@ export default class extends Controller {
   // row the index is virtual: a clone's place glides there and settle() jumps home,
   // but under reduced motion the row goes straight to the real slide.
   scrollToStop(index, { announce = true } = {}) {
+    if (this.cascade) {
+      if (!(index >= 0 && index < this.slideTargets.length)) return
+      this.activate(index)
+      if (announce && this.hasStatusTarget) this.statusTarget.textContent = positionText(index, 1, this.slideTargets.length)
+      return
+    }
     const reduce = window.matchMedia?.(REDUCE).matches
     if (this.cloned) {
       const total = this.positions.length

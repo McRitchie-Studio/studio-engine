@@ -101,6 +101,7 @@ Rails.application.routes.draw do
   get "lab/carousel", to: "e2e_lab#carousel"
   get "lab/carousel_spotlight", to: "e2e_lab#carousel_spotlight"
   get "lab/carousel_autoplay", to: "e2e_lab#carousel_autoplay"
+  get "lab/carousel_cascade", to: "e2e_lab#carousel_cascade"
   get "lab/admin_models/:key", to: "e2e_lab_admin_models#show"
   get "lab/board", to: "e2e_lab#board"
   get "lab/chips", to: "e2e_lab#chips"
