@@ -272,4 +272,12 @@ test("the reveal waits ask the page for its reveal, never for a clock", async ()
   assert.match(calls[4][1], /::view-transition/)
   assert.match(calls[7][1], /__studioReveal\.done === true/)
   assert.equal(calls[8][1], 2)
+
+  // Every wait names the new page. With no selector, the old page's own reveal answers it
+  // the moment after a click, so the wait refuses before it asks the page anything.
+  calls.length = 0
+  for (const wait of [revealed, settled, arrivalSettled]) {
+    await assert.rejects(wait(page), /needs a selector only the new page has/)
+  }
+  assert.deepEqual(calls, [])
 })

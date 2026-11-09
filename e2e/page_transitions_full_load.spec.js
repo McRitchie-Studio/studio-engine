@@ -1,5 +1,5 @@
 const { test, expect, chromium } = require("@playwright/test");
-const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
+const { watchPageErrors, blockOffsiteRequests, scrolledTo, navAtRest } = require("./helpers");
 // The reveal waits and the log-on-red hook are shared with every host's own transition spec.
 const shared = require("../lib/studio/node_tooling/e2e_helpers.js");
 
@@ -96,6 +96,28 @@ const pageSelector = (testId) => `[data-test="page-${testId}"]`;
 const settled = (page, testId) => shared.settled(page, pageSelector(testId));
 const revealed = (page, testId = "b") => shared.revealed(page, pageSelector(testId));
 const arrivalSettled = (page, testId = "b") => shared.arrivalSettled(page, pageSelector(testId));
+// For "nothing played": the arrival settled, then the new page's modules booted (window.Turbo,
+// read on the new page because arrivalSettled found it first), then two more frames. A motion
+// or a startViewTransition the arriving page's own script starts is in the log by then.
+async function nothingPlayed(page, testId = "b") {
+  await arrivalSettled(page, testId);
+  await page.waitForFunction(() => window.Turbo);
+  await shared.frames(page);
+  const lines = await logged(page);
+  expect(lines.filter((line) => line.startsWith("::view-transition")), `the event log:\n${lines.join("\n")}`).toEqual([]);
+  // A same-document transition after the reveal draws its own pseudos only if it is not
+  // skipped; the call itself is the evidence either way.
+  expect(lines, "a view transition was started on a load that plays nothing").not.toContain("startViewTransition");
+  return lines;
+}
+// Same path, or a redirect back to it: the old page carries the same test id, so wait for the
+// new document's reveal in the log (open() and each step clear it) before reading the page.
+// Before a full-load Back or Forward: the page is fully loaded, so its own module has run and
+// is listening for pageswap. Revealed is not enough: at 8x CPU Back once left page b while it
+// was still "interactive", and a page whose module has not run leaves by the plain load (the
+// "click before the old page's module" test below), so the move never played.
+const loaded = (page) => page.waitForFunction(() => document.readyState === "complete");
+const newDocumentRevealed = (page) => page.waitForFunction(() => (sessionStorage.getItem("pt-log") || "").includes("pagereveal"));
 
 function expectOneMotion(lines, oldName, newName) {
   expect(rootMotion(lines).sort(), `the event log:\n${lines.join("\n")}`).toEqual([
@@ -266,11 +288,9 @@ test("a page that arrived by a full load then plays a Turbo visit once", async (
 test("a reload plays nothing and leaves no name", async ({ page }) => {
   await open(page, STRICT);
   await page.reload();
-  await page.waitForFunction(() => window.Turbo && document.documentElement.dataset.pageTransitionDirection);
-  await arrivalSettled(page, "a");
-  const lines = await logged(page);
+  await newDocumentRevealed(page);
+  const lines = await nothingPlayed(page, "a");
   expect(lines).toEqual(expect.arrayContaining(["pageswap plain", "pagereveal plain"]));
-  expect(lines.filter((line) => line.startsWith("::view-transition"))).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.dataset.pageTransition)).toBeUndefined();
   expect(await page.locator("[data-vt-held]").evaluate((el) => getComputedStyle(el).viewTransitionName)).toBe("none");
 });
@@ -278,12 +298,10 @@ test("a reload plays nothing and leaves no name", async ({ page }) => {
 test("a full load of the same path plays nothing", async ({ page }) => {
   await open(page, STRICT);
   await fullLoad(page, "same-full");
-  await page.waitForFunction(() => window.Turbo && document.documentElement.dataset.pageTransitionDirection);
-  await arrivalSettled(page, "a");
-  const lines = await logged(page);
+  await newDocumentRevealed(page);
+  const lines = await nothingPlayed(page, "a");
   expect(lines).toContain("pageswap transition");
   expect(lines).toContain("pagereveal plain");
-  expect(lines.filter((line) => line.startsWith("::view-transition"))).toEqual([]);
 });
 
 test("a redirect plays once, and a redirect back to this path plays nothing", async ({ page }) => {
@@ -292,13 +310,12 @@ test("a redirect plays once, and a redirect back to this path plays nothing", as
   await bounce(STRICT);
   await settled(page, "b");
   expectOneMotion(await logged(page), "pt-out-left", "pt-in-from-right");
-  await page.waitForFunction(() => window.Turbo && document.documentElement.dataset.pageTransitionDirection);
+  await loaded(page);
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
   await bounce(STRICT);
-  await page.waitForFunction(() => sessionStorage.getItem("pt-log")?.includes("pagereveal"));
-  const lines = await logged(page);
+  await newDocumentRevealed(page);
+  const lines = await nothingPlayed(page, "b");
   expect(lines).toContain("pagereveal plain");
-  expect(lines.filter((line) => line.startsWith("::view-transition"))).toEqual([]);
 });
 
 test("a native form's page-load overlay is not frozen into the old page's picture", async ({ page }) => {
@@ -339,9 +356,12 @@ test("a click before the old page's module has run gets the plain load, not the 
   await page.unroute("**/e2e/modules/studio/page_transitions*");
   await fullLoad(page);
   await arrivalSettled(page);
+  await page.waitForFunction(() => window.Turbo);
+  await shared.frames(page);
   const lines = await logged(page);
   expect(lines).toContain("pagereveal transition");
   expect(rootMotion(lines)).toEqual([]);
+  expect(lines, "a view transition was started on a load that plays nothing").not.toContain("startViewTransition");
 });
 
 test("the stack carries its name for the motion alone, on both pages", async ({ page }) => {
@@ -413,8 +433,7 @@ test("the navbar and the banner stack hold still across a full load", async ({ p
 
 test("leaving a page scrolled, the stack does not slide in", async ({ page }) => {
   await open(page, STRICT);
-  await page.evaluate(() => window.scrollTo(0, 800));
-  await page.waitForTimeout(100);
+  await scrolledTo(page, 800);
   await page.evaluate(() => document.querySelector('[data-test="other-full"]').click());
   await settled(page, "b");
   const frames = await page.evaluate(() => window.__frames);
@@ -425,14 +444,16 @@ test("leaving a page scrolled, the stack does not slide in", async ({ page }) =>
 
 test("arriving scrolled by a full load, the taller old navbar does not draw under the new one", async ({ page }) => {
   await open(page, STRICT);
-  await page.evaluate(() => window.scrollTo(0, 800));
-  await page.waitForTimeout(200);
+  await scrolledTo(page, 800);
+  // The collapsed height, once the navbar has landed: read mid-ease it is neither size.
+  await navAtRest(page);
   const shorter = await page.locator(".vt-pinned-header").evaluate((el) => el.offsetHeight);
   await page.evaluate(() => document.querySelector('[data-test="other-full"]').click());
   await settled(page, "b");
   const taller = await page.locator(".vt-pinned-header").evaluate((el) => el.offsetHeight);
   expect(taller, "the old navbar is not taller, so this measured nothing").toBeGreaterThan(shorter);
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
+  await loaded(page);
   await page.goBack();
   await settled(page, "a");
   expect(await page.evaluate(() => window.scrollY), "Back did not arrive scrolled").toBe(800);
@@ -444,12 +465,13 @@ test("arriving scrolled by a full load, the taller old navbar does not draw unde
 
 test("the same arrival by a Turbo visit, Back from a scrolled page, draws one navbar", async ({ page }) => {
   await open(page, "direction=left&style=unfold");
-  await page.evaluate(() => window.scrollTo(0, 800));
-  await page.waitForTimeout(200);
+  // Turbo keeps the position for Back from its own scroll listener: heard, not hoped for.
+  await scrolledTo(page, 800);
   const leave = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
   await page.evaluate(() => document.querySelector('[data-test="other"]').click());
   await leave;
-  await page.waitForTimeout(200);
+  // turbo:load fires mid-move; the frames below must be Back's alone.
+  await settled(page, "b");
   await page.evaluate(() => { window.__frames.length = 0; });
   const back = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
   await page.goBack();
@@ -476,10 +498,12 @@ test("Back across a full load plays the move the other way, and Forward the dire
   await fullLoad(page);
   await settled(page, "b");
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
+  await loaded(page);
   await page.goBack();
   await settled(page, "a");
   expectOneMotion(await logged(page), "pt-out-right", "pt-in-from-left");
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
+  await loaded(page);
   await page.goForward();
   await settled(page, "b");
   expectOneMotion(await logged(page), "pt-out-left", "pt-in-from-right");
@@ -557,10 +581,8 @@ test("with no direction, a full load has no sheet, no script, no at-rule and not
   page.on("request", (request) => requests.push(request.url()));
   await open(page, "");
   await fullLoad(page);
-  await revealed(page);
-  const lines = await logged(page);
+  const lines = await nothingPlayed(page);
   expect(lines).toEqual(expect.arrayContaining(["pageswap plain", "pagereveal plain"]));
-  expect(lines.filter((line) => line.startsWith("::view-transition"))).toEqual([]);
   expect(requests.filter((url) => /studio\/page_transition/.test(url))).toEqual([]);
   const viewTransitionRules = () => page.evaluate(() => {
     const count = (rules) => [...rules].reduce((sum, rule) => sum + (rule.constructor.name === "CSSViewTransitionRule" ? 1 : 0) + (rule.cssRules ? count(rule.cssRules) : 0), 0);
@@ -594,6 +616,7 @@ test("a browser without cross-document view transitions loads plainly and throws
   expect(supported, "the flag did not turn the feature off, so this measured nothing").toBe(false);
   expect(lines).toContain("pageswap plain");
   expect(lines.filter((line) => line.startsWith("::view-transition"))).toEqual([]);
+  expect(lines, "a view transition was started on a load that plays nothing").not.toContain("startViewTransition");
   expect(left).toBeNull();
   expect(errors).toEqual([]);
 });
@@ -605,12 +628,9 @@ test.describe("with reduced motion", () => {
     const errors = watchPageErrors(page);
     await open(page, STRICT);
     await fullLoad(page);
-    // Past page b's modules too, so a motion its own script started would be in the log.
-    await page.waitForFunction(() => window.Turbo);
-    await arrivalSettled(page);
-    const lines = await logged(page);
+    // Page b first, then its modules: a window.Turbo wait ahead of it answered on page a.
+    const lines = await nothingPlayed(page);
     expect(lines).toEqual(expect.arrayContaining(["pageswap plain", "pagereveal plain"]));
-    expect(lines.filter((line) => line.startsWith("::view-transition"))).toEqual([]);
     expect(await page.evaluate(() => sessionStorage.getItem("studio-page-transition-style"))).toBeNull();
     expect(errors).toEqual([]);
   });

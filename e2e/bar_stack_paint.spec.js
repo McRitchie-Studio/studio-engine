@@ -1,6 +1,6 @@
 const { test, expect } = require("@playwright/test");
 const {
-  watchPageErrors, expectStickyChromeIsLive, sampleAcrossFrames, blockOffsiteRequests
+  watchPageErrors, expectStickyChromeIsLive, sampleAcrossFrames, blockOffsiteRequests, scrolledTo, navAtRest
 } = require("./helpers");
 
 // [e2e] DEFECT 1 — the navbar's paint-time offset jump (fix-navbar-offset-jump).
@@ -50,8 +50,8 @@ test("the pinned header does not move when a bar grows under it", async ({ page 
   // Scroll well past the bar so the header is PINNED. 600px is far below any
   // plausible bar height, so the header is stuck for the whole sample window and a
   // change in its rect top can only come from its OFFSET changing.
-  await page.evaluate(() => window.scrollTo(0, 600));
-  await page.waitForTimeout(100);
+  await scrolledTo(page, 600);
+  await navAtRest(page); // the collapse the scroll started has landed: the samples see only the bar
 
   const samples = await sampleAcrossFrames(page, {
     // The webfont swap, in one line: make the bar 80px taller than it was.

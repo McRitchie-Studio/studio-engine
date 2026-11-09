@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { blockOffsiteRequests } = require("./helpers");
+const { blockOffsiteRequests, slidIn, transitionsDone } = require("./helpers");
 
 // [e2e] The link sidebar's keyboard focus ring clears 3:1 against both colours beside
 // it (WCAG 1.4.11 non-text contrast, and the 2.4.13 focus-appearance bar), in dark,
@@ -75,7 +75,8 @@ async function grade(page, { palette, glass, dark }) {
   await expect(page.locator("#studio-link-sidebar")).toBeVisible();
   await page.evaluate((on) => document.documentElement.classList.toggle("dark", on), dark);
   await page.mouse.move(1, 1);
-  await page.waitForTimeout(450);
+  await slidIn(page.locator("#studio-link-sidebar"));
+  await transitionsDone(page.locator("html")); // the theme's colours, and the hover the move left
 
   const rows = [];
   const targets = glass ? [...TARGETS, CURRENT_GLASS] : TARGETS;
@@ -85,7 +86,7 @@ async function grade(page, { palette, glass, dark }) {
     await page.locator(target).first().evaluate((el) => el.focus());
     await expect(page.locator(target).first()).toBeFocused();
     expect(await page.locator(target).first().evaluate((el) => el.matches(":focus-visible"))).toBe(true);
-    await page.waitForTimeout(200); // the rows' colour transition
+    await transitionsDone(page.locator("html")); // the rows' colour transition, in and out
     const shot = (await page.screenshot()).toString("base64");
     rows.push({ name, ...(await page.evaluate(MEASURE, { shot, target, inset, outline })) });
   }

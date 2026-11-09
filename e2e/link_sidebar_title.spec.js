@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
+const { watchPageErrors, blockOffsiteRequests, slidIn, transitionsDone } = require("./helpers");
 
 // [e2e] The link sidebar's title, groups and rows: the word the browser writes by its own
 // clock and zone, a drawn divider, one row height, and a description that moves nothing.
@@ -90,7 +90,7 @@ const openPanel = async (page, query = "sidebar=1&signed_in=1&admin=1") => {
   await openLab(page, query);
   await trigger(page).click();
   await expect(panel(page)).toBeVisible();
-  await page.waitForTimeout(350); // the 300ms slide, or the boxes read off-canvas
+  await slidIn(panel(page)); // the 300ms slide, or the boxes read off-canvas
 };
 
 const HEADERS = "sidebar=1&headers=1&signed_in=1&admin=1";
@@ -220,7 +220,7 @@ test("the description sits inside the row, under the lifted label, and truncates
   const row = panel(page).locator(TERMS);
   await row.hover();
   await expect.poll(() => opacityOf(descOf(row))).toBe(1);
-  await page.waitForTimeout(100); // the transform ends with the fade; read it settled
+  await transitionsDone(row); // the transform ends with the fade; read it settled
 
   const box = await row.boundingBox();
   const label = await row.locator("[data-sidebar-row-label]").boundingBox();
@@ -297,7 +297,7 @@ test.describe("on a touch screen", () => {
     expect(await page.evaluate(() => matchMedia("(hover: hover)").matches), "the device reports no hover").toBe(false);
     await trigger(page).tap();
     await expect(phonePanel(page)).toBeVisible();
-    await page.waitForTimeout(350);
+    await slidIn(phonePanel(page));
 
     // The row would navigate and the panel would close: hold both, to read the row tapped.
     await page.evaluate(() => {
@@ -308,7 +308,9 @@ test.describe("on a touch screen", () => {
     });
     const row = phonePanel(page).locator(TERMS);
     await row.tap();
-    await page.waitForTimeout(450);
+    // A fade the tap wrongly started is running now (getAnimations flushes the :hover); wait it
+    // out, so the opacity below is where it ends, not where it began.
+    await transitionsDone(row);
 
     expect(await row.evaluate((node) => node.matches(":hover")), "the tap left :hover behind").toBe(true);
     expect(await opacityOf(descOf(row))).toBe(0);
@@ -318,7 +320,7 @@ test.describe("on a touch screen", () => {
     await openLab(page, "sidebar=1&signed_in=1&admin=1");
     await trigger(page).tap();
     await expect(phonePanel(page)).toBeVisible();
-    await page.waitForTimeout(350);
+    await slidIn(phonePanel(page));
     const row = phonePanel(page).locator("[data-test='geo-signpost-disabled']");
     const rest = await layoutOf(phonePanel(page));
     expect(await opacityOf(descOf(row)), "hidden at rest").toBe(0);
@@ -363,7 +365,7 @@ test.describe("a long name on a 320px phone", () => {
     await trigger(page).click();
     const box = phonePanel(page);
     await expect(box).toBeVisible();
-    await page.waitForTimeout(350); // the 300ms slide, or the boxes read off-canvas
+    await slidIn(box); // the 300ms slide, or the boxes read off-canvas
 
     const title = titleOf(box);
     const measure = await title.evaluate((node) => ({

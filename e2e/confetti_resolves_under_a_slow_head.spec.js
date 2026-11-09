@@ -31,7 +31,8 @@ test("confetti resolves when the parse of the head is slower than the module's p
 
   const response = await page.goto("/lab/session_drift?fp=fp-alice&issued=1000&state=authenticated");
   await page.waitForFunction(() => Boolean(window.Alpine), null, { timeout: 10_000 });
-  await page.waitForTimeout(200);
+  // The condition itself: both confetti globals resolved, however late the head's module ran.
+  await page.waitForFunction(() => typeof window.studioConfetti === "object" && typeof window.confetti === "function");
 
   expect(errors).toEqual([]);
   expect(await page.evaluate(() => typeof window.studioConfetti)).toBe("object");

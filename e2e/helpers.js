@@ -118,4 +118,69 @@ async function blockOffsiteRequests(page) {
   await shared.blockOffsiteRequests(page);
 }
 
-module.exports = { watchPageErrors, expectStickyChromeIsLive, sampleAcrossFrames, blockOffsiteRequests };
+// ---- Waits on a real condition, in place of a pause ------------------------------------
+//
+// Scrolled to `y`, as the page's own scroll listeners heard it. Turbo records the restoration
+// position in its scroll listener (bound when Turbo starts, so ahead of this one), and the
+// navbar's collapse queues its frame there. A pause of 100-200ms only hoped both had run.
+// A page that cannot scroll that far never fires the event at `y`, and the wait times out.
+function scrolledTo(page, y) {
+  return page.evaluate((target) => new Promise((done) => {
+    if (Math.round(window.scrollY) === target) { done(); return; }
+    const heard = () => {
+      if (Math.round(window.scrollY) !== target) return;
+      window.removeEventListener("scroll", heard);
+      done();
+    };
+    window.addEventListener("scroll", heard);
+    window.scrollTo(0, target);
+  }), y);
+}
+
+// The navbar's collapse is at rest: studio/nav_collapse eases --nav-p over about ten frames
+// after a hard scroll and stops writing once it lands. Two frames with the header's height,
+// --nav-p and its hold margin all unchanged is that landing.
+function navAtRest(page) {
+  return page.evaluate(() => new Promise((done) => {
+    const header = document.querySelector("header");
+    const read = () => (header
+      ? `${header.offsetHeight} ${header.style.getPropertyValue("--nav-p")} ${getComputedStyle(header).marginBottom}`
+      : "");
+    let last = read();
+    let still = 0;
+    const tick = () => {
+      const now = read();
+      still = now === last ? still + 1 : 0;
+      last = now;
+      if (still >= 2) done(); else requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }));
+}
+
+// A panel Alpine's x-transition slid in (components/_sidebar_panel: duration-300). Alpine puts
+// the enter classes on as it shows the panel and takes them off when the transition ends, so
+// visible-and-still-carrying-them is mid-slide. Then no animation of its own is left.
+function slidIn(locator) {
+  return locator.evaluate((el) => new Promise((done) => {
+    const moving = () => el.classList.contains("ease-out") || el.classList.contains("translate-x-full")
+      || el.getAnimations().some((a) => a.playState === "running");
+    const tick = () => (moving() ? requestAnimationFrame(tick) : done());
+    tick();
+  }));
+}
+
+// Every CSS transition on the element and inside it has finished: a hover's fade and lift, a
+// colour easing to a new theme. getAnimations() flushes style first, so a transition the last
+// input started is in the list. Keyframe animations are left out: a glow's ring or a spinner
+// runs on its own clock (some forever, some paused), and none of them is a settling.
+function transitionsDone(locator) {
+  return locator.evaluate((el) => Promise.all(el.getAnimations({ subtree: true })
+    .filter((a) => typeof CSSTransition === "function" && a instanceof CSSTransition)
+    .map((a) => a.finished.catch(() => {}))).then(() => undefined));
+}
+
+module.exports = {
+  watchPageErrors, expectStickyChromeIsLive, sampleAcrossFrames, blockOffsiteRequests,
+  scrolledTo, navAtRest, slidIn, transitionsDone,
+};

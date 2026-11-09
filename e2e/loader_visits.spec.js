@@ -37,9 +37,9 @@ test("a background replace visit never shows the overlay; a user's slow navigati
 
   await watch();
   await page.evaluate(() => window.Turbo.visit("/lab/loader_visits?ms=1200", { action: "replace" }));
-  await page.waitForTimeout(800);
-  expect(await page.evaluate(() => window.__overlayShown), "a replace visit showed the overlay").toBe(0);
+  // The whole visit, not a slice of it: the observer counted every unhide until page b landed.
   await expect(page.locator('[data-test="arrived"]')).toHaveText("1200");
+  expect(await page.evaluate(() => window.__overlayShown), "a replace visit showed the overlay").toBe(0);
   await expect(overlay(page)).toBeHidden();
 
   await page.locator('[data-test="slow-link"]').click();
@@ -52,11 +52,20 @@ test("a background replace visit never shows the overlay; a user's slow navigati
 test("a Turbo link to a download with no extension leaves no overlay up", async ({ page }) => {
   await page.goto("/lab/loader_visits");
   await page.waitForFunction(() => window.Turbo);
+  // The answer is held until the overlay shows. Answered sooner, it cancels the overlay's
+  // 100ms show before it happens, and the test saw no overlay to clear: green with every hide
+  // path removed (2026-11-08). Held, the overlay is up, and only a hide can take it down.
+  // Turbo's fetch only: the browser's own request for the file, after the visit, passes.
+  let held = false;
+  await page.route("**/lab/loader_download", async (route) => {
+    if (held) return route.continue();
+    held = true;
+    await page.waitForFunction(() => !document.querySelector("[data-studio-loader-overlay]").hidden);
+    return route.continue();
+  });
   const download = page.waitForEvent("download");
   await page.locator('[data-test="download-link"]').click();
   await download;
-  // Past the overlay's 100ms delay, well inside the 15s cap.
-  await page.waitForTimeout(600);
   await expect(overlay(page)).toBeHidden();
   await expect(page).toHaveURL(/\/lab\/loader_visits$/);
 });

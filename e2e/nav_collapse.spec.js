@@ -1,6 +1,6 @@
 const { test, expect } = require("@playwright/test");
 const {
-  watchPageErrors, expectStickyChromeIsLive, sampleAcrossFrames, blockOffsiteRequests
+  watchPageErrors, expectStickyChromeIsLive, sampleAcrossFrames, blockOffsiteRequests, navAtRest
 } = require("./helpers");
 
 // THE COLLAPSE MUST STOP WHEN THE FINGER STOPS.
@@ -137,12 +137,14 @@ test("the collapse endpoints are unchanged at every band boundary", async ({ pag
     await page.goto("/lab/bar_stack");
 
     await page.evaluate(() => window.scrollTo(0, 0));
-    await page.waitForTimeout(120);
+    await navAtRest(page);
     const expanded = await page.evaluate(() =>
       Math.round(document.querySelector("header").getBoundingClientRect().height));
 
     await page.evaluate(() => window.scrollTo(0, 2000));
-    await page.waitForTimeout(400);
+    // The flick eases over about ten frames: collapsed is --nav-p at 1, then at rest.
+    await expect.poll(() => page.evaluate(() => document.querySelector("header").style.getPropertyValue("--nav-p"))).toBe("1.0000");
+    await navAtRest(page);
     const collapsed = await page.evaluate(() =>
       Math.round(document.querySelector("header").getBoundingClientRect().height));
 
@@ -344,7 +346,7 @@ test("a header restored as it was left keeps the page where a fresh load puts it
   const fresh = await page.evaluate(docTop);
   await page.evaluate(() => window.scrollTo(0, 600));
   await expect.poll(() => page.evaluate(() => document.querySelector("header").style.getPropertyValue("--nav-p"))).toBe("1.0000");
-  await page.waitForTimeout(300);
+  await navAtRest(page);
 
   // The copy carries everything the controller wrote, as a snapshot does.
   const carried = await page.evaluate(() => {
@@ -366,8 +368,7 @@ test("a header restored as it was left keeps the page where a fresh load puts it
 
   // The controller connects on the copy; let it start and settle.
   await expect.poll(() => page.evaluate(() => getComputedStyle(document.querySelector("header")).marginBottom)).not.toBe("");
-  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r)))));
-  await page.waitForTimeout(200);
+  await navAtRest(page);
 
   expect(await page.evaluate(() => window.scrollY)).toBe(600);
   const restored = await page.evaluate(docTop);
