@@ -33,7 +33,7 @@ const {
 // 1000ms the old 500ms pause went red 2/2 and this wait stays green); a scroll to the top is the scroll
 // event heard at 0; Back is the place restored two frames after its popstate (traversed),
 // which holds when Back does not move. Two checks stay negative proofs, each over every frame
-// of the module's own timer window (twice START_CAP_MS): nothing moves after Back, and the
+// of the module's own timer window (twice its longest timer, HOLD_MS): nothing moves after Back, and the
 // reader's scroll right after a jump holds. Controls, each red under the new spec: the end
 // event never sent, red 3/3; Back's restore smooth or removed, red; a late aim 300ms after
 // the end, red 2/2; the stuck bar never set, red (inner target, and headers below the fold,
@@ -133,7 +133,7 @@ const serveFeed = (page) => page.route("**/admin/style/loaders_feed*", async (ro
 });
 
 // A tab's click is a smooth scroll (studio/in_page_links). It has landed when the module's
-// jump ended (its scrollend after the last aim; jumpEnded), the navbar's collapse that the
+// jump ended (its scrollend after the last aim, or its backstop; jumpEnded), the navbar's collapse that the
 // scroll drove is at rest, and the pinned stack has written its settled values to the root
 // (stackSettled), which the section bars' sticky line reads. `count` is the jumps since the
 // page loaded.

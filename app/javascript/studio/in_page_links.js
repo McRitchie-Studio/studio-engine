@@ -37,9 +37,10 @@ export const STATE_KEY = "studioInPage"
 // The mark on a target that took tabindex=-1 for focus here; engine.css draws no ring on it.
 export const FOCUS_MARK = "data-in-page-focus"
 // No scroll for this long ends the scroll, where the browser has no scrollend event. Where it
-// has one, only scrollend ends a scroll that moved: on a slow main thread (a phone, or CI at
-// 8x CPU) a smooth scroll's frames come further apart than this, and a quiet spell ended the
-// jump at its first frame. Then the target moved and nothing aimed again.
+// has one, scrollend ends a scroll that moved (or the START_CAP_MS backstop below): on a slow
+// main thread (a phone, or CI at 8x CPU) a smooth scroll's frames come further apart than
+// this, and a quiet spell ended the jump at its first frame. Then the target moved and nothing
+// aimed again.
 export const SETTLE_MS = 150
 // A scroll the reader never sees move still ends: the cap for a scroll that never starts.
 // Where the browser has scrollend, it is also the backstop after each scroll event: a scroll
@@ -243,8 +244,8 @@ export function installInPageLinks(doc) {
   // target was at the start. Content that grows on the way (a lazy frame the scroll passes,
   // the navbar's collapse) moves the target, so the scroll aims again, up to MAX_AIMS times,
   // until the reader takes over (a wheel, a touch, a key, a press). The end is the browser's
-  // scrollend where it has one, a quiet spell where not; then the end event, once. A scroll
-  // that never starts ends at the cap either way. Then, unless the reader took over, the
+  // scrollend where it has one (else START_CAP_MS after the last scroll event), a quiet spell
+  // where not; then the end event, once. A scroll that never starts ends at the cap either way. Then, unless the reader took over, the
   // target holds its place for HOLD_MS (hold, above).
   const jump = (target, behavior) => {
     if (settling) settling()

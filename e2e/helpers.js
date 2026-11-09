@@ -215,7 +215,9 @@ function watchInPageJumps(page) {
 
 // The module's jump has ended: at least `count` jumps started since the document began, and
 // every one has ended. The end is the module's own: the browser's scrollend after its last
-// aim, so the target is in place, not a guess at how long a smooth scroll takes. A page
+// aim (or its START_CAP_MS backstop when no scrollend comes), so the target is in place, not
+// a guess at how long a smooth scroll takes. Growth above the target after this is the
+// module's hold (HOLD_MS), which keeps the target's place on the screen. A page
 // without the module never starts one, and the wait times out.
 function jumpEnded(page, count = 1) {
   return page.waitForFunction((n) => {
