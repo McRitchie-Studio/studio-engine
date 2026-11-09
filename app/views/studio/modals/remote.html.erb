@@ -1,0 +1,5 @@
+<%# One on-demand modal's content, as Studio::ModalsController serves it: the
+    registered partial with its locals, resolved in THIS view, and nothing else.
+    No layout, no script: studio/modal_host wraps it in the host's
+    <template x-if> on the client. %>
+<%= render @studio_modal.partial, @studio_modal.locals_for(self) %>

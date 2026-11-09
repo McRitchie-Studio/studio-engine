@@ -33,6 +33,7 @@ require "studio/js_literal"
 require "studio/js_identifier"
 require "studio/hold_button"
 require "studio/partial_block"
+require "studio/modals"
 require "studio/sidebar_sections"
 require "studio/icons"
 require "studio/site_footer"
@@ -2191,6 +2192,14 @@ module Studio
       # request that does not present it.
       get "_studio/health_report", to: "studio/health_reports#show", as: :studio_health_report,
           defaults: { format: :json }
+
+      # The on-demand modal fragments (Studio::ModalsController, Studio.modals).
+      # Drawn for every app: the controller is the gate, answering 404 for any
+      # id the registry does not name, so an app that registers nothing serves
+      # nothing. HTML only; studio/modal_host is its one caller.
+      get "_studio/modals/:id", to: "studio/modals#show", as: :studio_modal,
+          constraints: { id: /[a-z0-9][a-z0-9_-]*/ },
+          defaults: { format: :html }
 
       # Developer-desk tools. Drawn outside production, and each controller
       # re-checks Studio.local_tool_enabled? per request (loopback only) — the
