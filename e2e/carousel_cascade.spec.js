@@ -642,3 +642,141 @@ test("the style guide's image-only specimen moves its one caption with the open 
   expect(ring, "the open picture wears a ring").not.toBe("none");
   expect(errors).toEqual([]);
 });
+
+// -- carousel-captions-edge-follow-ups -----------------------------------------------
+//
+// CONTROLS, each run against this file with the lab server restarted (2026-11-08):
+//   - carousel-captions connect() without its read of the open slide: the held
+//     fragment spec red (App 1's caption while App 3 is open).
+//   - the change listener without its own-row filter: the scoped spec red (the
+//     second row's move changes the caption).
+//   - the narrow cascade's shadow room removed: the phone shadow spec red (the mask
+//     ends inside the front card's shadow).
+//   - the narrow cascade's controls lift removed: the 390 image-only spec red (the
+//     track's room intercepts the arrow click).
+//   - motion-reduce:transition-none dropped from the style guide's captions: the
+//     reduced-motion caption spec red (a 0.2s fade).
+
+const captionState = (page, stage) => page.locator(`[data-lab-stage='${stage}'] [data-carousel-captions-target='caption']`)
+  .evaluateAll((all) => all.map((caption) => ({
+    current: caption.hasAttribute("data-current"),
+    hidden: caption.getAttribute("aria-hidden"),
+    shown: getComputedStyle(caption).visibility === "visible"
+  })));
+
+// The caption stage shows exactly caption `index`: marked, exposed and visible, the rest hidden.
+async function expectCaptionOn(page, stage, index) {
+  await expect.poll(async () => (await captionState(page, stage)).map(({ current }) => current).indexOf(true)).toBe(index);
+  await rest(page);
+  const state = await captionState(page, stage);
+  state.forEach((caption, at) => {
+    expect(caption.current, `caption ${at + 1} marked`).toBe(at === index);
+    expect(caption.hidden, `caption ${at + 1} aria-hidden`).toBe(at === index ? null : "true");
+    expect(caption.shown, `caption ${at + 1} visible`).toBe(at === index);
+  });
+}
+
+test("a #fragment to a card shows that card's caption when the captions controller connects after the row moved", async ({ page }) => {
+  await page.setViewportSize(DESKTOP);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const errors = watchPageErrors(page);
+  await blockOffsiteRequests(page);
+  // Hold the captions controller's module until the row has opened on the fragment's
+  // card and announced it: the order two lazy controllers can take on their own. This
+  // route is registered after the offsite block, so it runs first.
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  let asked = 0;
+  await page.route("**/carousel_captions_controller*.js", async (route) => { asked += 1; await held; await route.fallback(); });
+  await page.goto(`${LAB}#portfolio-app-3`);
+  const row = region(page, "cascade-portfolio");
+  await expect(row).toHaveAttribute("data-carousel-ready", "");
+  await expect(row.locator(".carousel-slide[data-current]")).toHaveAttribute("aria-label", "App 3");
+  await expect.poll(() => changes(page, "cascade-portfolio")).toEqual([{ lab: "cascade-portfolio", index: 2, previous: 0, total: 7, slide: "App 3", marked: true }]);
+  expect(asked, "the captions controller was asked for and held").toBeGreaterThan(0);
+  release();
+  await expectCaptionOn(page, "portfolio", 2);
+  // It keeps following the row after that.
+  await row.getByRole("button", { name: "Next slide", exact: true }).click();
+  await expectCaptionOn(page, "portfolio", 3);
+  expect(errors).toEqual([]);
+});
+
+test("fresh loads with a #fragment always show the open card's caption", async ({ page }) => {
+  await page.setViewportSize(DESKTOP);
+  await blockOffsiteRequests(page);
+  const errors = watchPageErrors(page);
+  for (let load = 0; load < 6; load += 1) {
+    await page.goto("about:blank");
+    await page.goto(`${LAB}#portfolio-app-${3 + (load % 3)}`);
+    const row = region(page, "cascade-portfolio");
+    await expect(row).toHaveAttribute("data-carousel-ready", "");
+    await expect(row.locator(".carousel-slide[data-current]")).toHaveAttribute("aria-label", `App ${3 + (load % 3)}`);
+    await expectCaptionOn(page, "portfolio", 2 + (load % 3));
+  }
+  expect(errors).toEqual([]);
+});
+
+test("a caption wrapper follows its own row, not a second row inside it", async ({ page }) => {
+  await page.setViewportSize(DESKTOP);
+  const errors = await open(page, { lab: "scoped-other" });
+  await expectCaptionOn(page, "scoped", 0);
+  await region(page, "scoped-other").getByRole("button", { name: "Next slide", exact: true }).click();
+  await expect.poll(() => changes(page, "scoped-other")).toHaveLength(1);
+  await expectCaptionOn(page, "scoped", 0);
+  await region(page, "scoped").getByRole("button", { name: "Next slide", exact: true }).click();
+  await expectCaptionOn(page, "scoped", 1);
+  expect(errors).toEqual([]);
+});
+
+// How far a box-shadow paints below its box: the deepest layer's offset + blur + spread.
+const shadowReach = (shadow) => Math.max(0, ...shadow.split(/,(?![^(]*\))/).map((layer) => {
+  const px = (layer.match(/-?[\d.]+px/g) || []).map(parseFloat);
+  return px.length >= 2 ? px[1] + (px[2] || 0) + (px[3] || 0) : 0;
+}));
+
+for (const theme of ["dark", "light"]) {
+  test(`${theme}, a phone (390px): the edge mask leaves room for the front card's shadow`, async ({ browser }) => {
+    const context = await browser.newContext({ ...devices["iPhone 13"] });
+    const page = await context.newPage();
+    try {
+      const errors = await open(page, { lab: "cascade-portfolio", theme });
+      expect(await page.evaluate(() => window.innerWidth)).toBe(390);
+      const row = region(page, "cascade-portfolio");
+      const look = await row.evaluate((section) => {
+        const track = section.querySelector(".carousel-track");
+        const style = getComputedStyle(track);
+        const card = track.querySelector(".carousel-slide[data-current] [data-test='portfolio-card']");
+        return {
+          mask: style.maskImage || style.webkitMaskImage,
+          shadow: getComputedStyle(card).boxShadow,
+          below: track.getBoundingClientRect().bottom - card.getBoundingClientRect().bottom
+        };
+      });
+      expect(look.mask, "the edge still fades the sides").toMatch(/^linear-gradient\(to right, /);
+      const reach = shadowReach(look.shadow);
+      expect(reach, "the open card wears its shadow-xl").toBeGreaterThanOrEqual(30);
+      // The mask paints only inside the track's box, so the box must reach past the shadow.
+      expect(look.below, `the track's box reaches ${reach}px below the card`).toBeGreaterThanOrEqual(reach);
+      // The room changes no layout: the arrows still take a press (a click checks the hit).
+      await row.getByRole("button", { name: "Next slide", exact: true }).click();
+      await expect(row.locator(".carousel-slide[data-current]")).toHaveAttribute("aria-label", "App 2");
+      await expectNoSideScroll(page);
+      expect(errors).toEqual([]);
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+test("under reduced motion the style guide's caption swaps with no fade", async ({ page }) => {
+  await page.setViewportSize(DESKTOP);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/style_nav");
+  const stage = page.locator("[data-carousel-image-only-specimen]");
+  await expect(stage.locator("section.carousel")).toHaveAttribute("data-carousel-ready", "");
+  const durations = await stage.locator("[data-carousel-captions-target='caption']")
+    .evaluateAll((all) => all.map((caption) => getComputedStyle(caption).transitionDuration));
+  expect(durations.every((duration) => duration.split(",").every((part) => parseFloat(part) === 0)), `durations ${durations}`).toBe(true);
+});
