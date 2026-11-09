@@ -112,7 +112,7 @@ function page({ reading, rootProps = {} } = {}) {
   const fire = (type, detail) => (docListeners[type] || []).forEach((fn) => fn({ type, detail }))
   const flush = () => { while (frames.length) frames.shift()() }
   const clone = () => created.find((el) => el.className === "sticky-table-header-clone")
-  return { window, stack, fire, flush, clone, observers, header, docListeners, winListeners }
+  return { window, stack, fire, flush, clone, observers, header, table, docListeners, winListeners }
 }
 
 function booted(options) {
@@ -184,11 +184,38 @@ test("with no publisher it falls back to --pin-stack-bottom and never to --nav-h
   assert.equal(bare.window.StudioStickyTableHeaders.pinnedEdge(), 0, "a header height is not an edge")
 })
 
-test("placement: hidden until the header reaches the edge, then pushed up by the table's end", () => {
+test("placement: hidden until the header reaches the edge, then cut at the edge as the table leaves", () => {
   // Spread out of the vm's realm: deepStrictEqual compares prototypes.
   const placement = (m) => ({ ...page().window.StudioStickyTableHeaders.placement(m) })
-  assert.deepEqual(placement({ edge: 50, headerTop: 51, tableBottom: 900, cloneHeight: 40 }), { active: false, top: null })
-  assert.deepEqual(placement({ edge: 50, headerTop: 50, tableBottom: 900, cloneHeight: 40 }), { active: true, top: 50 })
-  assert.deepEqual(placement({ edge: 50, headerTop: -300, tableBottom: 70, cloneHeight: 40 }), { active: true, top: 30 })
-  assert.deepEqual(placement({ edge: 50, headerTop: -300, tableBottom: 50, cloneHeight: 40 }), { active: false, top: null })
+  const off = { active: false, top: null, height: null, shift: null }
+  assert.deepEqual(placement({ edge: 50, headerTop: 51, tableBottom: 900, cloneHeight: 40 }), off)
+  assert.deepEqual(placement({ edge: 50, headerTop: 50, tableBottom: 900, cloneHeight: 40 }), { active: true, top: 50, height: 40, shift: 0 })
+  // The table's last 20px are below the edge: the shell stays AT the edge, 20px
+  // tall, and the row moves up 20px inside it. It used to be top: 30, over the
+  // page header.
+  assert.deepEqual(placement({ edge: 50, headerTop: -300, tableBottom: 70, cloneHeight: 40 }), { active: true, top: 50, height: 20, shift: -20 })
+  assert.deepEqual(placement({ edge: 50, headerTop: -300, tableBottom: 50, cloneHeight: 40 }), off)
+})
+
+test("placement: the clone's top is never above the edge, at any table bottom", () => {
+  const { placement } = page().window.StudioStickyTableHeaders
+  for (let tableBottom = 51; tableBottom <= 200; tableBottom++) {
+    const p = placement({ edge: 50, headerTop: -300, tableBottom, cloneHeight: 40 })
+    assert.equal(p.top, 50, `tableBottom ${tableBottom}`)
+    assert.ok(p.top + p.height <= tableBottom, `the shell ends with the table at ${tableBottom}`)
+    assert.equal(p.height - p.shift, 40, "the row inside keeps its full height")
+  }
+})
+
+test("a leaving table cuts the shell at the edge and moves the row up inside it", () => {
+  const p = booted({ reading: { bottom: 50, timeline: false, travel: 0 } })
+  assert.equal(p.clone().style.height, "40px", "a long table: the full row")
+  // Scroll on until 15px of the table are left below the edge.
+  p.table.rect = rect({ top: -900, bottom: 65, left: 0, width: 800 })
+  p.observers.at(-1).cb([])
+  const shell = p.clone()
+  assert.equal(shell.style.display, "block")
+  assert.equal(shell.style.top, "50px", "the shell stays at the edge, under the page header")
+  assert.equal(shell.style.height, "15px", "and ends where the table does")
+  assert.equal(shell.children[0].style.transform, "translate(0px, -25px)", "the row moves up inside it")
 })

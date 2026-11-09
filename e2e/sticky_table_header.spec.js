@@ -202,3 +202,80 @@ test("a plain script-mode host (no timeline): the clone sits on the bar after a 
   expect(Math.abs(after.clone - after.bar), `clone ${after.clone} vs bar ${after.bar}`).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
 });
+
+// A SHORT TABLE UNDER THE PINNED PAGE HEADER (Turf Monster /contests, My Contests).
+// As a table leaves, the clone used to be pushed up by the table's bottom, into the
+// page header's band, and at the page header's own z-index it painted over the
+// title (it is appended to <body>, so it won the tie). Now the clone stays at the
+// stack's bottom edge and gets shorter, and it stacks under the page header.
+//
+// On every painted frame of a slow scroll through the table's exit: the clone's top
+// is at or below the page header's bottom, and its bottom is at or above the
+// table's.
+const PAGE_HEADER = "/lab/sticky_table?page_header=1";
+
+const READ_LEAVING = () => {
+  const row = document.querySelector('[data-pin="page"]').getBoundingClientRect();
+  const table = document.querySelector('[data-test="short-table"]').getBoundingClientRect();
+  const clone = [...document.querySelectorAll(".sticky-table-header-clone")]
+    .find((c) => getComputedStyle(c).display !== "none");
+  const box = clone && clone.getBoundingClientRect();
+  return {
+    y: Math.round(window.scrollY),
+    rowBottom: Math.round(row.bottom * 10) / 10,
+    tableBottom: Math.round(table.bottom * 10) / 10,
+    cloneTop: box ? Math.round(box.top * 10) / 10 : null,
+    cloneBottom: box ? Math.round(box.bottom * 10) / 10 : null
+  };
+};
+
+for (const [label, size] of [["1280px", DESKTOP], ["390px", PHONE]]) {
+  test(`${label}: a short table leaving under the page header never draws its clone over the title`, async ({ page }) => {
+    await blockOffsiteRequests(page);
+    const errors = watchPageErrors(page);
+    await page.setViewportSize(size);
+    await page.goto(PAGE_HEADER);
+    await expectStickyChromeIsLive(page, expect);
+    await page.evaluate(() => document.fonts.ready);
+    await settled(page);
+
+    // Start with the table's header row just below the page header, then scroll
+    // 4px a frame until the table is gone.
+    const start = await page.evaluate(() => {
+      const t = document.querySelector('[data-test="short-table"]').getBoundingClientRect().top + window.scrollY;
+      const row = document.querySelector('[data-pin="page"]');
+      return Math.max(0, Math.round(t - row.offsetHeight - 200));
+    });
+    await scrollToPinned(page, start);
+    const rows = await page.evaluate(async (readSrc) => {
+      const read = eval(`(${readSrc})`);
+      const painted = () => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+      const out = [];
+      for (let i = 0; i < 200; i++) {
+        window.scrollBy(0, 4);
+        await painted();
+        const r = read();
+        out.push(r);
+        if (r.tableBottom < r.rowBottom - 40) break;
+      }
+      return out;
+    }, READ_LEAVING.toString());
+
+    const shown = rows.filter((r) => r.cloneTop !== null);
+    expect(shown.length, "the clone showed on some frame").toBeGreaterThan(0);
+    const over = shown.filter((r) => r.cloneTop < r.rowBottom - 0.5);
+    expect(over, "frames where the clone's top rose above the page header's bottom").toEqual([]);
+    const past = shown.filter((r) => r.cloneBottom > r.tableBottom + 0.5);
+    expect(past, "frames where the clone ran past the table's bottom").toEqual([]);
+    const cut = shown.filter((r) => r.cloneBottom - r.cloneTop < 30);
+    expect(cut.length, "frames where the table was leaving and the clone was cut short").toBeGreaterThan(0);
+
+    // The second guard: the clone stacks under the page header.
+    const z = await page.evaluate(() => ({
+      row: Number(getComputedStyle(document.querySelector('[data-pin="page"]')).zIndex),
+      clone: Number(getComputedStyle(document.querySelector(".sticky-table-header-clone")).zIndex)
+    }));
+    expect(z.clone, `clone z ${z.clone} vs page header z ${z.row}`).toBeLessThan(z.row);
+    expect(errors).toEqual([]);
+  });
+}

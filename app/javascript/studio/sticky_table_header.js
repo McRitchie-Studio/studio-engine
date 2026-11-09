@@ -57,11 +57,22 @@
   }
 
   // Where the clone goes for one table, as a pure function of what was measured:
-  // shown once the real header has scrolled up to the edge, and pushed up by the
-  // table's own bottom so it leaves with the table.
+  // shown once the real header has scrolled up to the edge, and gone once the
+  // table's own bottom has.
+  //
+  // IT NEVER RISES ABOVE THE EDGE. As the table leaves, the clone used to be
+  // pushed up by the table's bottom (top = tableBottom - cloneHeight), and that
+  // slid it into the pinned page header's band, where it painted over the title
+  // (Turf Monster /contests: CONTEST / STATUS / ENTRY over "Contests"). A glass
+  // header is translucent, so even a clone stacked under it would show through.
+  // Now the shell stays at the edge and gets SHORTER, `height` = what is left of
+  // the table below the edge, and the copied row moves up inside it by `shift`
+  // (zero or negative), so the row still leaves with the table, cut at the edge.
   function placement({ edge, headerTop, tableBottom, cloneHeight }) {
     const active = headerTop <= edge && tableBottom > edge;
-    return { active, top: active ? Math.min(edge, tableBottom - cloneHeight) : null };
+    if (!active) return { active, top: null, height: null, shift: null };
+    const height = Math.min(cloneHeight, tableBottom - edge);
+    return { active, top: edge, height, shift: height - cloneHeight };
   }
 
   window.StudioStickyTableHeaders = { loaded: true, pinnedEdge, placement };
@@ -151,7 +162,7 @@
       const tableRect = this.table.getBoundingClientRect();
       const scrollerRect = this.scroller.getBoundingClientRect();
       const cloneHeight = headerRect.height || this.cloneShell.getBoundingClientRect().height;
-      const { active, top } = placement({
+      const { active, top, height, shift } = placement({
         edge, headerTop: headerRect.top, tableBottom: tableRect.bottom, cloneHeight
       });
 
@@ -169,9 +180,9 @@
       this.cloneShell.style.left = `${scrollerRect.left}px`;
       this.cloneShell.style.top = `${top}px`;
       this.cloneShell.style.width = `${scrollerRect.width}px`;
-      this.cloneShell.style.height = `${cloneHeight}px`;
+      this.cloneShell.style.height = `${height}px`;
       this.cloneTable.style.width = `${tableRect.width}px`;
-      this.cloneTable.style.transform = `translateX(${translateX}px)`;
+      this.cloneTable.style.transform = `translate(${translateX}px, ${shift}px)`;
       this.table.setAttribute("data-sticky-table-active", "true");
     }
   }
