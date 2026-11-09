@@ -180,7 +180,57 @@ function transitionsDone(locator) {
     .map((a) => a.finished.catch(() => {}))).then(() => undefined));
 }
 
+// ---- In-page jumps and history (studio/in_page_links) ----------------------------------
+//
+// Counts, from the document's first script on: each jump the module starts
+// (studio:in-page-scroll), each it ends (studio:in-page-scroll-end: its scrollend after the
+// last aim, or the reader taking over), and each popstate. An init script, so the popstate
+// listener is bound ahead of the module's own. Under Turbo the module stops the popstate
+// (stopImmediatePropagation) after it has scrolled, so a listener bound later never hears it.
+// Call before page.goto.
+function watchInPageJumps(page) {
+  return page.addInitScript(() => {
+    const seen = { starts: 0, ends: 0, pops: 0 };
+    window.__inPageJumps = seen;
+    document.addEventListener("studio:in-page-scroll", () => { seen.starts += 1; });
+    document.addEventListener("studio:in-page-scroll-end", () => { seen.ends += 1; });
+    window.addEventListener("popstate", () => { seen.pops += 1; }, { capture: true });
+  });
+}
+
+// The module's jump has ended: at least `count` jumps started since the document began, and
+// every one has ended. The end is the module's own: the browser's scrollend after its last
+// aim, so the target is in place, not a guess at how long a smooth scroll takes. A page
+// without the module never starts one, and the wait times out.
+function jumpEnded(page, count = 1) {
+  return page.waitForFunction((n) => {
+    const seen = window.__inPageJumps;
+    return seen.starts >= n && seen.ends >= seen.starts;
+  }, count);
+}
+
+// Back or Forward between two entries of one page, and the place it restored. A traversal
+// fires popstate even when it does not move the page, where no scroll or scrollend event
+// comes. The restore runs in the popstate's own task: the module's instant scroll under
+// Turbo, the browser's own restore without it. So the read is two frames after the
+// popstate, and it is the restored position whether the page moved or not.
+async function traversed(page, go) {
+  const before = await page.evaluate(() => window.__inPageJumps.pops);
+  await go();
+  await page.waitForFunction((n) => window.__inPageJumps.pops > n, before);
+  return page.evaluate(() => new Promise((done) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => done(window.scrollY)));
+  }));
+}
+
+// Every scrollY across `frames` frames, from the next one on. A check that the page holds its
+// place reads each frame, so a move and a move back cannot pass as stillness.
+function scrollYAcrossFrames(page, frames = 30) {
+  return sampleAcrossFrames(page, { perturb: () => {}, read: () => window.scrollY, frames });
+}
+
 module.exports = {
   watchPageErrors, expectStickyChromeIsLive, sampleAcrossFrames, blockOffsiteRequests,
   scrolledTo, navAtRest, slidIn, transitionsDone,
+  watchInPageJumps, jumpEnded, traversed, scrollYAcrossFrames,
 };

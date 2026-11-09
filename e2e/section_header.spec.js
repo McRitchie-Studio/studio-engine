@@ -1,5 +1,8 @@
 const { test, expect } = require("@playwright/test");
-const { watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive } = require("./helpers");
+const {
+  watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive, scrolledTo, navAtRest,
+  watchInPageJumps, jumpEnded, traversed, scrollYAcrossFrames,
+} = require("./helpers");
 
 // [e2e] THE SECTION HEADER (studio/_section_header, docs/PAGE_HEADER.md). Alex McRitchie,
 // 2026-11-05: "the style stays but a 'Modals' fixed header should be directly under, until
@@ -116,19 +119,13 @@ const serveFeed = (page) => page.route("**/admin/style/loaders_feed*", async (ro
   await route.fulfill({ response: await route.fetch({ url: `${url.origin}/lab/loaders_feed${url.search}` }) });
 });
 
-// A tab's click is a smooth scroll (studio/in_page_links), so a landing is read once the
-// page has stood still for ten frames.
-const landed = (page) => page.waitForFunction(() => new Promise((done) => {
-  let last = window.scrollY;
-  let still = 0;
-  const tick = () => {
-    still = window.scrollY === last ? still + 1 : 0;
-    last = window.scrollY;
-    if (still >= 10) done(true);
-    else requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
-}));
+// A tab's click is a smooth scroll (studio/in_page_links). It has landed when the module's
+// jump ended (its scrollend after the last aim; jumpEnded) and the navbar's collapse that
+// the scroll drove is at rest. `count` is the jumps since the page loaded.
+async function landed(page, count) {
+  await jumpEnded(page, count);
+  await navAtRest(page);
+}
 
 const TABS = [["Modals", "modals"], ["Tricks", "tricks"], ["Tasks", "tasks"], ["Theme", "theme"]];
 
@@ -136,6 +133,7 @@ const TABS = [["Modals", "modals"], ["Tricks", "tricks"], ["Tasks", "tasks"], ["
 // test( in the source, so a loop around test() would not match what runs.
 async function tabJump(page, url) {
   const errors = watchPageErrors(page);
+  await watchInPageJumps(page);
   for (const viewport of [DESKTOP, PHONE]) {
     await blockOffsiteRequests(page);
     await serveFeed(page);
@@ -146,8 +144,7 @@ async function tabJump(page, url) {
     for (const [index, [label, id]] of TABS.entries()) {
       await row.locator("a", { hasText: label }).click();
       await page.waitForFunction((want) => location.hash === `#${want}`, id);
-      await landed(page);
-      await page.waitForTimeout(500);
+      await landed(page, index + 1);
       await expectLanded(page, row, label, id, viewport, index > 0);
     }
   }
@@ -155,6 +152,7 @@ async function tabJump(page, url) {
 }
 async function backKeepsPlace(page, url) {
   await blockOffsiteRequests(page);
+  await watchInPageJumps(page);
   await page.setViewportSize(PHONE);
   await page.goto(url);
   await page.waitForFunction(() => document.documentElement.hasAttribute("data-pin-live"));
@@ -162,35 +160,41 @@ async function backKeepsPlace(page, url) {
   // Tricks comes before Modals, so the second jump lands further down.
   await row.locator("a", { hasText: "Tricks" }).click();
   await page.waitForFunction(() => location.hash === "#tricks");
-  await landed(page);
-  await page.waitForTimeout(300);
-  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
-  await page.waitForTimeout(300);
+  await landed(page, 1);
+  await scrolledTo(page, 0);
+  await navAtRest(page);
   await row.locator("a", { hasText: "Modals" }).click();
   await page.waitForFunction(() => location.hash === "#modals");
-  await landed(page);
-  await page.waitForTimeout(300);
+  await landed(page, 2);
   const before = await page.evaluate(() => window.scrollY);
-  await page.goBack();
-  await page.waitForFunction(() => location.hash === "#tricks");
-  await page.waitForTimeout(800);
-  const held = await page.evaluate(() => window.scrollY);
-  await page.waitForTimeout(800);
-  expect(await page.evaluate(() => window.scrollY), "nothing moves the page after Back settles").toBe(held);
+  // The place Back restored, read two frames after its popstate: Back may not move the page,
+  // and then no scrollend comes.
+  const held = await traversed(page, () => page.goBack());
+  expect(await page.evaluate(() => location.hash)).toBe("#tricks");
   expect(held, "Back left the jump's place").toBeLessThan(before);
+  // Back starts no jump, so none is left to end. Then every frame of the navbar's collapse
+  // and thirty more read the same place.
+  await jumpEnded(page, 2);
+  await navAtRest(page);
+  expect(new Set(await scrollYAcrossFrames(page)), "nothing moves the page after Back settles").toEqual(new Set([held]));
 }
 async function scrollHolds(page, url) {
   await blockOffsiteRequests(page);
+  await watchInPageJumps(page);
   await page.setViewportSize(DESKTOP);
   await page.goto(url);
   await page.waitForFunction(() => document.documentElement.hasAttribute("data-pin-live"));
   await styleRow(page).locator("a", { hasText: "Modals" }).click();
   await page.waitForFunction(() => location.hash === "#modals");
-  await landed(page);
+  await landed(page, 1);
   await page.evaluate(() => window.scrollBy({ top: -300, behavior: "instant" }));
   const held = await page.evaluate(() => window.scrollY);
-  await page.waitForTimeout(1800);
+  // A jump still running would aim again on this scroll. The module is done once every jump
+  // it started has ended; after that it listens for nothing. Then thirty frames hold.
+  await jumpEnded(page, 1);
+  await navAtRest(page);
   expect(await page.evaluate(() => window.scrollY)).toBe(held);
+  expect(new Set(await scrollYAcrossFrames(page)), "the reader's scroll holds").toEqual(new Set([held]));
 }
 test("a tab's jump shows the section's title under the row, on the right bar and tab, without Turbo", async ({ page }) => tabJump(page, STYLE));
 test("a tab's jump shows the section's title under the row, on the right bar and tab, under Turbo", async ({ page }) => tabJump(page, `${STYLE}?turbo=1`));
@@ -204,7 +208,10 @@ test("a load with a hash shows the title, with no error on a hash that cannot be
   await blockOffsiteRequests(page);
   await page.setViewportSize(DESKTOP);
   await page.goto(`${STYLE}#modals`);
-  await page.waitForTimeout(600);
+  // The browser jumps to #modals as the page loads; the stack and the highlight read it once
+  // the chrome is live. Both checks below are polled.
+  await expectStickyChromeIsLive(page, expect);
+  await page.waitForFunction(() => document.documentElement.hasAttribute("data-pin-live"));
   const row = styleRow(page);
   await expect(row.locator("a[aria-current='true']")).toHaveText("Modals");
   await expect.poll(async () => (await topOf(header(page, "modals"))) >= (await bottomOf(row)) - 1).toBe(true);
@@ -218,11 +225,16 @@ test("a load with a hash shows the title, with no error on a hash that cannot be
 test("a jump to a target inside a section lands below the section's bar", async ({ page }) => {
   await open(page, LAB, DESKTOP);
   await scrollTo(page, "#second", -300);
-  await page.evaluate(() => { location.hash = "#inner"; });
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 200))));
+  // The browser's jump to the fragment runs in the hash change's own navigation, ahead of
+  // its hashchange event. Then the navbar's collapse comes to rest, and the bar is read.
+  await page.evaluate(() => new Promise((resolve) => {
+    window.addEventListener("hashchange", resolve, { once: true });
+    location.hash = "#inner";
+  }));
+  await navAtRest(page);
   const bar = header(page, "second");
   await expect(bar).toHaveAttribute("data-stuck", "");
-  expect(await topOf(page.locator("#inner"))).toBeGreaterThanOrEqual((await bottomOf(bar)) - 1);
+  await expect.poll(async () => (await topOf(page.locator("#inner"))) - (await bottomOf(bar))).toBeGreaterThanOrEqual(-1);
 });
 
 test("at rest a plain title; stuck a bar in light and dark, its box unchanged", async ({ page }) => {
