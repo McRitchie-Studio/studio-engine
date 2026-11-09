@@ -446,10 +446,11 @@ stop, and it marks none `data-current`.
 each card is only its picture, filling the card; the open card wears a ring; and one caption
 sits under the stack and follows the open card. A caption inside each slide would ride the
 slide's 3D move, so the captions live outside the row, one per item in item order, all in one
-grid cell, and the change event marks the open one:
+grid cell. The engine's `carousel-captions` controller (lazy) marks the open one
+`data-current` and the rest `aria-hidden` on each change event; the page needs no script:
 
 ```erb
-<div data-carousel-caption-stage>
+<div data-studio-controller="carousel-captions">
   <%= render layout: "studio/carousel",
         locals: { label: "Portfolio", items: @apps, style: :cascade, loop: true, dots: false,
                   slide_label: ->(app) { app.name } } do |app| %>
@@ -458,10 +459,10 @@ grid cell, and the change event marks the open one:
       <%= image_tag app.image, alt: "", class: "h-full w-full object-cover" %>
     <% end %>
   <% end %>
-  <div class="grid pt-4 text-center" data-carousel-captions>
+  <div class="grid pt-4 text-center">
     <% @apps.each_with_index do |app, index| %>
       <div class="col-start-1 row-start-1 opacity-0 invisible transition-opacity data-current:opacity-100 data-current:visible"
-           data-carousel-caption<%= " data-current".html_safe if index.zero? %><%= ' aria-hidden="true"'.html_safe unless index.zero? %>>
+           data-carousel-captions-target="caption"<%= " data-current".html_safe if index.zero? %><%= ' aria-hidden="true"'.html_safe unless index.zero? %>>
         <h2 class="type-h4 text-heading"><%= app.name %></h2>
         <p class="text-sm text-secondary"><%= app.blurb %></p>
       </div>
@@ -470,25 +471,11 @@ grid cell, and the change event marks the open one:
 </div>
 ```
 
-```js
-// Once per page (a module the layout loads, or a nonce'd inline script): one
-// listener on the document serves every stage, after every Turbo visit too.
-document.addEventListener("studio:carousel:change", ({ target, detail }) => {
-  const stage = target.closest("[data-carousel-caption-stage]")
-  if (!stage) return
-  stage.querySelectorAll("[data-carousel-captions] > [data-carousel-caption]").forEach((caption, index) => {
-    const open = index === detail.index
-    caption.toggleAttribute("data-current", open)
-    if (open) caption.removeAttribute("aria-hidden")
-    else caption.setAttribute("aria-hidden", "true")
-  })
-})
-```
-
 The server marks the caption of the slide the row opens on (`start:`; index 0 for a
 looping row). The ring keys on `data-current`, which the cascade and the spotlight set on
 the open slide (`in-data-current:` matches the card inside it). The row's status line
-already says which slide is open, so the caption stack is not a live region.
+already says which slide is open, so the caption stack is not a live region. A host that
+needs more than a caption listens for `studio:carousel:change` itself.
 
 ### The "at" time stamp — `at_time_tag`
 

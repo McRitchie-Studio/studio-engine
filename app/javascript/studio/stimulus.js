@@ -71,7 +71,8 @@ export const schema = {
 // So is the page header: its tabs are links, and a row whose controller failed
 // keeps its bar at all times (data-studio-controller-failed="page-header").
 // So is the carousel: its track is a native scroll row, and one whose controller
-// failed keeps a scrollbar and hides the arrows and dots it cannot drive.
+// failed keeps a scrollbar and hides the arrows and dots it cannot drive. So are
+// the carousel's captions: a stage whose controller failed keeps the server's caption.
 // So is infinite scroll: a list whose controller failed keeps its "Load more"
 // link, which loads the next page by itself. So is pull to refresh: nothing
 // depends on it, and the browser's own reload still works.
@@ -93,6 +94,7 @@ export const LAZY = {
   "copy-text": () => import("studio/controllers/copy_text_controller"),
   "page-header": () => import("studio/controllers/page_header_controller"),
   "carousel": () => import("studio/controllers/carousel_controller"),
+  "carousel-captions": () => import("studio/controllers/carousel_captions_controller"),
   "infinite-scroll": () => import("studio/controllers/infinite_scroll_controller"),
   "pull-to-refresh": () => import("studio/controllers/pull_to_refresh_controller")
 }

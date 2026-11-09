@@ -544,7 +544,7 @@ async function expectImageOnlyPattern(page, { theme, width }) {
   expect(await page.evaluate(() => window.innerWidth)).toBe(width);
   const row = region(page, "cascade-portfolio");
   const stage = page.locator("[data-lab-stage='portfolio']");
-  const captions = stage.locator("[data-carousel-caption]");
+  const captions = stage.locator("[data-carousel-captions-target='caption']");
   await expect(row.locator(".carousel-dots"), "dots: false draws no dot group").toHaveCount(0);
   await expect(row.locator("button.carousel-dot")).toHaveCount(0);
 
@@ -632,11 +632,11 @@ test("the style guide's image-only specimen moves its one caption with the open 
   await expect(row).toHaveAttribute("data-carousel-ready", "");
   await row.scrollIntoViewIfNeeded();
   await expect(row.locator(".carousel-dots")).toHaveCount(0);
-  const current = () => stage.locator("[data-carousel-caption][data-current]");
+  const current = () => stage.locator("[data-carousel-captions-target='caption'][data-current]");
   await expect(current()).toHaveText(/Picture 1/);
   await row.getByRole("button", { name: "Next slide", exact: true }).click();
   await expect(current()).toHaveText(/Picture 2/);
-  await expect(stage.locator("[data-carousel-caption]").first()).toHaveAttribute("aria-hidden", "true");
+  await expect(stage.locator("[data-carousel-captions-target='caption']").first()).toHaveAttribute("aria-hidden", "true");
   await expect(row.locator(".carousel-slide[data-current] [role='img']")).toHaveAttribute("aria-label", "Picture 2");
   const ring = await row.locator(".carousel-slide[data-current] [role='img']").evaluate((card) => getComputedStyle(card).boxShadow);
   expect(ring, "the open picture wears a ring").not.toBe("none");

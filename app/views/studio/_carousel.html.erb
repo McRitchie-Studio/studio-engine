@@ -90,8 +90,8 @@
     THE CHANGE EVENT. Every style dispatches "studio:carousel:change" from the
     region, bubbling, once each time the open slide changes, after data-current
     has moved: detail { index, previous, slide, total }. A host that follows the
-    open slide (a caption under the row, a counter) listens for it; see the
-    README's image-only pattern.
+    open slide listens for it. One caption under the row needs no script: the
+    carousel-captions controller follows it (README, the image-only pattern).
 
     THE TRACK IS A NATIVE SCROLL-SNAP ROW (engine.css, carousel). A swipe, a
     trackpad, a wheel and a focused link move it with no script. The carousel

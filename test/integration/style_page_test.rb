@@ -143,10 +143,10 @@ class StylePageTest < ActiveSupport::TestCase
   end
 
   # The image-only pattern (README, The carousel): a cascade of pictures with no dots,
-  # one caption stack under it, and the change-event listener that moves the caption.
+  # one caption stack under it, and the carousel-captions controller that moves it.
   test "the Tricks section shows the image-only cascade with one caption under the stack" do
     doc = Nokogiri::HTML.fragment(render_index)
-    stage = doc.at_css("section#tricks [data-carousel-specimen] [data-carousel-image-only-specimen][data-carousel-caption-stage]")
+    stage = doc.at_css("section#tricks [data-carousel-specimen] [data-carousel-image-only-specimen][data-studio-controller='carousel-captions']")
 
     assert stage, "the image-only specimen is a caption stage"
     row = stage.at_css("section.carousel.carousel-cascade")
@@ -154,12 +154,11 @@ class StylePageTest < ActiveSupport::TestCase
     assert_nil row.at_css(".carousel-dots"), "dots: false draws no dots"
     assert_equal 5, row.css(".carousel-slide > .carousel-cascade-body > [role='img']").size, "each card is its picture alone"
     assert_nil row.at_css(".carousel-caption"), "no caption rides the slides"
-    captions = stage.css("[data-carousel-captions] > [data-carousel-caption]")
+    captions = stage.css("[data-carousel-captions-target='caption']")
     assert_equal 5, captions.size
     assert_equal [true, false, false, false, false], captions.map { |caption| caption.key?("data-current") }
     assert_equal [nil, "true", "true", "true", "true"], captions.map { |caption| caption["aria-hidden"] }
-    script = stage.parent.css("script").map(&:text).join
-    assert_includes script, 'addEventListener("studio:carousel:change"'
+    assert_empty stage.parent.css("script"), "the carousel-captions controller follows the row; no inline script"
   end
 
   test "every section's title is a section header, first in its section, and joins no data-pin" do
