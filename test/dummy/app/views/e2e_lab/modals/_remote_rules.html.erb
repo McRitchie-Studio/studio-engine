@@ -1,0 +1,8 @@
+<%# An app's on-demand modal, as Studio.modals serves it (e2e/modal_remote.spec.js,
+    test/integration/modals_endpoint_test.rb). One root, like any host
+    registration. `greeting` arrives from the registered locals helper. %>
+<div class="p-2" data-test="remote-rules">
+  <h2 class="text-lg font-bold mb-3" x-text="$store.modals.current().props.title"></h2>
+  <p data-test="remote-greeting"><%= local_assigns.fetch(:greeting, "no locals") %></p>
+  <button type="button" data-test="remote-close" class="btn btn-outline" @click="$store.modals.close()">Close</button>
+</div>
