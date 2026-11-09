@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { blockOffsiteRequests } = require("./helpers");
+const { blockOffsiteRequests, slidIn } = require("./helpers");
 
 // [e2e] The link sidebar's blurred edge (engine.css, THE SIDEBAR'S EDGE). It is a pseudo-element
 // with a backdrop filter, so no box and no byte says what it does: these compare the pixels
@@ -48,7 +48,7 @@ test("the band blurs the page beside the panel and leaves the page beyond it sha
   await openLab(page);
   await trigger(page).click();
   await expect(panel(page)).toBeVisible();
-  await page.waitForTimeout(350); // the 300ms slide
+  await slidIn(panel(page)); // the 300ms slide
   const { x: left } = await panel(page).boundingBox();
   const beside = { x: left - 24, y: 200, width: 22, height: 300 };
   const reach = { x: left - 90, y: 200, width: 40, height: 300 };
@@ -100,7 +100,7 @@ test("the band takes no clicks: a click in it reaches the page and closes the pa
   await openLab(page);
   await trigger(page).click();
   await expect(panel(page)).toBeVisible();
-  await page.waitForTimeout(350);
+  await slidIn(panel(page));
   const { x: left } = await panel(page).boundingBox();
 
   const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x, y).closest("[data-test]")?.dataset.test, [left - 10, 300]);
@@ -120,7 +120,7 @@ test.describe("on a phone", () => {
     await trigger(page).click();
     const phone = page.locator("#studio-link-sidebar-mobile");
     await expect(phone).toBeVisible();
-    await page.waitForTimeout(350);
+    await slidIn(phone);
 
     const measured = await phone.evaluate((node) => ({
       band: getComputedStyle(node, "::before").content,

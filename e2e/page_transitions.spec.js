@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
+const { watchPageErrors, blockOffsiteRequests, scrolledTo } = require("./helpers");
 
 // [e2e] The app-to-app page transition (studio/page_transitions, docs/PAGE_TRANSITIONS.md).
 // The animation names, the groups and the frames are observable only in a browser. A recorder
@@ -38,6 +38,10 @@ async function record(page) {
 }
 
 const seen = (page) => page.evaluate(() => window.__seen);
+// The move is over: turbo:load fires mid-move, and a Back pressed then lands on a page still
+// drawing the forward move into the log the Back is about to be read from.
+const still = (page) => page.waitForFunction(() => document.documentElement.dataset.pageTransition === undefined
+  && window.transitionAnimations().length === 0);
 
 async function go(page, testId = "other") {
   const load = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
@@ -550,13 +554,13 @@ test("Back between two chat heads still morphs, from Turbo's cache", async ({ pa
 
 test("Back from a scrolled page plays the app's move the other way and restores the scroll", async ({ page }) => {
   await open(page, "direction=left");
-  await page.evaluate(() => window.scrollTo(0, 800));
-  await page.waitForTimeout(200); // Turbo records the position on a throttled scroll.
+  // Turbo records the position in its own scroll listener: wait until it has heard it.
+  await scrolledTo(page, 800);
   // Not locator.click: Playwright would scroll the link into view first.
   const left = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
   await page.evaluate(() => document.querySelector('[data-test="other"]').click());
   await left;
-  await page.waitForTimeout(200); // Past the page's own load: Turbo ignores an early popstate.
+  await still(page);
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
   await page.evaluate(() => { window.__seen.length = 0; });
   const load = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
@@ -606,8 +610,7 @@ test("at phone width the chrome holds still while the page moves", async ({ page
 
 test("leaving a page scrolled, the stack does not slide in, and the collapsed navbar still pins", async ({ page }) => {
   await open(page, "direction=left");
-  await page.evaluate(() => window.scrollTo(0, 800));
-  await page.waitForTimeout(100);
+  await scrolledTo(page, 800);
   const left = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
   await page.evaluate(() => document.querySelector('[data-test="other"]').click());
   await left;
@@ -670,7 +673,7 @@ test("Back plays the reverse move and Forward the app's own, in the slide and th
   ]) {
     await open(page, query);
     await go(page);
-    await page.waitForTimeout(200); // Past the page's own load: Turbo ignores an early popstate.
+    await still(page);
     await page.evaluate(() => { window.__seen.length = 0; });
     let load = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
     await page.goBack();

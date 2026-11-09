@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
+const { watchPageErrors, blockOffsiteRequests, slidIn, animationsDone } = require("./helpers");
 
 // [e2e] The glass link sidebar (Studio.sidebar_style = :glass): where the panel sits, what its
 // rows draw, a hover that moves nothing, and both ways it closes.
@@ -22,7 +22,8 @@ const openGlass = async (page) => {
   await page.goto("/lab/sidebar_panels?glass=1&signed_in=1&admin=1");
   await page.waitForFunction(() => window.Alpine);
   await trigger(page).click();
-  await page.waitForTimeout(450);
+  await expect(panel(page)).toBeVisible();
+  await slidIn(panel(page));
 };
 
 test("the shell holds the blur, the frame slides, and the old edge is off", async ({ page }) => {
@@ -129,7 +130,7 @@ test("a hover moves no row and keeps both lines inside the row", async ({ page }
   const before = await tops();
 
   await row(panel(page), "Terms").hover();
-  await page.waitForTimeout(500);
+  await animationsDone(row(panel(page), "Terms"));
 
   expect(await tops()).toEqual(before);
   const fit = await row(panel(page), "Terms").evaluate((el) => {
@@ -161,7 +162,8 @@ test("a click in the inset closes it, and it opens again in place", async ({ pag
   await expect(panel(page)).toBeHidden();
 
   await trigger(page).click();
-  await page.waitForTimeout(450);
+  await expect(panel(page)).toBeVisible();
+  await slidIn(panel(page));
   expect((await panel(page).boundingBox()).x).toBe(1280 - 312);
   expect(await panel(page).getAttribute("class")).not.toMatch(/translate-x/);
 });
@@ -184,7 +186,8 @@ test.describe("on a phone", () => {
     await page.goto("/lab/sidebar_panels?glass=1&signed_in=1&admin=1");
     await page.waitForFunction(() => window.Alpine);
     await page.evaluate(() => { window.Alpine.store("sidebars").linkTreeOpen = true; });
-    await page.waitForTimeout(450);
+    await expect(phonePanel(page)).toBeVisible();
+    await slidIn(phonePanel(page));
 
     const fit = await page.evaluate(() => {
       const box = document.querySelector("#studio-link-sidebar-mobile [data-sidebar-glass-shell]").getBoundingClientRect();
