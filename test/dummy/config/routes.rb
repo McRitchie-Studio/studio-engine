@@ -55,7 +55,7 @@ Rails.application.routes.draw do
   # studio-engine.gemspec has never included test/ — so there is nothing to gate.
   #
   # Path prefixes are deliberately disjoint: /e2e/* is served as STATIC files from
-  # test/dummy/public (the compiled Tailwind and Alpine), /lab/* is routed. Sharing
+  # the lab's public folder, tmp/e2e-lab/public (the compiled Tailwind and Alpine), /lab/* is routed. Sharing
   # one prefix means the static file server shadows a route the day someone adds a
   # file whose name collides.
   get "up", to: "e2e_lab#up"

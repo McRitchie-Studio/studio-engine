@@ -296,18 +296,33 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
 
   # The favicon link carries the file's content version (Studio::PublicFileVersion),
   # and a host with no public/favicon.png keeps the bare link it always had.
+  #
+  # Both halves set their own public root. The bare half once read the dummy's
+  # real public folder, so an ignored favicon.png left there by a lab run turned it
+  # red with no change in the diff (e2e_lab_residue_test.rb holds the lab side).
   test "the favicon link carries the current file's digest, and is bare without the file" do
-    get "/lab/bar_stack"
-    assert_includes response.body, %(<link rel="icon" type="image/png" href="/favicon.png">)
+    with_public_root do
+      get "/lab/bar_stack"
+      assert_includes response.body, %(<link rel="icon" type="image/png" href="/favicon.png">)
+    end
 
-    Dir.mktmpdir do |root|
+    with_public_root do |root|
       File.binwrite(File.join(root, "favicon.png"), "a favicon")
+      get "/lab/bar_stack"
+      digest = Digest::SHA256.hexdigest("a favicon")[0, 8]
+      assert_equal "/favicon.png?v=#{digest}", Nokogiri::HTML(response.body).at_css("head link[rel=icon]")["href"]
+    end
+  end
+
+  private
+
+  # Points Studio::PublicFileVersion at a fresh, empty folder for the block.
+  def with_public_root
+    Dir.mktmpdir do |root|
       original = Studio::PublicFileVersion.method(:default_root)
       Studio::PublicFileVersion.define_singleton_method(:default_root) { root }
       begin
-        get "/lab/bar_stack"
-        digest = Digest::SHA256.hexdigest("a favicon")[0, 8]
-        assert_equal "/favicon.png?v=#{digest}", Nokogiri::HTML(response.body).at_css("head link[rel=icon]")["href"]
+        yield root
       ensure
         Studio::PublicFileVersion.singleton_class.send(:remove_method, :default_root)
         Studio::PublicFileVersion.define_singleton_method(:default_root, original) unless Studio::PublicFileVersion.respond_to?(:default_root)

@@ -35,7 +35,7 @@ class E2eLabController < ActionController::Base
   # javascript_importmap_tags: the HOST's asset pipeline, which a gem does not have
   # and has no reason to grow. Rather than fork the partial or skip it, the dummy
   # does what every host does — it delivers the assets, by its own route. e2e/boot.rb
-  # copies the engine's real app/assets JS and CSS into test/dummy/public/e2e, and
+  # copies the engine's real app/assets JS and CSS into the lab's public/e2e, and
   # these three helpers point at them. The engine's shipped `studio/sortable.js` is
   # the same bytes here as in a consuming app.
   #
