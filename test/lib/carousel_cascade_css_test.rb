@@ -51,6 +51,19 @@ class CarouselCascadeCssTest < Minitest::Test
     assert_match(/&\[data-studio-controller-failed\] > \.carousel-track \{[^}]*mask-image: none;/, BLOCK, "the fallback row drops it")
   end
 
+  # The mask paints only inside the track's box, so the narrow track keeps room under
+  # the cards for the open card's shadow (shadow-xl reaches 40px) and gives it back
+  # with a matching negative margin; the controls over that room are lifted above the
+  # track (a stacking context) so they keep every press. e2e: the phone shadow spec.
+  def test_a_narrow_region_keeps_room_for_the_open_cards_shadow
+    narrow = BLOCK.scan(NARROW).first
+    assert_includes narrow, "padding-block-end: calc(0.75rem + var(--carousel-cascade-shadow-room, 2.5rem));"
+    assert_includes narrow, "margin-block-end: calc(-1 * var(--carousel-cascade-shadow-room, 2.5rem));"
+    assert_match(/& > \.carousel-controls \{\s*position: relative;\s*z-index: 1;\s*\}/, narrow)
+    # A row with no controls has nothing over the room, so it keeps it (no overlap).
+    assert_match(/&:is\(\[data-carousel-static\], \[data-studio-controller-failed\]\) > \.carousel-track \{\s*margin-block-end: 0;\s*\}/, narrow)
+  end
+
   def test_reduced_motion_lays_it_flat_with_no_glide
     reduced = BLOCK[REDUCED]
     refute_nil reduced

@@ -8,7 +8,10 @@
     card round the seam; "cascade-portfolio" is the image-only pattern (the hub
     Portfolio): each card is only its picture, the row draws no dots (dots: false),
     the open card wears a ring, and one caption under the stack follows the open
-    card on the carousel's change event (studio:carousel:change).
+    card on the carousel's change event (studio:carousel:change); each card has an
+    id (portfolio-app-<n>), so a #fragment opens the row on it. "scoped" is a
+    caption wrapper holding two rows: the captions follow the one marked as their
+    carousel target ("scoped"), never the first row ("scoped-other").
     window.__carouselChanges logs every change event on the page. %>
 <% cards = (1..7).to_a %>
 <% picture = lambda do |n| %>
@@ -57,18 +60,40 @@
     <%= render layout: "studio/carousel",
           locals: { label: "Portfolio", items: cards, style: :cascade, loop: true, dots: false,
                     slide_label: ->(n) { "App #{n}" }, data: { lab: "cascade-portfolio" } } do |n| %>
-      <a href="#portfolio-open-<%= n %>" aria-label="App <%= n %>" data-test="portfolio-card" data-lab-card="<%= n %>"
-         class="block aspect-[4/3] overflow-hidden rounded-2xl bg-surface-alt transition-shadow duration-300 in-data-current:ring-2 in-data-current:ring-primary in-data-current:shadow-xl">
+      <a href="#portfolio-open-<%= n %>" id="portfolio-app-<%= n %>" aria-label="App <%= n %>" data-test="portfolio-card" data-lab-card="<%= n %>"
+         class="block aspect-[4/3] overflow-hidden rounded-2xl bg-surface-alt transition-shadow duration-300 motion-reduce:transition-none in-data-current:ring-2 in-data-current:ring-primary in-data-current:shadow-xl">
         <img src="<%= capture { picture.call(n) }.strip %>" alt="" class="h-full w-full object-cover">
       </a>
     <% end %>
     <div class="grid pt-4 text-center">
       <% cards.each_with_index do |n, index| %>
-        <div class="col-start-1 row-start-1 opacity-0 invisible transition-opacity duration-200 data-current:opacity-100 data-current:visible"
+        <div class="col-start-1 row-start-1 opacity-0 invisible transition-opacity duration-200 motion-reduce:transition-none data-current:opacity-100 data-current:visible"
              data-carousel-captions-target="caption" data-test="portfolio-caption"<%= " data-current".html_safe if index.zero? %><%= ' aria-hidden="true"'.html_safe unless index.zero? %>>
           <h2 class="type-h4 text-heading">App <%= n %></h2>
           <p class="text-sm text-secondary">The caption for app <%= n %>, under the stack.</p>
         </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# ONE CAROUSEL PER CAPTION WRAPPER. The captions follow the wrapper's own row: its
+      carousel target here (the portfolio stage above takes the default, the first row
+      inside it). The other row inside the same wrapper moves nothing. %>
+  <div data-studio-controller="carousel-captions" data-lab-stage="scoped">
+    <%= render layout: "studio/carousel",
+          locals: { label: "Scoped other", items: cards.first(3), style: :cascade, start: 0, dots: false,
+                    slide_label: ->(n) { "Other #{n}" }, data: { lab: "scoped-other" } } do |n| %>
+      <%= capture { card.call(n, "other") } %>
+    <% end %>
+    <%= render layout: "studio/carousel",
+          locals: { label: "Scoped", items: cards.first(3), style: :cascade, start: 0, dots: false,
+                    slide_label: ->(n) { "Scoped #{n}" }, data: { lab: "scoped", carousel_captions_target: "carousel" } } do |n| %>
+      <%= capture { card.call(n, "scoped") } %>
+    <% end %>
+    <div class="grid pt-4 text-center">
+      <% cards.first(3).each_with_index do |n, index| %>
+        <p class="col-start-1 row-start-1 opacity-0 invisible transition-opacity duration-200 motion-reduce:transition-none data-current:opacity-100 data-current:visible"
+           data-carousel-captions-target="caption"<%= " data-current".html_safe if index.zero? %><%= ' aria-hidden="true"'.html_safe unless index.zero? %>>Scoped caption <%= n %></p>
       <% end %>
     </div>
   </div>

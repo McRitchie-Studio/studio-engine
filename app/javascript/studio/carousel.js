@@ -344,6 +344,16 @@ export function changeDetail(previous, index, slides) {
   return { index, previous: Number.isInteger(previous) ? previous : null, slide: list[index], total: list.length }
 }
 
+// The open slide's index among a region's real slides: the first that carries
+// data-current, a looping row's copies (data-carousel-clone) not counted. -1 when none
+// is marked (a standard row marks none). A host that connects after the row opened
+// (a #fragment, a lazy controller) reads where it stands with it, then follows
+// CHANGE_EVENT.
+export function markedSlide(slides) {
+  const real = Array.from(slides || []).filter((slide) => !slide.hasAttribute("data-carousel-clone"))
+  return real.findIndex((slide) => slide.hasAttribute("data-current"))
+}
+
 // -- the cascade's press --------------------------------------------------------
 
 // The slide a click on a cascade belongs to. A mouse press on a side slide records
