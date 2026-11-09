@@ -4,7 +4,7 @@ module Studio
   # The one list of account roles every Studio app draws from (database audit
   # 2026-11-07, section 3). `users.role` holds one of these, guarded twice: by
   # Studio::Account's inclusion validation and by CHECK users_role_known, which
-  # db/migrate/20261108160000_add_users_role_known_check.rb installs.
+  # db/migrate/20261108170000_add_users_role_known_check.rb installs.
   #
   # A host may NARROW the list (`studio_roles %w[viewer admin]` in its User),
   # never widen it: a role the engine does not know means nothing to the
