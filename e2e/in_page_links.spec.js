@@ -1,5 +1,8 @@
 const { test, expect } = require("@playwright/test");
-const { watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive } = require("./helpers");
+const {
+  watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive, navAtRest,
+  watchInPageJumps, traversed, scrollYAcrossWindow, inPageTimerWindow,
+} = require("./helpers");
 
 // [e2e] IN-PAGE LINKS (studio/in_page_links, docs/PAGE_HEADER.md "In-page links"). Alex
 // McRitchie, 2026-11-06, on QA /admin/style: "I don't like when clicking the admin/style pills
@@ -15,6 +18,15 @@ const { watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive } = requ
 // five Turbo visits, reduced motion on its visit, and the Turbo-free page on the frames
 // mid-scroll (none: a cut). The highlight and cross-page tests stay green: an instant jump
 // passes no tab, and a cross-page link is Turbo's either way.
+//
+// THE WAITS READ REAL CONDITIONS (engine-anchor-scroll-waits). A click settles at the module's
+// own end event (its scrollend after the last aim), or, with the module gone, at the Turbo
+// visit's turbo:load or the browser's scrollend; then the navbar at rest. Back and Forward
+// read the place they restored two frames after their popstate (helpers traversed), since a
+// Back that does not move fires no scroll and no scrollend. Controls, each red under the new
+// spec: the module's end event never sent, red 3/3 (the old 1s fallback hid it: 2 of 3 green);
+// the install line removed, red 4/6 on the assertions above; Back's restore smooth, red; Back's
+// restore removed, red at once on the place, not a hang.
 
 const DESKTOP = { width: 1280, height: 800 };
 const TURBO = "/lab/style_chrome?turbo=1&direction=left";
@@ -30,8 +42,14 @@ const serveFeed = (page) => page.route("**/admin/style/loaders_feed*", async (ro
   await route.fulfill({ response: await route.fetch({ url: `${url.origin}/lab/loaders_feed${url.search}` }) });
 });
 
+// A feed fetch the scroll started can still be in flight when a test ends; its route
+// handler then fails on "Test ended" (red 1 in 60 unthrottled). Waiting for every handler
+// to finish closes that.
+test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: "wait" }); });
+
 async function open(page, url) {
   await blockOffsiteRequests(page);
+  await watchInPageJumps(page);
   await serveFeed(page);
   await page.setViewportSize(DESKTOP);
   await page.goto(url);
@@ -43,9 +61,12 @@ async function open(page, url) {
 // scroll, the flags on <html>, and which tab is current.
 async function watch(page) {
   await page.evaluate(() => {
-    const seen = { visits: 0, fetches: 0, scrolls: 0, ends: 0, frames: [] };
+    const seen = { visits: 0, loads: 0, fetches: 0, scrolls: 0, ends: 0, nativeEnds: 0, moves: 0, frames: [] };
     window.__inPage = seen;
     document.addEventListener("turbo:visit", () => { seen.visits += 1; });
+    document.addEventListener("turbo:load", () => { seen.loads += 1; });
+    window.addEventListener("scrollend", () => { seen.nativeEnds += 1; });
+    window.addEventListener("scroll", () => { seen.moves += 1; });
     // A fetch of this page itself. The Loaders section's lazy frame fetches its own feed.
     document.addEventListener("turbo:before-fetch-request", (event) => {
       if (new URL(event.detail.url).pathname === location.pathname) seen.fetches += 1;
@@ -67,16 +88,23 @@ async function watch(page) {
   });
 }
 const seen = (page) => page.evaluate(() => window.__inPage);
-// The module's end event, or, with the module gone (the control), a moment for the visit.
-const settled = (page) => page
-  .waitForFunction(() => window.__inPage.ends >= window.__inPage.scrolls && window.__inPage.scrolls > 0, null, { timeout: 4000 })
-  .catch(() => page.waitForTimeout(1000));
+// The click has settled. The module starts its jump in the click's own task, ahead of the
+// hash, so by the hash a jump it took has started, and its end event is the scroll at rest.
+// A click it did not take (the control, the module gone) is a Turbo visit, done at its
+// turbo:load, or the browser's own jump, done at its scrollend. Then the navbar's collapse
+// is at rest, so the row and the section are read where they stay.
+async function settled(page) {
+  await page.waitForFunction(() => {
+    const s = window.__inPage;
+    return s.scrolls > 0 ? s.ends >= s.scrolls : (s.loads > 0 || s.nativeEnds > 0);
+  });
+  await navAtRest(page);
+}
 
 async function clickAndSettle(page, label, id) {
   await pill(page, label).click();
   await page.waitForFunction((want) => location.hash === `#${want}`, id);
   await settled(page);
-  await page.waitForTimeout(200);
 }
 
 test("a style tab scrolls down the page, with no Turbo visit and no page transition", async ({ page }) => {
@@ -136,21 +164,27 @@ test("Back returns to where the reader was, and Forward to the section, with no 
   const tasks = await page.evaluate(() => window.scrollY);
   expect(tasks).toBeGreaterThan(tricks);
 
-  await page.goBack();
-  await page.waitForFunction(() => location.hash === "#tricks");
-  await page.waitForTimeout(300);
-  expect(await page.evaluate(() => window.scrollY), "Back lands at Tricks").toBeCloseTo(tricks, -1);
+  // Each read is the place the traversal restored, two frames after its popstate.
+  expect(await traversed(page, () => page.goBack()), "Back lands at Tricks").toBeCloseTo(tricks, -1);
+  expect(await page.evaluate(() => location.hash)).toBe("#tricks");
   await expect(pill(page, "Tricks"), "the highlight follows Back").toHaveAttribute("aria-current", "true");
 
-  await page.goBack();
-  await page.waitForFunction(() => location.hash === "");
-  await page.waitForTimeout(300);
-  expect(await page.evaluate(() => window.scrollY), "Back again: the top").toBeLessThan(5);
+  expect(await traversed(page, () => page.goBack()), "Back again: the top").toBeLessThan(5);
+  expect(await page.evaluate(() => location.hash)).toBe("");
 
-  await page.goForward();
-  await page.waitForFunction(() => location.hash === "#tricks");
-  await page.waitForTimeout(300);
-  expect(Math.abs(await page.evaluate(() => window.scrollY) - tricks), "Forward: Tricks").toBeLessThan(100);
+  const forward = await traversed(page, () => page.goForward());
+  expect(Math.abs(forward - tricks), "Forward: Tricks").toBeLessThan(100);
+  expect(await page.evaluate(() => location.hash)).toBe("#tricks");
+
+  // A Back to the place the reader already holds moves nothing: no scroll, so no scrollend.
+  // The read is still the restored place, and the page holds it.
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+  await navAtRest(page);
+  const moves = (await seen(page)).moves;
+  expect(await traversed(page, () => page.goBack()), "Back to the place held: the top").toBe(0);
+  expect(await page.evaluate(() => location.hash)).toBe("");
+  expect(new Set(await scrollYAcrossWindow(page, inPageTimerWindow())), "the page holds the top").toEqual(new Set([0]));
+  expect((await seen(page)).moves, "the Back moved nothing").toBe(moves);
 
   const result = await seen(page);
   expect(result.visits, "no Turbo restore visit").toBe(0);
