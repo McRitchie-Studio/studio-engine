@@ -1,10 +1,12 @@
 class ErrorLog < ApplicationRecord
+  # `slug` is NOT NULL and unique (RequireSlugsOnEngineTables), so every insert
+  # carries one, including a host's bare `ErrorLog.create!`. Sluggable writes a
+  # unique placeholder before the insert and settles it to `error-log-<id>` right
+  # after, inside the create, once the id exists.
+  include Sluggable
+
   belongs_to :target, polymorphic: true, optional: true
   belongs_to :parent, polymorphic: true, optional: true
-
-  def to_param
-    slug
-  end
 
   def inspect_field
     read_attribute(:inspect)
@@ -25,7 +27,6 @@ class ErrorLog < ApplicationRecord
       inspect: safe_inspect,
       backtrace: cleaned.to_json
     )
-    log.update_column(:slug, "error-log-#{log.id}")
 
     # Fan out to Sentry if the host app loaded sentry-ruby. Guard with
     # respond_to? so we don't blow up on old SDK versions. The DB ErrorLog
@@ -41,5 +42,13 @@ class ErrorLog < ApplicationRecord
     end
 
     log
+  end
+
+  private
+
+  # The id does not exist before the insert, so the first call returns a unique
+  # placeholder; Sluggable calls it again after the insert.
+  def name_slug
+    id ? "error-log-#{id}" : "error-log-new-#{SecureRandom.hex(8)}"
   end
 end

@@ -14,7 +14,9 @@
 #     fail on existing rows or lock a large table.
 #
 # On every consumer that existed when this shipped, the second branch adds
-# nothing. Studio::HostSchema checks the same columns at boot.
+# nothing. Studio::HostSchema checks the same columns at boot. The slug
+# standard (NOT NULL, unique) is the later RequireSlugsOnEngineTables
+# (20261108160000), which tightens the column on every host.
 class EnsureErrorLogsTable < ActiveRecord::Migration[7.2]
   def up
     unless table_exists?(:error_logs)
