@@ -241,7 +241,10 @@ includes the row's own edge, so the row would chase itself down the page.
 
 Anything that sits under the stack positions off `--pin-stack-bottom` or, in a
 script, `window.studioPinnedStack.read()`. It needs no edit when a page adopts the
-row. The sticky table header's clone is one such reader. It needs
+row. The sticky table header's clone is one such reader. It starts at the stack's
+bottom edge, never above it: as its table leaves, the clone stays at the edge and
+gets shorter, so it never covers the row, and it stacks two rungs under the row's
+`--z-sticky`. It needs
 `config.sticky_table_headers` on in the host, or the `sticky_table_headers` local on
 the head partial. The engine draws no `position: sticky` header cells of its own: a
 page that draws them gets no clone, and points their `top` at `--pin-stack-bottom`.
