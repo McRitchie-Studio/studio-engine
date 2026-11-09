@@ -4,7 +4,9 @@
     screenshot check (e2e/ui_primitives_screenshots.spec.js) reads them here.
 
     THE LAB RULE (see E2eLabController): a lab page sets up a partial's inputs
-    and nothing else. The lab layout is dark; the spec flips html.dark for light. %>
+    and nothing else. The lab layout is dark; the spec flips html.dark for light.
+    The palette is pinned to the engine default (E2eLabController#ui_primitives). %>
+<%= tag.style(@palette_css.html_safe, nonce: content_security_policy_nonce) %>
 <main class="max-w-5xl mx-auto px-4 py-10" data-primitives-lab>
   <%= render "style/primitives" %>
 </main>
