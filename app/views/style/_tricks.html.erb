@@ -281,6 +281,43 @@
           </div>
         <% end %>
       </div>
+
+      <%# The image-only pattern (README, The carousel): each card is only its picture,
+          the open card wears a ring, the row draws no dots, and one caption under the
+          stack follows the open card on studio:carousel:change. %>
+      <div class="w-full min-w-0" data-carousel-caption-stage data-carousel-image-only-specimen>
+        <%= render layout: "studio/carousel",
+              locals: { label: "Image-only specimen", items: (1..5).to_a, style: :cascade, loop: true, dots: false,
+                        id: "style-carousel-image-only-specimen", slide_label: ->(n) { "Picture #{n}" } } do |n| %>
+          <div role="img" aria-label="Picture <%= n %>"
+               class="aspect-[4/3] overflow-hidden rounded-2xl transition-shadow duration-300 in-data-current:ring-2 in-data-current:ring-primary"
+               style="background-image: linear-gradient(<%= 120 + n * 30 %>deg, rgb(var(--color-primary-rgb) / <%= 0.25 + n * 0.12 %>), rgb(var(--color-primary-rgb) / 0.08))"></div>
+        <% end %>
+        <div class="grid pt-3 text-center" data-carousel-captions>
+          <% (1..5).each do |n| %>
+            <div class="col-start-1 row-start-1 opacity-0 invisible transition-opacity duration-200 data-current:opacity-100 data-current:visible"
+                 data-carousel-caption<%= " data-current".html_safe if n == 1 %><%= ' aria-hidden="true"'.html_safe unless n == 1 %>>
+              <p class="text-sm font-semibold text-heading">Picture <%= n %></p>
+              <p class="text-xs text-secondary">One caption under the stack.</p>
+            </div>
+          <% end %>
+        </div>
+      </div>
+      <%= tag.script(nonce: (content_security_policy_nonce if respond_to?(:content_security_policy_nonce))) do %>
+        if (!window.__studioCarouselCaptionStage) {
+          window.__studioCarouselCaptionStage = true
+          document.addEventListener("studio:carousel:change", ({ target, detail }) => {
+            const stage = target.closest("[data-carousel-caption-stage]")
+            if (!stage) return
+            stage.querySelectorAll("[data-carousel-captions] > [data-carousel-caption]").forEach((caption, index) => {
+              const open = index === detail.index
+              caption.toggleAttribute("data-current", open)
+              if (open) caption.removeAttribute("aria-hidden")
+              else caption.setAttribute("aria-hidden", "true")
+            })
+          })
+        }
+      <% end %>
     <% end %>
   </section>
 

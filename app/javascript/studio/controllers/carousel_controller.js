@@ -57,10 +57,21 @@
 // and autoplay move it as they move a spotlight, through the same move() and
 // scrollToStop(). A swipe or a drag (pointer events, past DRAG_THRESHOLD) moves it
 // too; a click on a side slide brings that slide to the front and follows no link,
-// and keyboard focus landing in a side slide does the same, so Tab walks the set. A
-// looping cascade takes no clones: the steps wrap round the set, and a slide that
-// crosses the stack round the seam (cascadeJumps) takes no glide. A focused slide
-// that leaves the window hands focus to the track, so the keys keep working.
+// and keyboard focus landing in a side slide in view does the same. TAB: a slide past
+// the window is hidden, so Tab skips it. Tab from the track lands on the first slide
+// in view and brings it to the front, and each Tab after moves one slide on. A cascade
+// that does not loop and opens mid-row (the default :middle) has slides before the
+// window that forward Tab never reaches: Shift+Tab from the first slide in view (its
+// focus has moved the stack, so the slide before it is in view), Home, the arrow keys,
+// the Previous arrow and the dots reach them. A looping cascade takes no clones: the
+// steps wrap round the set, and a slide that crosses the stack round the seam
+// (cascadeJumps) takes no glide but fades in, every time. A focused slide that leaves
+// the window hands focus to the track, so the keys keep working.
+//
+// THE CHANGE EVENT (studio/carousel CHANGE_EVENT, "studio:carousel:change"): every
+// style dispatches it from the region, bubbling, once per change of the open slide,
+// after data-current has moved (announceChange). detail: { index, previous, slide,
+// total }. A host follows the open slide with it instead of observing data-current.
 import { Controller } from "@hotwired/stimulus"
 import {
   CHANGE_EVENT, CLONE_STRIP, TOLERANCE, autoplayRunning, changeDetail, clickedSlide, autoplaySeconds, autoplayStop, cascadeJumps, cascadeReach, cascadeSlot,
@@ -232,7 +243,8 @@ export default class extends Controller {
     this.scrollToStop(index)
   }
 
-  // Keyboard focus in a side slide brings it to the front, so Tab walks the set. A
+  // Keyboard focus in a side slide brings it to the front, so Tab moves one slide on
+  // from the first slide in view (see TAB above for the slides before the window). A
   // mouse press focuses without :focus-visible and leaves the move to its click.
   focusSide(event) {
     const index = this.slideAt(event.target)

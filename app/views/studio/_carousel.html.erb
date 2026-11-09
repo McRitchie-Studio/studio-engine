@@ -77,10 +77,21 @@
     lays the stack out (perspective, translateZ, a slight turn toward the centre)
     and transitions it. An arrow, a dot, a key, a swipe or drag, autoplay, a click
     on a side slide and keyboard focus in one bring that slide to the front; a
-    click on a side slide opens nothing. A looping cascade needs no clones: the
-    steps wrap round the set, so the window is never wider than the set. Under
-    reduced motion it lays flat, as a spotlight does, and swaps with no glide. If
-    its controller fails it falls back to a plain scrolling row.
+    click on a side slide opens nothing. Tab skips the slides past the window (they
+    are hidden): it lands on the first slide in view and moves one on each press.
+    A cascade that does not loop and opens mid-row has slides before the window
+    that forward Tab never reaches; Shift+Tab from the first slide in view, Home,
+    the arrow keys, Previous and the dots do. A looping cascade needs no clones: the
+    steps wrap round the set, so the window is never wider than the set. A narrow
+    region fades its side slides at the track's edge. Under reduced motion it lays
+    flat, as a spotlight does, and swaps with no glide. If its controller fails it
+    falls back to a plain scrolling row.
+
+    THE CHANGE EVENT. Every style dispatches "studio:carousel:change" from the
+    region, bubbling, once each time the open slide changes, after data-current
+    has moved: detail { index, previous, slide, total }. A host that follows the
+    open slide (a caption under the row, a counter) listens for it; see the
+    README's image-only pattern.
 
     THE TRACK IS A NATIVE SCROLL-SNAP ROW (engine.css, carousel). A swipe, a
     trackpad, a wheel and a focused link move it with no script. The carousel

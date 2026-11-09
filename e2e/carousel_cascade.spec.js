@@ -620,3 +620,24 @@ test("dots: false leaves no dot in the tab order: Tab goes from the cards to the
   const focused = await page.evaluate(() => document.activeElement.className + "|" + (document.activeElement.getAttribute("aria-label") || ""));
   expect(focused).not.toContain("carousel-dot");
 });
+
+test("the style guide's image-only specimen moves its one caption with the open card", async ({ page }) => {
+  await page.setViewportSize(DESKTOP);
+  await blockOffsiteRequests(page);
+  const errors = watchPageErrors(page);
+  await page.goto("/lab/style_nav");
+  const stage = page.locator("[data-carousel-image-only-specimen]");
+  const row = stage.locator("section.carousel");
+  await expect(row).toHaveAttribute("data-carousel-ready", "");
+  await row.scrollIntoViewIfNeeded();
+  await expect(row.locator(".carousel-dots")).toHaveCount(0);
+  const current = () => stage.locator("[data-carousel-caption][data-current]");
+  await expect(current()).toHaveText(/Picture 1/);
+  await row.getByRole("button", { name: "Next slide", exact: true }).click();
+  await expect(current()).toHaveText(/Picture 2/);
+  await expect(stage.locator("[data-carousel-caption]").first()).toHaveAttribute("aria-hidden", "true");
+  await expect(row.locator(".carousel-slide[data-current] [role='img']")).toHaveAttribute("aria-label", "Picture 2");
+  const ring = await row.locator(".carousel-slide[data-current] [role='img']").evaluate((card) => getComputedStyle(card).boxShadow);
+  expect(ring, "the open picture wears a ring").not.toBe("none");
+  expect(errors).toEqual([]);
+});
