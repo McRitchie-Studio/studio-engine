@@ -13,7 +13,7 @@ panel on the integration's page.
 
 | Key | Integration | Grant | Tokens | Account |
 |-----|-------------|-------|--------|---------|
-| `:quickbooks` | QuickBooks Online (Intuit) | code | `:rotating`, HTTP Basic client auth, JSON revoke | the company, named on the callback (`realmId`) |
+| `:quickbooks` | QuickBooks Online (Intuit) | code | `:cached` until 5 minutes before expiry, rotating refresh token, HTTP Basic client auth, JSON revoke | the company, named on the callback (`realmId`) |
 | `:egnyte` | Egnyte | code | `:cached`, refreshed within 1 day of expiry, secret-only revoke | the domain, typed at Connect |
 | `:microsoft_365` | Microsoft 365 (Microsoft Graph, app-only) | client credentials after admin consent | `:memory`, no revoke endpoint | the tenant, named on the callback (private) |
 
@@ -118,6 +118,7 @@ A host reader gets its token and its base URL from the integration:
 
 ```ruby
 token = connection.fresh_access_token                                  # QuickBooks, Egnyte
+token = connection.fresh_access_token(stale: token)                    # once, after a 401
 token = Studio.connection(:microsoft_365).access_token(connection)     # Microsoft 365
 base  = Studio.integration(:quickbooks).api_base(connection)
 ```
@@ -139,10 +140,20 @@ QuickBooks asks for `minorversion=75` or later on every call
 - Sign-in at `appcenter.intuit.com/connect/oauth2` with the scope
   `com.intuit.quickbooks.accounting`.
 - Token and revoke calls use HTTP Basic client auth. The revoke body is JSON.
-- Refresh tokens rotate. Every token read refreshes under the row's lock, and the
-  answered refresh token is stored before the access token is used. A refresh
-  that answers no refresh token refuses. `x_refresh_token_expires_in` sets
-  `refresh_expires_at`.
+- Endpoints: from Intuit's discovery document
+  (`https://developer.api.intuit.com/.well-known/openid_configuration`), the same
+  for sandbox and production.
+- The access token (about one hour, `expires_in`) is stored encrypted with its
+  expiry. It is reused until 5 minutes before that expiry, or until the API answers
+  401 (`fresh_access_token(stale: token)`). The app refreshes when the access token
+  expires, not on every call.
+- A refresh runs once, under the row's lock, which reloads the row first. A racing
+  caller waits, then reads the new token. The refresh token rotates: every refresh
+  answer must carry a new one (else the refresh refuses and nothing is stored), and
+  it is stored with the access token and `x_refresh_token_expires_in` before the
+  access token is used. A reader that still gets a 401 after its one refresh asks
+  the admin to connect again; it does not retry in a loop. `invalid_grant` raises
+  `Revoked`.
 - `realmId` names the company on the callback. It is a number, and it is kept out
   of the logs by its exact key.
 - `environment:` names the env var that says which Intuit keys these are. Only

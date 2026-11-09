@@ -248,7 +248,7 @@ class IntegrationsPageTest < ActionDispatch::IntegrationTest
   test "the host's panel renders on its integration's page with the connections, and only there" do
     with_env do
       sign_in
-      Studio::Connection.store!(:quickbooks, { "refresh_token" => "r1" }, account: "4620", by: "tester")
+      Studio::Connection.store!(:quickbooks, { "access_token" => "a1", "refresh_token" => "r1" }, account: "4620", by: "tester")
       get "/admin/integrations/quickbooks"
       assert_select "[data-studio-integration-panel] [data-host-panel='quickbooks']", text: "host panel for QuickBooks: 1 connected"
 

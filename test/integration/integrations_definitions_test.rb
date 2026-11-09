@@ -76,7 +76,7 @@ class IntegrationsDefinitionsTest < ActiveSupport::TestCase
     with_env do
       assert_equal :ready, qbo.status
       assert_empty qbo.missing
-      Studio::Connection.store!(:quickbooks, { "refresh_token" => "r1" }, account: "4620", by: "tester")
+      Studio::Connection.store!(:quickbooks, { "access_token" => "a1", "refresh_token" => "r1" }, account: "4620", by: "tester")
       assert_equal :connected, qbo.status
       assert_equal "Connected", qbo.status_label
     end
@@ -116,30 +116,79 @@ class IntegrationsDefinitionsTest < ActiveSupport::TestCase
     assert_nil qbo.provider.normalize_account("93414x")
   end
 
-  test "[unit] quickbooks: Basic client auth, a rotating refresh that keeps the latest token and its lifetime" do
+  test "[unit] quickbooks: Basic client auth; the access token is kept with its expiry and reused until near it" do
     with_env do
-      requests = stub_tokens(qbo, answer(access_token: "a1", refresh_token: "r1", expires_in: 3600, x_refresh_token_expires_in: 8_726_400),
-                             answer(access_token: "a2", refresh_token: "r2", expires_in: 3600, x_refresh_token_expires_in: 8_000_000))
+      requests = stub_tokens(qbo, answer(access_token: "a1", refresh_token: "r1", expires_in: 3600, x_refresh_token_expires_in: 8_726_400))
       grant = qbo.provider.exchange_code(code: "c1", redirect_uri: "https://app.example/cb")
       assert_equal "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer", requests[0][:url]
       assert_equal "Basic #{Base64.strict_encode64('qbo-id:qbo-secret')}", requests[0][:headers]["Authorization"]
       refute requests[0][:form].key?(:client_secret), "Basic auth: the secret rides the header, not the form"
 
       row = Studio::Connection.store!(:quickbooks, grant, account: "4620", by: "tester")
-      assert_nil row.access_token, "a rotating connection stores no access token"
+      assert_equal "a1", row.access_token
+      assert_in_delta Time.current + 3600, row.access_expires_at, 5
+      assert_in_delta Time.current + 8_726_400, row.refresh_expires_at, 5
+      3.times { assert_equal "a1", row.fresh_access_token }
+      assert_equal 1, requests.size, "no refresh while the access token is good"
+    end
+  end
+
+  test "[unit] quickbooks: within 5 minutes of expiry it refreshes once and stores the newest refresh token and its lifetime" do
+    with_env do
+      row = Studio::Connection.store!(:quickbooks, { "access_token" => "a1", "refresh_token" => "r1", "expires_in" => 3600 },
+                                      account: "4620", by: "tester")
+      requests = stub_tokens(qbo, answer(access_token: "a2", refresh_token: "r2", expires_in: 3600, x_refresh_token_expires_in: 8_000_000))
+      row.update!(access_expires_at: 6.minutes.from_now)
+      assert_equal "a1", row.fresh_access_token
+      assert_empty requests
+
+      row.update!(access_expires_at: 4.minutes.from_now)
       assert_equal "a2", row.fresh_access_token
+      assert_equal [{ grant_type: "refresh_token", refresh_token: "r1" }], requests.map { _1[:form] }
       row.reload
       assert_equal "r2", row.refresh_token
+      assert_equal "a2", row.access_token
+      assert_in_delta Time.current + 3600, row.access_expires_at, 5
       assert_in_delta Time.current + 8_000_000, row.refresh_expires_at, 5
     end
   end
 
-  test "[unit] quickbooks: a refresh without a new refresh token, or an invalid_grant, refuses" do
+  test "[unit] quickbooks: a stale row waits on the lock and reads the newest pair, never spending a spent refresh token" do
     with_env do
-      row = Studio::Connection.store!(:quickbooks, { "refresh_token" => "r1" }, account: "4620", by: "tester")
-      stub_tokens(qbo, answer(access_token: "a2"))
+      row = Studio::Connection.store!(:quickbooks, { "access_token" => "a1", "refresh_token" => "r1", "expires_in" => 60 },
+                                      account: "4620", by: "tester")
+      stale = Studio::Connection.find(row.id)
+      requests = stub_tokens(qbo, answer(access_token: "a2", refresh_token: "r2", expires_in: 3600))
+      assert_equal "a2", row.fresh_access_token
+      assert_equal "r1", stale.refresh_token, "the stale copy still holds the spent token in memory"
+
+      assert_equal "a2", stale.fresh_access_token
+      assert_equal 1, requests.size, "the stale copy reloads under the lock and reuses the new token"
+      assert_equal "r2", stale.refresh_token
+    end
+  end
+
+  test "[unit] quickbooks: a 401 refreshes once; a second caller with the same stale token does not refresh again" do
+    with_env do
+      row = Studio::Connection.store!(:quickbooks, { "access_token" => "a1", "refresh_token" => "r1", "expires_in" => 3600 },
+                                      account: "4620", by: "tester")
+      requests = stub_tokens(qbo, answer(access_token: "a2", refresh_token: "r2", expires_in: 3600))
+      assert_equal "a2", row.fresh_access_token(stale: "a1")
+      assert_equal "a2", Studio::Connection.find(row.id).fresh_access_token(stale: "a1")
+      assert_equal 1, requests.size
+      assert_equal "r2", row.reload.refresh_token
+    end
+  end
+
+  test "[unit] quickbooks: a refresh without a new refresh token, or an invalid_grant, refuses and keeps the stored pair" do
+    with_env do
+      row = Studio::Connection.store!(:quickbooks, { "access_token" => "a1", "refresh_token" => "r1", "expires_in" => 60 },
+                                      account: "4620", by: "tester")
+      stub_tokens(qbo, answer(access_token: "a2", expires_in: 3600))
       assert_raises(Studio::Connections::Error) { row.fresh_access_token }
-      assert_equal "r1", row.reload.refresh_token
+      row.reload
+      assert_equal "r1", row.refresh_token
+      assert_equal "a1", row.access_token
 
       stub_tokens(qbo, answer(400, error: "invalid_grant"))
       assert_raises(Studio::Connections::Revoked) { row.fresh_access_token }
@@ -148,7 +197,7 @@ class IntegrationsDefinitionsTest < ActiveSupport::TestCase
 
   test "[unit] quickbooks: the revoke is a JSON body with Basic auth" do
     with_env do
-      row = Studio::Connection.store!(:quickbooks, { "refresh_token" => "r9" }, account: "4620", by: "tester")
+      row = Studio::Connection.store!(:quickbooks, { "access_token" => "a9", "refresh_token" => "r9" }, account: "4620", by: "tester")
       requests = stub_tokens(qbo, [200, ""])
       assert qbo.provider.revoke(row)
       assert_equal "https://developer.api.intuit.com/v2/oauth2/tokens/revoke", requests[0][:url]
@@ -186,7 +235,7 @@ class IntegrationsDefinitionsTest < ActiveSupport::TestCase
   end
 
   test "[unit] quickbooks: api_base follows the connection's stored environment" do
-    row = Studio::Connection.store!(:quickbooks, { "refresh_token" => "r1" }, account: "4620", by: "tester", metadata: { environment: "production" })
+    row = Studio::Connection.store!(:quickbooks, { "access_token" => "a1", "refresh_token" => "r1" }, account: "4620", by: "tester", metadata: { environment: "production" })
     assert_equal "https://quickbooks.api.intuit.com/v3/company/4620", qbo.api_base(row)
     row.update!(metadata: {})
     assert_equal "https://sandbox-quickbooks.api.intuit.com/v3/company/4620", qbo.api_base(row)

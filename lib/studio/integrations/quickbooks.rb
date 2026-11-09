@@ -5,15 +5,25 @@ module Studio
     # QUICKBOOKS ONLINE (Intuit), the connection only. A host's readers (company
     # info, reports) are its own; they call Studio.integration(:quickbooks).api_base(connection).
     #
-    #   * Sign-in at Intuit's app center; the endpoints are Intuit's discovery
-    #     document's, the same for sandbox and production.
+    #   * Sign-in at Intuit's app center. The endpoints come from Intuit's
+    #     discovery document
+    #     (https://developer.api.intuit.com/.well-known/openid_configuration),
+    #     the same for sandbox and production.
     #   * The token and revoke calls authenticate with HTTP Basic; the revoke
     #     body is JSON.
-    #   * ROTATING refresh tokens: access tokens last an hour, a refresh may
-    #     answer a new refresh token and the latest must be kept, so every
-    #     access_token call refreshes under the row's lock and stores the
-    #     answered token first. The grant states the refresh token's own
-    #     lifetime in x_refresh_token_expires_in.
+    #   * CACHED access token, refreshed when it expires: Intuit's access token
+    #     lives about an hour (expires_in 3600). The row keeps it, encrypted,
+    #     with its expiry, and reuses it until 5 minutes before that expiry, or
+    #     until the API answers 401 (fresh_access_token(stale: token)). Then it
+    #     refreshes ONCE under the row's lock, reloading the row first, so a
+    #     racing caller waits and reads the new token instead of spending the
+    #     refresh token twice. A reader that still gets a 401 after that one
+    #     refresh asks the admin to connect again; it never loops.
+    #   * The refresh token ROTATES and the newest must be kept: every refresh
+    #     answer must carry one (rotation: :required, else nothing is stored and
+    #     the refresh refuses), and it is stored, with the access token and
+    #     x_refresh_token_expires_in, before the access token is used.
+    #   * invalid_grant on a refresh is a revoked grant: connect again.
     #   * The company is named on the callback (?realmId=), a number, kept out
     #     of the logs by exact key.
     #   * The environment setting (sandbox, the default, or production) says
@@ -43,7 +53,8 @@ module Studio
           authorize_url: AUTHORIZE_URL, token_url: TOKEN_URL, revoke_url: REVOKE_URL,
           scopes: [SCOPE],
           client_auth: :basic, revoke_format: :json,
-          refresh: :rotating, refresh_expires_in_key: "x_refresh_token_expires_in",
+          refresh: :cached, refresh_margin: 5.minutes, rotation: :required,
+          refresh_expires_in_key: "x_refresh_token_expires_in",
           account: :callback, account_param: "realmId", account_format: REALM_ID,
           filter_keys: %w[realmId],
           refusal_hint: "Check the Intuit app's redirect URI, then start again."
