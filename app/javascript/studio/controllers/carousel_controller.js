@@ -63,7 +63,7 @@
 // that leaves the window hands focus to the track, so the keys keep working.
 import { Controller } from "@hotwired/stimulus"
 import {
-  CHANGE_EVENT, CLONE_STRIP, TOLERANCE, autoplayRunning, changeDetail, clickedSlide, replayedJumps, autoplaySeconds, autoplayStop, cascadeJumps, cascadeReach, cascadeSlot,
+  CHANGE_EVENT, CLONE_STRIP, TOLERANCE, autoplayRunning, changeDetail, clickedSlide, autoplaySeconds, autoplayStop, cascadeJumps, cascadeReach, cascadeSlot,
   cascadeStep, cascadeSteps, cascadeTarget, centerStops, cloneCount, cloneLayout, dragSteps,
   currentStop, hiddenEnds, idleDelay, initialReasons, keyAction, loopPositionText, loopStop, nearestVirtual, ownsKey,
   perPage, positionText, seamJump, startStop, stops, targetStop, toggleLabel, withReason, wrapIndex
@@ -162,13 +162,12 @@ export default class extends Controller {
     if (this.hasNextTarget) this.nextTarget.setAttribute("aria-disabled", String(!wraps && this.active >= total - 1))
     const steps = cascadeSteps(total, this.active, this.loop)
     const jumps = this.laid ? cascadeJumps(this.laid, steps, this.active) : steps.map(() => false)
-    // A slide that jumps again while it still wears the mark from its last jump (Next
-    // then Previous round the seam) would not replay its fade: drop the mark, let
-    // the style settle, and set it again.
-    const marked = this.slideTargets.map((slide) => slide.hasAttribute("data-cascade-jump"))
-    const replays = replayedJumps(marked, jumps)
-    if (replays.some(Boolean)) {
-      this.slideTargets.forEach((slide, index) => { if (replays[index]) slide.removeAttribute("data-cascade-jump") })
+    // A jumping slide's fade replays only if the style saw it without the mark first.
+    // It may still wear the mark from its last jump (Next then Previous round the
+    // seam), or have lost it earlier in this same task (move() syncs before it moves),
+    // which the style never saw: drop the mark, settle the style, then set it.
+    if (jumps.some(Boolean)) {
+      this.slideTargets.forEach((slide, index) => { if (jumps[index]) slide.removeAttribute("data-cascade-jump") })
       void this.trackTarget.offsetWidth
     }
     this.slideTargets.forEach((slide, index) => {
@@ -590,7 +589,9 @@ export default class extends Controller {
       if (index === this.current) dot.setAttribute("aria-current", "true")
       else dot.removeAttribute("aria-current")
     })
-    this.announceChange(this.current)
+    // A looping row resting on a copy is on its way home (settle): it announces the
+    // real slide once it lands there, so the slide the event names carries the mark.
+    if (!this.cloned || this.virtual === this.current) this.announceChange(this.current)
   }
 
   prev() { this.move("prev") }

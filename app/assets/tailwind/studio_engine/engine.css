@@ -1267,7 +1267,9 @@ body.modal-open .studio-app-banner {
   /* Round the seam: no glide across the stack, a fade in at the new place. */
   & > .carousel-track > .carousel-slide[data-cascade-jump] {
     transition: none;
-    animation: carousel-cascade-in 320ms ease both;
+    /* backwards, not both: a fade that has ended leaves nothing running, so the
+       slide holds no finished animation until its next move. */
+    animation: carousel-cascade-in 320ms ease backwards;
   }
 
   & > .carousel-track > .carousel-slide[data-cascade-jump]:is([data-cascade-step="before"], [data-cascade-step="after"]) {

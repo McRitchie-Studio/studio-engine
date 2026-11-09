@@ -437,7 +437,7 @@ test("a phone fades the side cards at the track's edge instead of cutting them",
     });
     expect(edge.past, "a side card runs past the track's edge").toBe(true);
     expect(edge.mask, "the edge fades it").toContain("linear-gradient");
-    expect(edge.mask).toContain("transparent");
+    expect(edge.mask, "transparent at the edge").toMatch(/^linear-gradient\(to right, (transparent|rgba\(0, 0, 0, 0\)), /);
     await expectNoSideScroll(page);
   } finally {
     await context.close();

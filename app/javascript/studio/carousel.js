@@ -330,7 +330,10 @@ export function cascadeTarget(active, by, total, loop = false) {
 // A standard row's "open slide" is the one at its first stop. The first paint's
 // slide (start:) fires nothing; a row that opens elsewhere when its controller
 // connects (a #fragment, a restored scroll) fires once. A looping row's glide round
-// the seam fires once, for the real slide, not for the copy it rests on first.
+// the seam fires once, for the real slide, when the row has jumped home onto it, not
+// for the copy it rests on first. A scrolling row's glide across several slides fires
+// for each slide it passes, as data-current moves; a cascade does not glide, so a dot
+// or End fires once.
 export const CHANGE_EVENT = "studio:carousel:change"
 
 // The event's detail when the open slide moved from `previous` to `index`, else null.
@@ -351,10 +354,4 @@ export function changeDetail(previous, index, slides) {
 export function clickedSlide(pressed, detail, hit) {
   if (detail === 0) return hit
   return pressed ?? hit
-}
-
-// The slides whose seam fade must start again: each one jumping now that still wears
-// the mark from its last jump, which a CSS animation would not replay.
-export function replayedJumps(marked, jumps) {
-  return jumps.map((jump, index) => !!jump && !!marked[index])
 }

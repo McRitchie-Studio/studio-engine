@@ -102,7 +102,7 @@ test("autoplay steps one slide on, round a looping set, and stops at the end of 
   assert.equal(autoplayStop(6, 7, true), 0)
 })
 
-const { CHANGE_EVENT, changeDetail, clickedSlide, replayedJumps } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
+const { CHANGE_EVENT, changeDetail, clickedSlide } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 test("the change event is named once and documented", () => {
   assert.equal(CHANGE_EVENT, "studio:carousel:change")
@@ -133,12 +133,10 @@ test("a mouse click reads its press first, then the slide it lands in", () => {
   assert.equal(clickedSlide(undefined, 2, -1), -1)
 })
 
-test("a slide that jumps again while it still wears the mark replays its fade", () => {
-  // Five in a loop: Next takes the far left slide round the seam, Previous takes it back.
+test("Next then Previous round a five-card loop's seam takes the same card across twice", () => {
+  // The controller replays that card's fade each time (e2e/carousel_cascade.spec.js).
   const first = cascadeJumps(cascadeSteps(5, 0, true), cascadeSteps(5, 1, true), 1)
   const back = cascadeJumps(cascadeSteps(5, 1, true), cascadeSteps(5, 0, true), 0)
   assert.deepEqual(first, [false, false, false, true, false])
   assert.deepEqual(back, [false, false, false, true, false])
-  assert.deepEqual(replayedJumps(first, back), [false, false, false, true, false])
-  assert.deepEqual(replayedJumps([false, true], [true, false]), [false, false], "a fresh mark plays on its own")
 })
