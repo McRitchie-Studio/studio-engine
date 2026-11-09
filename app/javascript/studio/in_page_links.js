@@ -255,11 +255,15 @@ export function installInPageLinks(doc) {
     let aims = 0
     let reader = false
     let live = true
+    // A scroll event has come since the last aim. Chrome can send the scrollend of a scroll an
+    // aim replaced before the new scroll's first frame; that scrollend is not this aim's end.
+    let scrolled = false
     let aimed = pageTop(target)
     const takeOver = () => { reader = true }
     const reaim = () => {
       if (reader || aims >= MAX_AIMS || Math.abs(pageTop(target) - aimed) <= AIM_SLACK_PX) return false
       aims += 1
+      scrolled = false
       scrollTo(target, behavior)
       aimed = pageTop(target)
       return true
@@ -273,7 +277,7 @@ export function installInPageLinks(doc) {
       // The target moved after the scroll stopped: aim once more and wait for that end.
       if (reaim()) return wait(START_CAP_MS)
       win.removeEventListener("scroll", onScroll)
-      win.removeEventListener("scrollend", end)
+      win.removeEventListener("scrollend", onScrollend)
       for (const name of INPUTS) win.removeEventListener(name, takeOver, true)
       win.clearTimeout(quiet)
       win.clearTimeout(cap)
@@ -284,18 +288,20 @@ export function installInPageLinks(doc) {
     }
     const onScroll = () => {
       win.clearTimeout(cap)
+      scrolled = true
       reaim()
       // The scroll has started. With scrollend, scrollend ends it, and START_CAP_MS after the
       // last scroll event is the backstop for a scroll that scrollend never follows.
       wait(hasScrollend ? START_CAP_MS : SETTLE_MS)
     }
+    const onScrollend = () => { if (scrolled) end() }
     const stop = () => {
       reader = true
       end()
     }
     settling = stop
     win.addEventListener("scroll", onScroll, { passive: true })
-    if (hasScrollend) win.addEventListener("scrollend", end)
+    if (hasScrollend) win.addEventListener("scrollend", onScrollend)
     for (const name of INPUTS) win.addEventListener(name, takeOver, { capture: true, passive: true })
     cap = win.setTimeout(end, START_CAP_MS)
     scrollTo(target, behavior)

@@ -335,3 +335,22 @@ test("a jump the reader took over holds nothing after it", async () => {
   page.advance(100)
   assert.deepEqual(page.scrolledBy, [])
 })
+
+// A STALE SCROLLEND. Measured at 8x CPU on a phone (section_header, red 3 in 10): the feed
+// landed in the scroll's last frame, the jump aimed again, and Chrome sent the first scroll's
+// scrollend before the new scroll's first frame. That scrollend ended the jump 88px short;
+// the new scroll then moved the page, so the hold let go too.
+test("after an aim, a scrollend before that aim's first scroll does not end the jump", async () => {
+  const install = await freshInstall("stale-scrollend")
+  const page = fakeWindow({ scrollend: true })
+  install(page.doc)
+  page.click()
+  page.frame(800)
+  page.grow(88)
+  page.frame(0) // the scroll's last frame: the target moved, so the jump aims again
+  page.scrollend() // the first scroll's end, before the new aim has scrolled
+  assert.equal(page.ends(), 0, "the aim's scroll is still to come")
+  page.frame(88)
+  page.scrollend()
+  assert.equal(page.ends(), 1, "the aim's own scrollend ends it")
+})
