@@ -59,6 +59,9 @@ const landed = async (page) => {
   await page.waitForTimeout(60);
   return page.evaluate(() => window.__t);
 };
+// The loader is up, as this spec's own per-frame recorder saw it. A response held until then
+// meets the wait it must not get; a fixed 450ms hold raced the loader's 350ms on a loaded host.
+const loaderSeen = (page) => page.waitForFunction(() => window.__t.loaderIn !== undefined);
 const report = (name, t) => { console.log(`[pace] ${name}: ${JSON.stringify(t)}`); };
 
 test("a fast visit shows no loader and gains no wait", async ({ page }) => {
@@ -114,13 +117,13 @@ test("the image wait comes after the minimum, and neither cuts the other short",
 test("a page that answers 500 gains no wait", async ({ page }) => {
   await timeline(page, "direction=left");
   await page.route("**/lab/page_transitions_b*", async (route) => {
-    await new Promise((done) => setTimeout(done, 450));
+    await loaderSeen(page);
     await route.fulfill({ status: 500, contentType: "text/html", body: "<html><body><h1 data-test=\"page-b\">Broken</h1></body></html>" });
   });
   await click(page);
   await expect(page.locator('h1[data-test="page-b"]')).toBeVisible();
   const t = await page.evaluate(() => window.__t);
-  report("500 at 450", t);
+  report("500 once the loader shows", t);
   expect(t.render).toBeLessThan(700);
 });
 
@@ -136,11 +139,13 @@ test("a visit the network drops clears the loader at once", async ({ page }) => 
   await page.route("**/lab/page_transitions_b*", async (route) => {
     if (dropped) return route.continue();
     dropped = true;
-    await new Promise((done) => setTimeout(done, 450));
+    await loaderSeen(page);
     return route.abort();
   });
   await click(page);
-  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("pt-dropped"))).not.toBeNull();
+  // Turbo answers a failed visit with a full load of the same URL, which the second request
+  // serves. sessionStorage outlives it, so read once page b is there, not while it navigates.
+  await expect(page.locator('[data-test="page-b"]')).toBeVisible();
   expect(JSON.parse(await page.evaluate(() => sessionStorage.getItem("pt-dropped")))).toEqual({ hidden: true, shown: true });
 });
 
