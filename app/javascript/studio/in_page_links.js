@@ -200,10 +200,11 @@ export function installInPageLinks(doc) {
   const pageTop = (target) => target.getBoundingClientRect().top + win.scrollY
   const INPUTS = ["wheel", "touchstart", "keydown", "pointerdown"]
 
-  // After a jump's end: each frame for HOLD_MS, a target that moved on the page moves the page
-  // with it, at once, so its place on the screen stays (scroll anchoring, for this one
-  // element). The check runs in an animation frame, after the growth's layout and before its
-  // paint, so the reader sees no frame with the target out of place. It lets go at the first
+  // After a jump's end: for HOLD_MS, a target that moved on the page moves the page with it,
+  // at once, so its place on the screen stays (scroll anchoring, for this one element). The
+  // check runs in the microtask after each change to the page's elements (a lazy frame's
+  // render), so no script and no frame sees the target out of place, and in each animation
+  // frame, for a size that changed with no new element (an image). It lets go at the first
   // input, at any scroll that is not its own (the reader's scrollbar, an app's scrollTo, a
   // clamp), at the next jump, at a Back or Forward, after MAX_AIMS moves, or at HOLD_MS.
   const hold = (target) => {
@@ -213,28 +214,39 @@ export function installInPageLinks(doc) {
     let moves = 0
     let frame = null
     let timer = null
+    let observer = null
+    let done = false
     const release = () => {
+      done = true
       win.cancelAnimationFrame(frame)
       win.clearTimeout(timer)
+      if (observer) observer.disconnect()
       for (const name of INPUTS) win.removeEventListener(name, release, true)
       if (settling === release) settling = null
     }
-    const check = () => {
+    const follow = () => {
+      if (done) return
       // A scroll the hold did not make is the reader's or the app's: it lets go first.
       if (Math.abs(win.scrollY - held) > AIM_SLACK_PX) return release()
       // A target a render took out of the page has no place to keep.
       if (target.isConnected === false) return release()
       const now = target.getBoundingClientRect().top
-      if (Math.abs(now - top) > AIM_SLACK_PX) {
-        if (moves >= MAX_AIMS) return release()
-        moves += 1
-        win.scrollBy({ top: now - top, behavior: "instant" })
-        held = win.scrollY
-        top = target.getBoundingClientRect().top
-      }
-      frame = win.requestAnimationFrame(check)
+      if (Math.abs(now - top) <= AIM_SLACK_PX) return
+      if (moves >= MAX_AIMS) return release()
+      moves += 1
+      win.scrollBy({ top: now - top, behavior: "instant" })
+      held = win.scrollY
+      top = target.getBoundingClientRect().top
+    }
+    const check = () => {
+      follow()
+      if (!done) frame = win.requestAnimationFrame(check)
     }
     settling = release
+    if (win.MutationObserver) {
+      observer = new win.MutationObserver(follow)
+      observer.observe(doc.documentElement, { childList: true, subtree: true })
+    }
     for (const name of INPUTS) win.addEventListener(name, release, { capture: true, passive: true })
     timer = win.setTimeout(release, HOLD_MS)
     frame = win.requestAnimationFrame(check)

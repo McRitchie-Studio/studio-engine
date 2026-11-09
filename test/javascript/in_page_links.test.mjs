@@ -141,7 +141,7 @@ test("a target's own scroll margin wins; else it stops under the pinned stack", 
 // whose frames come further apart than SETTLE_MS (a phone, or CI at 8x CPU) must not end
 // before the browser's scrollend. Measured red at 8x before the fix: the quiet spell ended
 // the jump at its first frame, the target then moved and nothing aimed again.
-function fakeWindow({ scrollend }) {
+function fakeWindow({ scrollend, mutations = false }) {
   const timers = new Map()
   let now = 0
   let next = 1
@@ -186,8 +186,18 @@ function fakeWindow({ scrollend }) {
     HashChangeEvent: class { constructor(type) { this.type = type } },
   }
   if (scrollend) win.onscrollend = null
+  // A MutationObserver whose callback a test runs, as the microtask after a change would.
+  const observers = []
+  if (mutations) {
+    win.MutationObserver = class {
+      constructor(fn) { this.fn = fn; this.on = false; observers.push(this) }
+      observe() { this.on = true }
+      disconnect() { this.on = false }
+    }
+  }
   const doc = {
     defaultView: win,
+    documentElement: {},
     getElementById: (id) => (id === "tricks" ? target : null),
     getElementsByName: () => [],
     addEventListener: on(docListeners),
@@ -213,6 +223,8 @@ function fakeWindow({ scrollend }) {
     scrollend: () => fire(listeners, "scrollend"),
     // Content above the target grows by dy: the target moves down, scrollY stays (no anchoring).
     grow: (dy) => { top += dy },
+    // Content above the target grows by an inserted element: the observers hear it.
+    insert: (dy) => { top += dy; for (const o of observers) if (o.on) o.fn([]) },
     input: (name) => fire(listeners, name),
     top: () => top,
     scrolledBy,
@@ -353,4 +365,20 @@ test("after an aim, a scrollend before that aim's first scroll does not end the 
   page.frame(88)
   page.scrollend()
   assert.equal(page.ends(), 1, "the aim's own scrollend ends it")
+})
+
+test("growth by an inserted element is followed in the change's own microtask, before any frame", async () => {
+  const install = await freshInstall("hold-mutation")
+  const page = fakeWindow({ scrollend: true, mutations: true })
+  install(page.doc)
+  page.click()
+  page.frame(800)
+  page.scrollend()
+  const place = page.top()
+  page.insert(88)
+  assert.deepEqual(page.scrolledBy, [88], "moved with no frame between")
+  assert.equal(page.top(), place)
+  page.advance(5000)
+  page.insert(40)
+  assert.deepEqual(page.scrolledBy, [88], "after HOLD_MS the observer is gone")
 })
