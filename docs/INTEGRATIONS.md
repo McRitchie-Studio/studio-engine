@@ -154,6 +154,15 @@ QuickBooks asks for `minorversion=75` or later on every call
   access token is used. A reader that still gets a 401 after its one refresh asks
   the admin to connect again; it does not retry in a loop. `invalid_grant` raises
   `Revoked`.
+- `intuit_tid`: Intuit names every answer with this response header and asks apps
+  to keep it (`trace_header: "intuit_tid"`). It is read from every token exchange,
+  refresh, revoke and describe answer, and logged with the call (never a token).
+  `Studio.connection(:quickbooks).last_trace_id` holds this thread's latest one.
+  Every error those calls raise carries it as `error.trace_id` and ends its message
+  with `[intuit_tid: <id>]`, so the error-log entry and the page show it. A refused
+  describe goes to the error log too. A host reader records its own answers' ids
+  with `Studio.connection(:quickbooks).record_trace(response, call: "read", status:)`,
+  and puts the id in what it logs.
 - `realmId` names the company on the callback. It is a number, and it is kept out
   of the logs by its exact key.
 - `environment:` names the env var that says which Intuit keys these are. Only

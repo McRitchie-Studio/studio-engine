@@ -24,6 +24,12 @@ module Studio
     #     the refresh refuses), and it is stored, with the access token and
     #     x_refresh_token_expires_in, before the access token is used.
     #   * invalid_grant on a refresh is a revoked grant: connect again.
+    #   * intuit_tid: Intuit names every answer with this response header, and
+    #     asks apps to keep it for support. It is read from every token
+    #     exchange, refresh, revoke and describe answer, logged with the call
+    #     (no token), kept as provider.last_trace_id, and carried by every error
+    #     raised (Error#trace_id, and in its message, so the error log has it).
+    #     Host readers call provider.record_trace(response, call:, status:).
     #   * The company is named on the callback (?realmId=), a number, kept out
     #     of the logs by exact key.
     #   * The environment setting (sandbox, the default, or production) says
@@ -56,7 +62,7 @@ module Studio
           refresh: :cached, refresh_margin: 5.minutes, rotation: :required,
           refresh_expires_in_key: "x_refresh_token_expires_in",
           account: :callback, account_param: "realmId", account_format: REALM_ID,
-          filter_keys: %w[realmId],
+          filter_keys: %w[realmId], trace_header: "intuit_tid",
           refusal_hint: "Check the Intuit app's redirect URI, then start again."
         },
         settings: { environment: { values: %w[sandbox production], default: "sandbox" } },

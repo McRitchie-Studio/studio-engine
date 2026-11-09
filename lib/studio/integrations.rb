@@ -215,7 +215,13 @@ module Studio
           begin
             described = definition.describe.call(self, grant:, account:, get: method(:describe_get)).to_h.symbolize_keys
           rescue Studio::Connections::Error => e
-            Rails.logger.warn("[studio_integration] describe #{key} refused: #{e.class}") if defined?(::Rails) && ::Rails.logger
+            # Kept in the error log (with the provider's trace id, when it names
+            # one), as a refused exchange is; the connection still stores.
+            begin
+              ::ErrorLog.capture!(e) if defined?(::ErrorLog) && ::ErrorLog.respond_to?(:capture!)
+            rescue StandardError => log_error
+              Rails.logger.error("[studio_integration] describe #{key} refused (#{e.message}); ErrorLog write failed: #{log_error.class}")
+            end
           end
         end
         label = described[:label].to_s.strip.presence || definition.default_label&.call(account)
@@ -228,15 +234,17 @@ module Studio
       # Studio::Connections::Error (RateLimited on a 429) on anything but a 200.
       def describe_get(url, token)
         headers = { "Authorization" => "Bearer #{token}", "Accept" => "application/json" }
-        status, body = api_http ? api_http.call(url, headers) : request(url, headers)
+        status, body, answered = api_http ? api_http.call(url, headers) : request(url, headers)
+        trace = provider.record_trace(answered, call: "describe", status:)
+        traced = { trace_header: provider.trace_header, trace_id: trace }
         json = begin
           JSON.parse(body.to_s)
         rescue JSON::ParserError
           {}
         end
         json = {} unless json.is_a?(Hash)
-        raise Studio::Connections::RateLimited, "#{label} is throttling this app (429)" if status == 429
-        raise Studio::Connections::Error, "#{label} answered #{status} to the describe call" unless status == 200
+        raise Studio::Connections::RateLimited.new("#{label} is throttling this app (429)", **traced) if status == 429
+        raise Studio::Connections::Error.new("#{label} answered #{status} to the describe call", **traced) unless status == 200
 
         json
       end
@@ -248,7 +256,7 @@ module Studio
         get = Net::HTTP::Get.new(uri)
         headers.each { |name, value| get[name] = value }
         response = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT) { _1.request(get) }
-        [response.code.to_i, response.body]
+        [response.code.to_i, response.body, response]
       rescue *Studio::Connections::NETWORK_ERRORS => e
         raise Studio::Connections::Error, "#{label} could not be reached: #{e.class}"
       end

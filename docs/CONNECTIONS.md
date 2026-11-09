@@ -92,6 +92,7 @@ stand-in is installed.
 | `rate_limited_statuses:` | `[429]` | These statuses raise `RateLimited`. |
 | `filter_keys:` | `[]` | Request keys kept out of the logs by exact key (see Logs). |
 | `revoke_note:` | generic | Shown when the provider cannot or did not confirm a revoke. |
+| `trace_header:` | `nil` | A response header that names each call for the provider's support (Intuit's `intuit_tid`). It is read from every token, refresh and revoke answer, logged with the call (`[studio_connection] provider=… call=… status=… <header>=…`, never a token), kept as `provider.last_trace_id`, and put on every error the call raises: `error.trace_id`, and `[<header>: <id>]` at the end of its message, so the error log and the page carry it. A host reader calls `provider.record_trace(response, call: "read", status:)` on its own answers. A stand-in may answer `[status, body, { "<header>" => "…" }]`. |
 
 ### Refresh policies
 

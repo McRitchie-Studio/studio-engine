@@ -187,6 +187,19 @@ class IntegrationsPageTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "quickbooks: a refused code exchange keeps Intuit's intuit_tid in the error log and on the page" do
+    with_env do
+      sign_in
+      post "/admin/integrations/quickbooks/connect"
+      stub_tokens(qbo, [400, { error: "invalid_request" }.to_json, { "intuit_tid" => "tid-1-abc" }])
+      get "/admin/integrations/quickbooks/callback", params: { state: location_query.fetch("state"), code: "c1", realmId: "4620" }
+      assert_redirected_to "/admin/integrations/quickbooks"
+      assert_includes flash[:alert], "[intuit_tid: tid-1-abc]"
+      assert_includes ErrorLog.sole.message, "[intuit_tid: tid-1-abc]"
+      assert_equal 0, Studio::Connection.count
+    end
+  end
+
   test "quickbooks: a callback without a valid realmId stores nothing" do
     with_env do
       sign_in

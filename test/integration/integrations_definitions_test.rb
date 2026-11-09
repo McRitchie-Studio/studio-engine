@@ -42,6 +42,7 @@ class IntegrationsDefinitionsTest < ActiveSupport::TestCase
     assert_equal %w[quickbooks egnyte microsoft_365], Studio::Integrations.catalog.map(&:key)
     assert Studio::Integrations.catalog.all?(&:frozen?)
     assert_raises(ArgumentError) { Studio::Integrations.definition(:fathom) }
+    assert_equal "intuit_tid", Studio::Integrations.definition(:quickbooks).connection[:trace_header]
   end
 
   test "[unit] a definition carries the connection only: no reader, no business-data call" do
@@ -245,6 +246,71 @@ class IntegrationsDefinitionsTest < ActiveSupport::TestCase
     assert_equal "[FILTERED]", filtered("realmId")
     assert_equal "secret-value", filtered("realmIdentity")
     assert_equal "secret-value", filtered("realmid")
+  end
+
+  test "[unit] quickbooks: intuit_tid is read from every token, refresh and revoke answer and logged with the call, never a token" do
+    with_env do
+      log = StringIO.new
+      saved_logger = Rails.logger
+      Rails.logger = ActiveSupport::Logger.new(log)
+      stub_tokens(qbo, [200, { access_token: "secret-a1", refresh_token: "secret-r1", expires_in: 60 }.to_json, { "Intuit_Tid" => "tid-exchange" }],
+                  [200, { access_token: "secret-a2", refresh_token: "secret-r2", expires_in: 3600 }.to_json, { "intuit_tid" => "tid-refresh" }],
+                  [200, "", { "intuit_tid" => "tid-revoke" }])
+      grant = qbo.provider.exchange_code(code: "c1", redirect_uri: "https://app.example/cb")
+      assert_equal "tid-exchange", qbo.provider.last_trace_id
+      row = Studio::Connection.store!(:quickbooks, grant, account: "4620", by: "tester")
+      row.fresh_access_token
+      assert_equal "tid-refresh", qbo.provider.last_trace_id
+      qbo.provider.revoke(row.reload)
+      assert_equal "tid-revoke", qbo.provider.last_trace_id
+
+      lines = log.string.lines.grep(/studio_connection/)
+      assert_equal ["call=authorization_code status=200 intuit_tid=tid-exchange", "call=refresh_token status=200 intuit_tid=tid-refresh",
+                    "call=revoke status=200 intuit_tid=tid-revoke"], lines.map { _1[/call=.*/].strip }
+      refute_match(/secret-/, log.string)
+    ensure
+      Rails.logger = saved_logger
+    end
+  end
+
+  test "[unit] quickbooks: a refused call carries its intuit_tid on the error and in its message" do
+    with_env do
+      row = Studio::Connection.store!(:quickbooks, { "access_token" => "a1", "refresh_token" => "r1", "expires_in" => 60 }, account: "4620", by: "tester")
+      stub_tokens(qbo, [400, { error: "invalid_grant" }.to_json, { "intuit_tid" => "tid-refused" }])
+      error = assert_raises(Studio::Connections::Revoked) { row.fresh_access_token }
+      assert_equal "tid-refused", error.trace_id
+      assert_equal "intuit_tid", error.trace_header
+      assert error.message.end_with?("[intuit_tid: tid-refused]"), error.message
+
+      stub_tokens(qbo, [500, "{}"])
+      error = assert_raises(Studio::Connections::Error) { row.fresh_access_token }
+      assert_nil error.trace_id, "no header, no trace"
+      refute_includes error.message, "intuit_tid"
+    end
+  end
+
+  test "[unit] quickbooks: a refused describe call keeps its intuit_tid in the error log; a good one records it" do
+    ErrorLog.delete_all
+    stub_describe(qbo, [403, "{}", { "intuit_tid" => "tid-describe" }])
+    described = qbo.describe_account(grant: { "access_token" => "a1" }, account: "4620")
+    assert_equal "QuickBooks company", described[:label]
+    assert_includes ErrorLog.sole.message, "[intuit_tid: tid-describe]"
+    refute_includes ErrorLog.sole.message, "a1"
+
+    stub_describe(qbo, [200, { CompanyInfo: { CompanyName: "Acme" } }.to_json, { "intuit_tid" => "tid-ok" }])
+    qbo.describe_account(grant: { "access_token" => "a1" }, account: "4620")
+    assert_equal "tid-ok", qbo.provider.last_trace_id
+  end
+
+  test "[unit] a provider that names no trace header raises plain errors" do
+    with_env do
+      assert_nil egnyte.provider.trace_header
+      row = Studio::Connection.store!(:egnyte, { "access_token" => "a1", "refresh_token" => "r1", "expires_in" => 60 }, account: "acme", by: "tester")
+      stub_tokens(egnyte, [400, { error: "invalid_grant" }.to_json, { "intuit_tid" => "x" }])
+      error = assert_raises(Studio::Connections::Revoked) { row.fresh_access_token }
+      assert_nil error.trace_id
+      refute_includes error.message, "["
+    end
   end
 
   # --- Egnyte ------------------------------------------------------------------
