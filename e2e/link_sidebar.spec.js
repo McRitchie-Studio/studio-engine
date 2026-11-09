@@ -174,7 +174,7 @@ test("the sidebar opens and closes when the boot fails to load", async ({ page }
 // style through the morph (keepPanelDisplay; task engine-logout-never-prefetched).
 // CONTROL: drop the turbo:before-morph-attribute listener: the closed panel is
 // visible after the morph and the first assertion fails.
-test("a morph refresh leaves a closed panel closed and an open one open", async ({ page }) => {
+test("a morph refresh draws a closed panel closed, and the flag and the panel agree", async ({ page }) => {
   const errors = watchPageErrors(page);
   await blockOffsiteRequests(page);
   await page.goto("/lab/sidebar_panels_turbo?sidebar=1&signed_in=1&refresh=morph");
@@ -195,11 +195,13 @@ test("a morph refresh leaves a closed panel closed and an open one open", async 
 
   await trigger(page).click();
   await expect(panel(page)).toBeVisible();
+  // An open panel closes on a refresh as on any visit (turbo:before-cache), and the
+  // morph leaves it drawn the way the flag reads.
   await morph(2);
-  expect(await flag(page)).toBe(true);
-  await expect(panel(page), "open before the morph, open after it").toBeVisible();
+  expect(await flag(page)).toBe(false);
+  await expect(panel(page), "the flag reads closed, and the panel is drawn closed").toBeHidden();
 
-  await page.keyboard.press("Escape");
-  await expect(panel(page)).toBeHidden();
+  await trigger(page).click();
+  await expect(panel(page), "the trigger still opens it after two morphs").toBeVisible();
   expect(errors).toEqual([]);
 });
