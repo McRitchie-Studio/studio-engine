@@ -4,6 +4,12 @@ const { blockOffsiteRequests } = require("./helpers");
 // [e2e] The one pace of a page load (docs/LOADER.md): under 350ms no loader; once shown, at
 // least 750ms. /lab/page_transitions renders no overlay of its own, so these read the one every
 // app gets from layouts/studio/_head. `slow=ms` makes page b answer that late.
+//
+// EVERY TIME IS FROM THE VISIT'S OWN START, turbo:visit, which is when studio/loader starts its
+// clock (350ms, then at least 750ms shown). Not from before Playwright's click: on a loaded
+// machine the click alone took over 250ms to land, and a limit read from the test's side of it
+// measured the host (787ms against 700, a fast visit's move at 453 against 350). A held wait
+// still reads 1100ms or later on the visit's clock, so every limit still catches one.
 const LAB = "/lab/page_transitions";
 
 async function timeline(page, query) {
@@ -11,8 +17,10 @@ async function timeline(page, query) {
   await page.route("**/e2e/img/pt-hung.png", () => {});
   await page.addInitScript(() => {
     const t = (window.__t = {});
-    const stamp = (key) => { if (t[key] === undefined && t.click !== undefined) t[key] = Math.round(performance.now() - t.click); };
+    const stamp = (key) => { if (t[key] === undefined && t.visit !== undefined) t[key] = Math.round(performance.now() - t.visit); };
     window.__mark = () => { t.click = performance.now(); };
+    // Capture, so this runs ahead of the page's own turbo:visit listeners, studio/loader's included.
+    document.addEventListener("turbo:visit", () => { if (t.click !== undefined && t.visit === undefined) t.visit = performance.now(); }, { capture: true });
     const start = Document.prototype.startViewTransition;
     if (start) {
       Document.prototype.startViewTransition = function (...args) {
@@ -150,15 +158,10 @@ test("StudioLoader.hide ends the wait at once", async ({ page }) => {
   expect(t.loaderOut - t.loaderIn).toBeLessThan(400);
 });
 
-// Timed from the visit's own start, turbo:visit, which is when studio/loader starts its clock
-// (350ms, then at least 750ms shown), not from before Playwright's click: on a loaded machine
-// the click alone took over 250ms to land (787ms against 700). A held reload comes at 1100ms or
-// later on that clock, so the limit still catches the wait.
 test("a response that asks for a full load, as a signing page does, gains no wait", async ({ page }) => {
   await timeline(page, "direction=left&strict=1&control=reload&slow=450");
   await page.evaluate(() => {
-    document.addEventListener("turbo:visit", () => { window.__visitAt = performance.now(); }, { once: true });
-    document.addEventListener("turbo:reload", () => sessionStorage.setItem("pt-reload-at", String(Math.round(performance.now() - window.__visitAt))));
+    document.addEventListener("turbo:reload", () => sessionStorage.setItem("pt-reload-at", String(Math.round(performance.now() - window.__t.visit))));
   });
   await click(page);
   await expect(page.locator('[data-test="page-b"]')).toBeVisible();

@@ -7,7 +7,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { createRequire } from "node:module"
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { execFileSync } from "node:child_process"
@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url"
 
 const require = createRequire(import.meta.url)
 const TOOLING = new URL("../../lib/studio/node_tooling/", import.meta.url)
-const { DEFAULTS, studioBaseURL, railsWebServer, studioPlaywrightConfig } = require(fileURLToPath(new URL("playwright_base.js", TOOLING)))
+const { DEFAULTS, studioBaseURL, listenerRoot, mayReuseServer, railsWebServer, studioPlaywrightConfig } = require(fileURLToPath(new URL("playwright_base.js", TOOLING)))
 const { isOffOrigin, blockOffsiteRequests } = require(fileURLToPath(new URL("e2e_helpers.js", TOOLING)))
 
 test("the base is one chromium worker collecting ./e2e, booting Rails on /up", () => {
@@ -161,4 +161,57 @@ test("a top-level name with digits maps to its file; a relative or URL specifier
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
+})
+
+test("a local run reuses only a server this tree started", () => {
+  const root = mkdtempSync(join(tmpdir(), "studio-desk-"))
+  try {
+    mkdirSync(join(root, "test/dummy"), { recursive: true })
+    const warnings = []
+    const warn = (message) => warnings.push(message)
+    const reuse = (found) => mayReuseServer({ port: "3620", root, lookup: () => found, warn })
+    assert.equal(reuse({ root: null }), true, "nothing listens: nothing to refuse")
+    assert.equal(reuse({ root }), true)
+    assert.equal(reuse({ root: join(root, "test/dummy") }), true, "a server started from inside the tree is the tree's")
+    assert.deepEqual(warnings, [])
+    assert.equal(reuse({ root: `${root}-sibling` }), false, "a sibling desk's path shares the prefix but not the tree")
+    assert.equal(reuse({ root: "/Users/alex/projects/studio-engine/.worktrees/another-desk" }), false)
+    assert.equal(reuse({ unknown: true }), false, "a root that cannot be read is not assumed to be this one")
+    assert.equal(warnings.length, 3)
+    assert.match(warnings[0], /port 3620 is held by a server rooted at .*-sibling.*E2E_PORT=/)
+    assert.match(warnings[2], /whose root cannot be read/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test("the server's reuse follows the listener's root, and CI never asks", () => {
+  let asked = 0
+  const lookup = (port) => { asked += 1; assert.equal(port, "3620"); return { root: "/elsewhere" } }
+  const local = studioPlaywrightConfig({ defaultPort: "3620", env: {}, webServer: { command: "x", root: "/here", lookup } })
+  assert.equal(local.webServer.reuseExistingServer, false)
+  const mine = studioPlaywrightConfig({ defaultPort: "3620", env: {}, webServer: { command: "x", root: "/here", lookup: () => ({ root: "/here" }) } })
+  assert.equal(mine.webServer.reuseExistingServer, true)
+  const ci = studioPlaywrightConfig({ defaultPort: "3620", env: { CI: "1" }, webServer: { command: "x", lookup } })
+  assert.equal(ci.webServer.reuseExistingServer, false)
+  assert.equal(asked, 1)
+})
+
+test("the listener lookup reads a real server's working directory", async () => {
+  const { createServer } = await import("node:net")
+  const server = createServer()
+  await new Promise((done) => server.listen(0, "127.0.0.1", done))
+  try {
+    const found = listenerRoot(String(server.address().port))
+    if (found.unknown) return // no lsof on this machine; mayReuseServer then refuses, tested above
+    assert.equal(realpathSync(found.root), realpathSync(process.cwd()))
+  } finally {
+    await new Promise((done) => server.close(done))
+  }
+  const free = createServer()
+  await new Promise((done) => free.listen(0, "127.0.0.1", done))
+  const port = String(free.address().port)
+  await new Promise((done) => free.close(done))
+  const none = listenerRoot(port)
+  if (!none.unknown) assert.equal(none.root, null)
 })
