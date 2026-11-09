@@ -64,7 +64,7 @@ class UsersRoleKnownMigrationTest < ActiveSupport::TestCase
     assert_empty check_names
   end
 
-  test "installs the CHECK, fills a NULL role with viewer, and sets NOT NULL" do
+  test "installs the CHECK, fills a NULL role with viewer, and leaves role nullable" do
     create_users
     insert_role(nil)
     insert_role("member")
@@ -73,9 +73,32 @@ class UsersRoleKnownMigrationTest < ActiveSupport::TestCase
 
     assert_includes check_names, "users_role_known"
     assert_equal %w[member viewer], connection.select_values("SELECT role FROM users ORDER BY role")
-    refute connection.columns(:users).find { |c| c.name == "role" }.null
+    assert connection.columns(:users).find { |c| c.name == "role" }.null,
+           "role stays nullable, so an old dyno's write without a role still works through a deploy or rollback"
     assert_raises(ActiveRecord::StatementInvalid, "a mistyped role must be refused") { insert_role("amdin") }
     Studio::Roles.each { |role| insert_role(role) }
+  end
+
+  test "an old dyno's insert without a role still works after the migration" do
+    connection.create_table(:users) do |t|
+      t.string :email
+      t.string :role, default: "viewer"
+    end
+    migrate_up
+
+    connection.execute("INSERT INTO users (email) VALUES ('old@example.com')")
+    insert_role(nil)
+
+    assert_equal ["viewer"], connection.select_values("SELECT role FROM users WHERE email = 'old@example.com'")
+  end
+
+  test "writes the CHECK in the form Postgres re-dumps unchanged after a schema load" do
+    migration = AddUsersRoleKnownCheck.new
+    migration.define_singleton_method(:postgres?) { true }
+
+    assert_equal "(role)::text = ANY (ARRAY['viewer'::character varying::text, " \
+                 "'member'::character varying::text, 'admin'::character varying::text])",
+                 migration.send(:expression)
   end
 
   test "leaves a host's own narrower CHECK in place" do

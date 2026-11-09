@@ -91,8 +91,10 @@ verified it, else nil with the collision logged by `ErrorLog.capture!`.
 `test/integration/studio_account_test.rb` keeps it that way.
 
 **The database half.** `db/migrate/20261108170000_add_users_role_known_check.rb`
-adds CHECK `users_role_known` (`role IN ('viewer', 'member', 'admin')`) and NOT
-NULL. Install it with `bin/rails studio_engine:install:migrations`. It skips an
+fills a NULL role with `viewer` and adds CHECK `users_role_known` (`role IN
+('viewer', 'member', 'admin')`). It sets no NOT NULL: an old dyno that inserts a
+user without a role during a deploy or rollback still works, because the column
+default fills it. NOT NULL waits for a later migration. Install it with `bin/rails studio_engine:install:migrations`. It skips an
 app with no `users.role`, and an app that already has a CHECK of that name (the
 hub's and Turf's are narrower and stay). It refuses, writing nothing, when a row
 holds a role outside the list: move those rows in the app's own migration first.
