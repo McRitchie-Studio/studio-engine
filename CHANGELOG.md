@@ -4,6 +4,13 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.141.2 — 2026-11-09
+
+### Fixed
+
+- **The link-preview card shows text typed before its controller loads.** The `link-preview-card` controller is registered lazily, so an operator could type in /admin/link_preview before it listened, and the card kept the saved title. `connect()` now paints the card from the fields as they stand (`paintAll` in `studio/link_preview_card`). No host change.
+- **An in-page jump ends at the browser's scrollend, not at a quiet spell.** `studio/in_page_links` ended a smooth jump after 150 ms with no scroll event, even in a browser that fires `scrollend`. On a slow main thread (a phone, or CI at 8x CPU) a smooth scroll's frames come further apart than that, so the jump ended at its first frame: the tab highlight followed the passing sections, and a target that moved on the way (a lazy feed above it) was not aimed at again. Now only `scrollend` ends a scroll that moved, where the browser has it; the quiet spell stays for a browser without it, and the 400 ms cap still ends a scroll that never starts. Nothing for a consumer to do.
+
 ## 0.141.1 — 2026-11-09
 
 ### Fixed
