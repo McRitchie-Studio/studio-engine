@@ -42,7 +42,8 @@ ROOT = File.expand_path("..", __dir__)
 # E2E_LAB_ROOT moves the folder, not what the lane measures: the bytes written
 # are the same. test/integration/e2e_lab_residue_test.rb sets it so that its own
 # boot does not clear the folder of a lab a builder is running.
-LAB_ROOT = File.expand_path(ENV.fetch("E2E_LAB_ROOT", File.join(ROOT, "tmp", "e2e-lab")))
+require_relative "lab_public"
+LAB_ROOT = E2eLabPublic.root(ROOT)
 LAB_PUBLIC = File.join(LAB_ROOT, "public")
 PUBLIC_DIR = File.join(LAB_PUBLIC, "e2e")
 
@@ -53,11 +54,7 @@ FileUtils.mkdir_p(PUBLIC_DIR)
 # Heal a desk that an older lab already wrote into: remove exactly the paths
 # that older script created in test/dummy/public, and the folder if that empties
 # it. The folder holds no committed file (it is ignored whole).
-DUMMY_PUBLIC = File.join(ROOT, "test", "dummy", "public")
-%w[favicon.png e2e images/state-flags].each { |legacy| FileUtils.rm_rf(File.join(DUMMY_PUBLIC, legacy)) }
-[File.join(DUMMY_PUBLIC, "images"), DUMMY_PUBLIC].each do |dir|
-  Dir.rmdir(dir) if Dir.exist?(dir) && Dir.empty?(dir)
-end
+E2eLabPublic.remove_legacy!(File.join(ROOT, "test", "dummy", "public"))
 
 # ---- The host's favicon ------------------------------------------------------
 #
