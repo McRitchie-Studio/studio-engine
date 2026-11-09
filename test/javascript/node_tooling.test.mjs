@@ -7,7 +7,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { createRequire } from "node:module"
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, realpathSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { execFileSync } from "node:child_process"
@@ -214,4 +214,62 @@ test("the listener lookup reads a real server's working directory", async () => 
   await new Promise((done) => free.close(done))
   const none = listenerRoot(port)
   if (!none.unknown) assert.equal(none.root, null)
+})
+
+test("logOnRed prints and attaches the log for a red only, and survives an unreadable one", async () => {
+  const { logOnRed, sessionLog } = require(fileURLToPath(new URL("e2e_helpers.js", TOOLING)))
+  let hook
+  logOnRed({ afterEach: (fn) => { hook = fn } }, async () => ["pagereveal transition", "::view-transition-old(root) pt-out-left"])
+  const run = async (status, read) => {
+    const attached = []
+    const info = { status, expectedStatus: "passed", title: "a test", attach: async (name, body) => attached.push({ name, ...body }) }
+    const logged = []
+    const real = console.log
+    console.log = (line) => logged.push(line)
+    try { await (read || hook)({ page: {} }, info) } finally { console.log = real }
+    return { attached, logged }
+  }
+  assert.deepEqual(await run("passed"), { attached: [], logged: [] })
+  const red = await run("failed")
+  assert.equal(red.attached.length, 1)
+  assert.equal(red.attached[0].name, "pt-log")
+  assert.equal(red.attached[0].body, "pagereveal transition\n::view-transition-old(root) pt-out-left")
+  assert.match(red.logged[0], /^pt-log for "a test":\npagereveal transition/)
+
+  let broken
+  logOnRed({ afterEach: (fn) => { broken = fn } }, () => { throw new Error("context destroyed") }, { name: "event-log" })
+  const unreadable = await run("timedOut", broken)
+  assert.equal(unreadable.attached[0].name, "event-log")
+  assert.match(unreadable.attached[0].body, /the log could not be read: context destroyed/)
+
+  // The default reader is the sessionStorage log, by key.
+  const page = { evaluate: async (fn, key) => { assert.equal(key, "pt-log"); return ["x"] } }
+  assert.deepEqual(await sessionLog(page), ["x"])
+})
+
+test("the reveal waits ask the page for its reveal, never for a clock", async () => {
+  const { watchReveal, revealed, settled, arrivalSettled } = require(fileURLToPath(new URL("e2e_helpers.js", TOOLING)))
+  const source = readFileSync(fileURLToPath(new URL("e2e_helpers.js", TOOLING)), "utf8")
+  assert.doesNotMatch(source, /waitForTimeout|setTimeout/, "a helper here waits on an event, not a pause")
+
+  const calls = []
+  const page = {
+    addInitScript: async (fn) => calls.push(["init", fn.toString()]),
+    locator: (selector) => ({ first: () => ({ waitFor: async (options) => calls.push(["visible", selector, options.state]) }) }),
+    waitForFunction: async (fn) => calls.push(["until", fn.toString()]),
+    evaluate: async (_fn, count) => calls.push(["frames", count]),
+  }
+  await watchReveal(page)
+  assert.match(calls[0][1], /pagereveal/)
+  assert.match(calls[0][1], /finished\.then/)
+  calls.length = 0
+  await revealed(page, '[data-test="page-b"]')
+  await settled(page, '[data-test="page-b"]')
+  await arrivalSettled(page, '[data-test="page-b"]')
+  const kinds = calls.map(([kind]) => kind)
+  assert.deepEqual(kinds, ["visible", "until", "visible", "until", "until", "visible", "until", "until", "frames"])
+  assert.match(calls[1][1], /__studioReveal\.revealed === true/)
+  assert.match(calls[4][1], /::view-transition/)
+  assert.match(calls[7][1], /__studioReveal\.done === true/)
+  assert.equal(calls[8][1], 2)
 })

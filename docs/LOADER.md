@@ -95,7 +95,9 @@ caller owns that moment. A caller's `StudioLoader.show()` has no minimum. A form
 `data-studio-loader-overlay` keeps its overlay up for the rest of the minimum, with nothing else
 held. Turbo's top progress bar is unchanged.
 
-Measured in the lab, Chromium, from the click (`e2e/loader_pace.spec.js`):
+Measured in the lab, Chromium, from the click (`e2e/loader_pace.spec.js`). The spec's limits
+read from `turbo:visit`, where the loader's clock starts, not from before Playwright's click: on a
+loaded machine the click alone can take a quarter of a second to land.
 
 | Page answers at | Loader in | Loader out | Move start | Move end |
 |---|---|---|---|---|
