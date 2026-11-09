@@ -1,6 +1,6 @@
 class ErrorLog < ApplicationRecord
-  # `slug` is NOT NULL and unique (RequireSlugsOnEngineTables), so every insert
-  # carries one, including a host's bare `ErrorLog.create!`. Sluggable writes a
+  # `slug` is unique (RequireSlugsOnEngineTables) and becomes NOT NULL a release
+  # later, so every insert carries one, including a host's bare `ErrorLog.create!`. Sluggable writes a
   # unique placeholder before the insert and settles it to `error-log-<id>` right
   # after, inside the create, once the id exists.
   include Sluggable

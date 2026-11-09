@@ -6,8 +6,8 @@
 # hand-copied migration omitted it, so a theme save raises on any host built
 # from that doc (cyvasse, mcritchie-industries and moms-app when this shipped).
 # The slug is "theme-<app_name>", derived on save. Rows this left with a NULL
-# slug are filled, and the column made NOT NULL and unique, by the later
-# RequireSlugsOnEngineTables (20261108160000).
+# slug are filled, and the column made unique, by the later
+# RequireSlugsOnEngineTables (20261108160000); NOT NULL comes a release after.
 #
 # A baseline, not a rebuild:
 #

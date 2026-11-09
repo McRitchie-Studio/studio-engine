@@ -1,5 +1,5 @@
-# The engine's own settings and log tables take the hub's slug standard:
-# `slug` NOT NULL with a unique index, on error_logs, theme_settings,
+# The engine's own settings and log tables take the first half of the hub's slug
+# standard: every slug filled and a unique index on it, on error_logs, theme_settings,
 # studio_geo_settings and studio_site_identities (database audit 2026-11-07,
 # finding 6). Every host inherits the tables, so one migration reaches them all.
 #
@@ -15,13 +15,21 @@
 #      error_logs) may hold a slug twice; every copy after the lowest id takes
 #      `-<id>` after it. No table here has slug children, so nothing else
 #      references the old value.
-#   3. NOT NULL, then the unique index on `slug` unless one is there. A
-#      non-unique slug index is replaced by the unique one.
+#   3. The unique index on `slug` unless one is there. A non-unique slug index
+#      is replaced by the unique one.
+#
+# NOT NULL is deliberately NOT here. The release sweep installs engine
+# migrations in the same release as the gem bump, and Heroku runs them while the
+# old dynos still serve: the shipped ErrorLog.capture! inserts a NULL slug and
+# sets it after, so a NOT NULL would make every error write raise until the
+# restart, and again after any `heroku rollback`. The unique index allows many
+# NULLs, so old code keeps working. NOT NULL lands in a later engine migration,
+# in the release after every host runs the Sluggable ErrorLog this release ships.
 #
 # Production on 2026-11-08 (every app with a database, read-only counts): no
 # NULL or blank slug, no duplicate, so steps 1 and 2 change no row there. The
-# largest table is the hub's error_logs at 606 rows, so the NOT NULL scan and
-# the index build are short. On Postgres each ALTER waits at most LOCK_TIMEOUT
+# largest table is the hub's error_logs at 606 rows, so the index build is
+# short. On Postgres each ALTER waits at most LOCK_TIMEOUT
 # for its lock; a migrate that cannot get it fails whole, changes nothing, and
 # runs again on the next release.
 class RequireSlugsOnEngineTables < ActiveRecord::Migration[7.2]
@@ -43,21 +51,14 @@ class RequireSlugsOnEngineTables < ActiveRecord::Migration[7.2]
 
       backfill(table)
       dedupe(table)
-      change_column_null table, :slug, false
       unique_slug_index(table)
     end
   end
 
-  # Only the NOT NULL is undone. The unique index stays: most hosts had it before
-  # this migration, and a down cannot tell which index it added. Backfilled slugs
+  # Nothing to undo. The unique index stays: most hosts had it before this
+  # migration, and a down cannot tell which index it added. Backfilled slugs
   # stay too; a slug is a valid value either way.
-  def down
-    TABLES.each do |table|
-      next unless table_exists?(table) && column_exists?(table, :slug)
-
-      change_column_null table, :slug, true
-    end
-  end
+  def down; end
 
   private
 
