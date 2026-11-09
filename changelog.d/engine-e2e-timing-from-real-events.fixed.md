@@ -1,1 +1,0 @@
-- **A local e2e run no longer reuses another tree's server.** `playwright_base.js` reuses a server already on the e2e port only when its working directory (read with `lsof`) is inside this tree. A sibling desk's server on the shared default port is refused, with a warning that names its root; give the run its own port with `E2E_PORT`. CI is unchanged: it never reuses a server.
