@@ -190,7 +190,11 @@ test("a response that asks for a full load, as a signing page does, gains no wai
     await loaderSeen(page);
     return route.fulfill({ response: answer });
   });
+  // The full load is the condition: its own load event, not a 5s look for page b (at 8x CPU on
+  // a loaded host the strict page took longer than that to arrive, 1 in 120).
+  const reloaded = page.waitForEvent("load");
   await click(page);
+  await reloaded;
   await expect(page.locator('[data-test="page-b"]')).toBeVisible();
   expect(Number(await page.evaluate(() => sessionStorage.getItem("pt-reload-after-answer")))).toBeLessThan(350);
 });

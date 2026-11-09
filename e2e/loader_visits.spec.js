@@ -37,9 +37,9 @@ test("a background replace visit never shows the overlay; a user's slow navigati
 
   await watch();
   await page.evaluate(() => window.Turbo.visit("/lab/loader_visits?ms=1200", { action: "replace" }));
-  await page.waitForTimeout(800);
-  expect(await page.evaluate(() => window.__overlayShown), "a replace visit showed the overlay").toBe(0);
+  // The whole visit, not a slice of it: the observer counted every unhide until page b landed.
   await expect(page.locator('[data-test="arrived"]')).toHaveText("1200");
+  expect(await page.evaluate(() => window.__overlayShown), "a replace visit showed the overlay").toBe(0);
   await expect(overlay(page)).toBeHidden();
 
   await page.locator('[data-test="slow-link"]').click();
@@ -52,11 +52,17 @@ test("a background replace visit never shows the overlay; a user's slow navigati
 test("a Turbo link to a download with no extension leaves no overlay up", async ({ page }) => {
   await page.goto("/lab/loader_visits");
   await page.waitForFunction(() => window.Turbo);
+  // Past the overlay's own delay, on its own clock: a timer queued on turbo:visit after
+  // studio/loader's (its listener runs first) with the same delay fires after its show would.
+  await page.evaluate(() => document.addEventListener("turbo:visit", () => {
+    const delay = parseInt(document.querySelector("[data-studio-loader-overlay]").getAttribute("data-delay"), 10);
+    setTimeout(() => { window.__pastDelay = true; }, delay >= 0 ? delay : 350);
+  }, { once: true }));
   const download = page.waitForEvent("download");
   await page.locator('[data-test="download-link"]').click();
   await download;
-  // Past the overlay's 100ms delay, well inside the 15s cap.
-  await page.waitForTimeout(600);
+  await page.waitForFunction(() => window.__pastDelay === true);
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   await expect(overlay(page)).toBeHidden();
   await expect(page).toHaveURL(/\/lab\/loader_visits$/);
 });
