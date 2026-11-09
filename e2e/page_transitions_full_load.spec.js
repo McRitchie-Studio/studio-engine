@@ -112,6 +112,11 @@ async function nothingPlayed(page, testId = "b") {
 }
 // Same path, or a redirect back to it: the old page carries the same test id, so wait for the
 // new document's reveal in the log (open() and each step clear it) before reading the page.
+// Before a full-load Back or Forward: the page is fully loaded, so its own module has run and
+// is listening for pageswap. Revealed is not enough: at 8x CPU Back once left page b while it
+// was still "interactive", and a page whose module has not run leaves by the plain load (the
+// "click before the old page's module" test below), so the move never played.
+const loaded = (page) => page.waitForFunction(() => document.readyState === "complete");
 const newDocumentRevealed = (page) => page.waitForFunction(() => (sessionStorage.getItem("pt-log") || "").includes("pagereveal"));
 
 function expectOneMotion(lines, oldName, newName) {
@@ -305,7 +310,7 @@ test("a redirect plays once, and a redirect back to this path plays nothing", as
   await bounce(STRICT);
   await settled(page, "b");
   expectOneMotion(await logged(page), "pt-out-left", "pt-in-from-right");
-  await page.waitForFunction(() => window.Turbo && document.documentElement.dataset.pageTransitionDirection);
+  await loaded(page);
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
   await bounce(STRICT);
   await newDocumentRevealed(page);
@@ -448,6 +453,7 @@ test("arriving scrolled by a full load, the taller old navbar does not draw unde
   const taller = await page.locator(".vt-pinned-header").evaluate((el) => el.offsetHeight);
   expect(taller, "the old navbar is not taller, so this measured nothing").toBeGreaterThan(shorter);
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
+  await loaded(page);
   await page.goBack();
   await settled(page, "a");
   expect(await page.evaluate(() => window.scrollY), "Back did not arrive scrolled").toBe(800);
@@ -492,10 +498,12 @@ test("Back across a full load plays the move the other way, and Forward the dire
   await fullLoad(page);
   await settled(page, "b");
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
+  await loaded(page);
   await page.goBack();
   await settled(page, "a");
   expectOneMotion(await logged(page), "pt-out-right", "pt-in-from-left");
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
+  await loaded(page);
   await page.goForward();
   await settled(page, "b");
   expectOneMotion(await logged(page), "pt-out-left", "pt-in-from-right");
