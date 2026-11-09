@@ -87,7 +87,7 @@ module IntegrationsHost
     "HOST_EGNYTE_ID" => "egnyte-id", "HOST_EGNYTE_SECRET" => "egnyte-secret",
     "HOST_M365_ID" => "m365-id", "HOST_M365_SECRET" => "m365-secret"
   }.freeze
-  TENANT = "0000000a-0000-0000-0000-0000000000b2"
+  TENANT = "00000000-0000-0000-0000-00000000000a"
 
   def self.enable!
     # Enabling again replaces each integration (and its provider) in place:

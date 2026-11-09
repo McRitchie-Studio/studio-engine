@@ -56,7 +56,7 @@ module Studio
         },
         default_label: ->(_tenant) { "Microsoft 365 tenant" },
         api_base: ->(_integration, _connection) { API_URL },
-        stand_in: { callback_params: { tenant: "00000000-0000-0000-0000-000000000365", admin_consent: "True" },
+        stand_in: { callback_params: { tenant: "00000000-0000-0000-0000-000000000000", admin_consent: "True" },
                     answer: { "displayName" => "Stand-in Tenant" } }
     end
   end

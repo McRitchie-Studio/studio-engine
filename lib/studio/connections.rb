@@ -9,7 +9,7 @@ require "set"
 
 module Studio
   # CONNECTIONS: the generic tooling a host app uses to connect a third-party
-  # account over OAuth 2.0 (docs/CONNECTIONS.md). The engine knows no provider.
+  # account over OAuth 2.0 (docs/CONNECTIONS.md). The tooling knows no provider.
   # A host declares each one in an initializer, and the engine gives it:
   #
   #   * Studio::Connection, one table (studio_connections) holding one row per
@@ -30,7 +30,8 @@ module Studio
   #     account: :connect, account_param: "domain", account_format: /\A[a-z0-9-]{1,63}\z/
   #
   # Provider specifics (endpoints, scopes, quirks, readers, the admin page's
-  # live read) belong to the host. Nothing here is named after a vendor.
+  # live read) belong to the host. Nothing in this file is named after a vendor:
+  # the engine's own definitions live in Studio::Integrations (docs/INTEGRATIONS.md).
   module Connections
     # What reaching a provider can raise below HTTP: TLS, refused, timed out, DNS.
     NETWORK_ERRORS = [OpenSSL::SSL::SSLError, SocketError, SystemCallError, Net::OpenTimeout, Net::ReadTimeout].freeze

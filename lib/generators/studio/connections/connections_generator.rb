@@ -53,6 +53,9 @@ module Studio
             bin/rails db:migrate
             Declare each provider in #{INITIALIZER}, then draw its routes in config/routes.rb:
               Studio.draw_connection_routes(self, :files, path: "admin/files", controller: "admin/files")
+            Or enable an integration the engine defines (docs/INTEGRATIONS.md) and mount its page:
+              Studio.enable_integration :quickbooks, env: { client_id: "INTUIT_CLIENT_ID", client_secret: "INTUIT_CLIENT_SECRET" }
+              Studio.draw_integrations_routes(self)
             Set the provider's client id and secret, and the app's Active Record encryption keys.
         TEXT
       end
@@ -68,6 +71,13 @@ module Studio
       INITIALIZER_BODY = <<~RUBY
         # frozen_string_literal: true
 
+        # Integrations the engine already defines (studio-engine docs/INTEGRATIONS.md):
+        # QuickBooks, Egnyte, Microsoft 365. One line each, naming this app's env
+        # vars; mount the page with Studio.draw_integrations_routes(self).
+        #
+        # Studio.enable_integration :quickbooks,
+        #   env: { client_id: "INTUIT_CLIENT_ID", client_secret: "INTUIT_CLIENT_SECRET", environment: "INTUIT_ENVIRONMENT" }
+        #
         # Connections (studio-engine docs/CONNECTIONS.md). One Studio.define_connection
         # per provider this app connects; each stays off until its client id and
         # secret are set. Draw its routes in config/routes.rb with

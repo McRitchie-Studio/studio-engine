@@ -221,7 +221,7 @@ class IntegrationsPageTest < ActionDispatch::IntegrationTest
     assert_redirected_to "/admin/integrations"
     assert_equal "Microsoft 365 connected: Stand-in Tenant.", flash[:notice]
     row = Studio::Connection.for_provider(:microsoft_365).sole
-    assert_equal "00000000-0000-0000-0000-000000000365", row.account_id
+    assert_equal "00000000-0000-0000-0000-000000000000", row.account_id
 
     delete "/admin/integrations/microsoft_365/connections/#{row.id}"
     assert_match(/Entra admin center/, flash[:notice])

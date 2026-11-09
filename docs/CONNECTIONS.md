@@ -1,7 +1,7 @@
 # Connections
 
 Generic tooling to connect a third-party account to a host app over OAuth 2.0.
-The engine knows no provider. A host declares each provider it connects, and the
+The tooling knows no provider. A host declares each provider it connects, and the
 engine gives it the table, the OAuth plumbing, the admin actions, the routes and
 the log filter. Provider details (endpoints, scopes, quirks, readers and the admin
 page's live read) stay in the host.

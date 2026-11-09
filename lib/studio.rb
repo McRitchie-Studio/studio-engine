@@ -1207,7 +1207,8 @@ module Studio
 
   # ---- Connections (docs/CONNECTIONS.md) ------------------------------------
   #
-  # The generic OAuth 2.0 connection tooling. The engine names no provider: a
+  # The generic OAuth 2.0 connection tooling. The tooling names no provider (the
+  # engine's own definitions are Studio::Integrations, below): a
   # host declares each in an initializer and draws its routes.
   #
   #   Studio.define_connection :files, label: "Acme Files", env: {...}, ...
