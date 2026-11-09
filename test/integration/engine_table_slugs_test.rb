@@ -14,9 +14,12 @@ require_relative "../../db/migrate/20260818120000_create_studio_geo_settings"
 require_relative "../../db/migrate/20260930120000_create_studio_site_identities"
 require_relative "../../db/migrate/20261108160000_require_slugs_on_engine_tables"
 
-# The engine's settings and log tables hold the hub's slug standard: `slug` NOT
-# NULL with a unique index, a NULL slug backfilled the way its model writes one
-# (database audit 2026-11-07, finding 6).
+# The engine's settings and log tables take the first half of the hub's slug
+# standard: a unique `slug` index, a NULL slug backfilled the way its model
+# writes one (database audit 2026-11-07, finding 6). The column stays nullable
+# this release, so old dynos' NULL-slug inserts keep working through a deploy or
+# a rollback; NOT NULL lands in the release after every host runs a Sluggable
+# ErrorLog.
 #
 # The host shapes are the ones host_tables_migrations_test.rb records: the hub's
 # error_logs has a unique slug index, turf-monster's has none; theme_settings has
@@ -82,7 +85,7 @@ class EngineTableSlugsTest < ActiveSupport::TestCase
   end
 
   def assert_standard(table)
-    refute slug_column(table).null, "#{table}.slug is NOT NULL"
+    assert slug_column(table).null, "#{table}.slug stays nullable this release (NOT NULL waits for the next)"
     assert_equal [["index_#{table}_on_slug", true]], slug_indexes(table), "#{table} has one unique slug index"
   end
 
@@ -99,7 +102,7 @@ class EngineTableSlugsTest < ActiveSupport::TestCase
     assert_equal "theme-4", migration.send(:derived_slug, "theme_settings", 4, nil), "no app name falls back to the id"
   end
 
-  test "[integration] fresh engine tables end NOT NULL and unique, and a second run changes nothing" do
+  test "[integration] fresh engine tables end unique and still nullable, and a second run changes nothing" do
     engine_tables
     migrate
     TABLES.each { |table| assert_standard(table) }
@@ -161,16 +164,20 @@ class EngineTableSlugsTest < ActiveSupport::TestCase
     (TABLES - ["error_logs"]).each { |table| refute connection.table_exists?(table), table }
   end
 
-  test "[integration] the database refuses a NULL slug and a duplicate afterwards" do
+  # The deploy window: old dynos run the shipped ErrorLog.capture!, which inserts
+  # a NULL slug and sets it after. That insert must still succeed once this
+  # migration has run, and two of them must not collide on the unique index.
+  test "[integration] an old-style NULL-slug insert still succeeds, and a duplicate slug is refused" do
     engine_tables
     migrate
 
-    assert_raises(ActiveRecord::NotNullViolation) { insert("error_logs", "message" => "a", "slug" => nil) }
+    insert("error_logs", "message" => "old dyno", "slug" => nil)
+    insert("error_logs", "message" => "old dyno again", "slug" => nil)
     insert("theme_settings", "app_name" => "A", "slug" => "theme-a")
     assert_raises(ActiveRecord::RecordNotUnique) { insert("theme_settings", "app_name" => "B", "slug" => "theme-a") }
   end
 
-  test "[integration] down relaxes NOT NULL and keeps the index" do
+  test "[integration] down changes nothing and keeps the index" do
     engine_tables
     migrate
     RequireSlugsOnEngineTables.new.migrate(:down)

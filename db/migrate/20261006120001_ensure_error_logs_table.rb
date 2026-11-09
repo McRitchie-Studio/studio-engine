@@ -15,8 +15,9 @@
 #
 # On every consumer that existed when this shipped, the second branch adds
 # nothing. Studio::HostSchema checks the same columns at boot. The slug
-# standard (NOT NULL, unique) is the later RequireSlugsOnEngineTables
-# (20261108160000), which tightens the column on every host.
+# standard starts with the later RequireSlugsOnEngineTables (20261108160000),
+# which backfills and uniquely indexes the column on every host; NOT NULL
+# follows a release later, once every host runs the Sluggable ErrorLog.
 class EnsureErrorLogsTable < ActiveRecord::Migration[7.2]
   def up
     unless table_exists?(:error_logs)
