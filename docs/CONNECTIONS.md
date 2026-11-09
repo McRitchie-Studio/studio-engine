@@ -6,6 +6,11 @@ engine gives it the table, the OAuth plumbing, the admin actions, the routes and
 the log filter. Provider details (endpoints, scopes, quirks, readers and the admin
 page's live read) stay in the host.
 
+The engine also ships ready connection definitions for QuickBooks, Egnyte and
+Microsoft 365, built on this tooling, and an admin page for them:
+[`INTEGRATIONS.md`](INTEGRATIONS.md). A host enables one with
+`Studio.enable_integration` instead of declaring it here.
+
 | Part | What it is |
 |------|------------|
 | `Studio::Connection` | One table, `studio_connections`. One row per provider and account. Tokens are encrypted. |
