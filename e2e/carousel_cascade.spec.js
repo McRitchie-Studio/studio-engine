@@ -206,7 +206,7 @@ test("Tab into a side card brings it to the front, and each Tab moves one card o
 
   // The first card's link is hidden (past the window), so Tab skips it and lands on
   // the first card in view, two left of the open one. Shift+Tab reaches card 1 from
-  // there (the next spec but three).
+  // there: see "a cascade opened mid-row" below.
   await page.keyboard.press("Tab");
   await expect(slides(page).nth(1).locator("a")).toBeFocused();
   await rest(page);
