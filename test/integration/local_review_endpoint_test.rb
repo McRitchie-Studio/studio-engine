@@ -264,6 +264,27 @@ class LocalReviewEndpointTest < ActionDispatch::IntegrationTest
       "the button must degrade to its old behavior, never to a 500"
   end
 
+  # The miss reaches ErrorLog, not only the Rails log: a role the host's
+  # Studio::Account list refuses (Studio.local_review_role = "editor") fails the
+  # save here, and an operator reads ErrorLog, not the dev log.
+  test "a provisioning failure is logged to ErrorLog" do
+    captured = []
+    original = User.method(:find_by)
+    User.define_singleton_method(:find_by) { |*| raise ActiveRecord::StatementInvalid, "boom" }
+    ErrorLog.singleton_class.alias_method(:__capture_before_test, :capture!)
+    ErrorLog.define_singleton_method(:capture!) { |error, **| captured << error }
+
+    begin
+      get "/_studio/local_review", params: { email: OPERATOR, return_to: "/admin/style" }
+    ensure
+      User.define_singleton_method(:find_by, original)
+      ErrorLog.singleton_class.alias_method(:capture!, :__capture_before_test)
+    end
+
+    assert_response :redirect
+    assert_equal ["boom"], captured.map(&:message)
+  end
+
   test "a malformed email provisions nobody" do
     get "/_studio/local_review", params: { email: "not-an-email", return_to: "/admin/style" }
 

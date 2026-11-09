@@ -5,7 +5,10 @@ class SessionsController < ApplicationController
   end
 
   def create
-    user = User.find_by(email: params[:email])
+    # Studio::Account.find_by_email, never find_by(email:): a form posted with
+    # no address made that find_by(email: nil), which matches any account with
+    # no email (a wallet or guest sign-up) and handed it to `authenticate`.
+    user = Studio::Account.find_by_email(User, params[:email])
     if user&.authenticate(params[:password])
       set_app_session(user)
       redirect_to root_path, notice: "Welcome back, #{user.display_name}!"
@@ -49,10 +52,16 @@ class SessionsController < ApplicationController
   private
 
   def authenticate_sso_user!
-    user = User.find_by(email: session[:sso_email])
+    # sso_continue checks the address is present first; this method does not
+    # trust that. A blank one finds nobody and signs nobody in: find_by(email:
+    # nil) would match any account without an email and sign in as it.
+    email = Studio::Account.normalize_email(session[:sso_email])
+    return redirect_to(login_path, alert: "Could not continue session. Please log in.") unless email
+
+    user = Studio::Account.find_by_email(User, email)
     unless user
       user = User.new(
-        email:    session[:sso_email],
+        email:    email,
         name:     session[:sso_name],
         provider: session[:sso_provider],
         uid:      session[:sso_uid]

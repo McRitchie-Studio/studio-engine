@@ -10,7 +10,7 @@ These are the methods/attributes the engine actively calls. Missing one of these
 | Name | Used by | Notes |
 |------|---------|-------|
 | `User.find_by(id:)` | `Studio::ErrorHandling#current_user` | Standard ActiveRecord finder — automatic on any AR model. |
-| `User.find_by(email:)` | `SessionsController#create` | Same. |
+| `User.where` on `email` | `SessionsController#create`, the SSO path | Through `Studio::Account.find_by_email`: a blank address finds nobody, compared `LOWER(email)`. Automatic on any AR model with an `email` column. |
 
 ### Instance methods
 | Name | Used by | Notes |
@@ -45,6 +45,57 @@ controller turns into a "use another method" redirect.
 
 `include Studio::OmniauthUser` gives `User.from_omniauth` the default under its
 own name. A `def self.from_omniauth` in the class body overrides it either way.
+
+## The account concern: `Studio::Account`
+
+One engine copy of the rules every app used to type by hand (database audit
+2026-11-07, section 3). Include it and the model has them all:
+
+```ruby
+class User < ApplicationRecord
+  include Studio::Account
+  studio_roles %w[viewer admin]   # optional: narrow the list, never widen it
+
+  def name_slug = name.to_s.parameterize
+end
+```
+
+| It gives | Notes |
+|----------|-------|
+| `#admin?` | `role == "admin"`. A `def admin?` in the class body overrides it. |
+| `#display_name` | The name, else the address before `@`, else `"User"`. |
+| `normalizes :email` | Stripped and downcased; a blank address is stored as NULL. |
+| `validates :role, inclusion:` | Against `Studio::Roles` (`viewer`, `member`, `admin`), or the host's narrower `studio_roles` list. A new account with no role takes `viewer` (or the first role of a list without it). `studio_roles` raises on a role the engine does not know: a new role is added to the engine, for every app. |
+| `Sluggable`, `Studio::OmniauthUser` | Included for you. The host still defines `name_slug`. |
+| `User.account_for_email(address)` | The one safe lookup, below. |
+
+**The safe lookup.** `Studio::Account.find_by_email(User, address)` (and
+`User.account_for_email`) finds nobody for a blank address, compares
+`LOWER(email)`, and never runs `find_by(email: nil)`. That line matches every
+account without an email (a wallet or guest sign-up), so a Google callback or a
+form with no address signed the caller in as a stranger: the account-takeover
+class the hub and Turf fixed on 2026-11-08. The engine's own `SessionsController`
+uses it on both doors. A lookup that LINKS a Google identity to the account it
+finds takes Google's verification first (`from_omniauth`, step 2 above).
+
+**The race rescue.** A host with its own `from_omniauth` rescues
+`ActiveRecord::RecordNotUnique` with
+`Studio::Account.race_winner(User, provider:, uid:, email:, email_verified:, error:)`:
+the row holding the Google id, else the row holding the address only when Google
+verified it, else nil with the collision logged by `ErrorLog.capture!`.
+
+**Why not `Studio::User`.** Inside `module Studio`, a bare `User` resolves to
+`Studio::User` before `::User`, and the engine reads the host's model bare in
+`Studio::ErrorHandling#current_user`, `Studio::LinkConsumption` and
+`Studio::LocalReviewsController`. The engine defines no `Studio::User`, and
+`test/integration/studio_account_test.rb` keeps it that way.
+
+**The database half.** `db/migrate/20261108170000_add_users_role_known_check.rb`
+adds CHECK `users_role_known` (`role IN ('viewer', 'member', 'admin')`) and NOT
+NULL. Install it with `bin/rails studio_engine:install:migrations`. It skips an
+app with no `users.role`, and an app that already has a CHECK of that name (the
+hub's and Turf's are narrower and stay). It refuses, writing nothing, when a row
+holds a role outside the list: move those rows in the app's own migration first.
 
 ## Optional
 
@@ -92,7 +143,7 @@ The engine doesn't care about DB shape directly, but in practice every consumer 
 - `email:string` (unique-indexed, nullable for wallet-only apps)
 - `password_digest:string` only when enabling password auth
 - `provider:string`, `uid:string` (OmniAuth)
-- `role:string` or `role:integer` (for `admin?`)
+- `role:string` (for `admin?`), one of `Studio::Roles`, guarded by CHECK `users_role_known`. A host still on an integer role keeps its own `admin?`; the engine's role migration skips it
 - `slug:string` (for `Sluggable`-friendly URLs)
 - `first_name:string` (and `last_name:string` where the app wants the surname) — the standard-columns migration installs `first_name`
 
@@ -100,16 +151,8 @@ The engine doesn't care about DB shape directly, but in practice every consumer 
 
 ```ruby
 class User < ApplicationRecord
-  include Sluggable                  # from the engine
+  include Studio::Account            # admin?, display_name, roles, Sluggable, OmniauthUser
   has_many :error_logs, as: :target  # if you want to associate logged errors
-
-  def admin?
-    role == "admin"
-  end
-
-  def display_name
-    name.presence || email&.split("@")&.first || "User"
-  end
 
   def name_slug
     (name.presence || email.to_s.split("@").first).parameterize

@@ -1,0 +1,1 @@
+- **A local-review provisioning miss is logged to ErrorLog.** `Studio::LocalReviewsController` still mints the link when it cannot provision the reviewer, and now records the reason with `ErrorLog.capture!` as well as the Rails log. The likeliest cause after `Studio::Account`: `Studio.local_review_role` names a role the app's list refuses.
