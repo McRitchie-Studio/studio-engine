@@ -109,11 +109,12 @@ class EngineNotNullChecksTest < ActiveSupport::TestCase
     insert("error_logs", "message" => "old dyno", "slug" => nil)
     insert("error_logs", "message" => "taken", "slug" => "error-log-3")
     insert("error_logs", "message" => "old dyno again", "slug" => nil)
+    insert("error_logs", "message" => "blank", "slug" => "")
     insert("theme_settings", "app_name" => "Turf Monster", "slug" => nil)
 
     migrate_up
 
-    assert_equal({ 1 => "error-log-1", 2 => "error-log-3", 3 => "error-log-3-3" }, slugs("error_logs"))
+    assert_equal({ 1 => "error-log-1", 2 => "error-log-3", 3 => "error-log-3-3", 4 => "error-log-4" }, slugs("error_logs"))
     assert_equal({ 1 => "theme-turf-monster" }, slugs("theme_settings"))
   end
 

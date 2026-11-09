@@ -37,14 +37,19 @@
 #   * users.role: the column's default is "viewer" on every host, and no engine
 #     or host code writes an explicit NULL role.
 #
+# The error_logs line is the floor: a host must have run 0.141.0 or later in
+# production for one release before it installs this migration. A host that
+# jumps from 0.137.0 or older straight to this version in one release breaks
+# its own error writes while the old dynos drain, and again on a rollback.
+#
 # Each step, per table, and a table or column the host does not have is skipped:
 #
 #   1. A column that is already NOT NULL (the hub's and Turf's users.role) needs
 #      no CHECK: skipped.
 #   2. A CHECK of this name already there: skipped, so a second run is a no-op.
-#   3. Backfill. A NULL slug gets the one its model would write (the same rule
-#      as RequireSlugsOnEngineTables, copied, since a migration must not depend
-#      on another migration's class); a NULL role becomes "viewer".
+#   3. Backfill. A NULL or blank slug gets the one its model would write (the
+#      same rule as RequireSlugsOnEngineTables, copied, since a migration must
+#      not depend on another migration's class); a NULL role becomes "viewer".
 #   4. Add the CHECK, validated.
 #
 # Production on 2026-11-08 held no NULL slug and no NULL role. On Postgres each
@@ -117,7 +122,7 @@ class AddEngineNotNullChecks < ActiveRecord::Migration[7.2]
   def backfill_slug(table)
     rows = connection.select_rows(<<~SQL.squish)
       SELECT id#{', app_name' if NAMED.key?(table)} FROM #{quoted(table)}
-      WHERE slug IS NULL ORDER BY id
+      WHERE slug IS NULL OR slug = '' ORDER BY id
     SQL
     rows.each do |id, app_name|
       derived = derived_slug(table, id, app_name)

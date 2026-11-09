@@ -299,8 +299,9 @@ Do not write these by hand: the engine's migrations above create `error_logs`,
 `theme_settings` (with the `slug` column `ThemeSetting` writes at create) and
 `image_caches`. A later engine migration backfills `slug` and makes it unique on
 `error_logs` and `theme_settings`, and on `studio_geo_settings` and
-`studio_site_identities` when the app has them; NOT NULL follows a release after
-that.
+`studio_site_identities` when the app has them. A release after that,
+`AddEngineNotNullChecks` adds a CHECK `slug IS NOT NULL` to each of them (and
+`role IS NOT NULL` to a nullable `users.role`).
 
 ```bash
 bin/rails db:create db:migrate
