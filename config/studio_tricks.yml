@@ -160,6 +160,13 @@ spotlight:
   note: "Centres one slide with its caption; its neighbours shrink and fade."
   resolve: [partial:studio/carousel, css:carousel-spotlight]
 
+cascade:
+  name: Cascade Carousel
+  group: Carousel
+  token: "render layout: \"studio/carousel\", style: :cascade"
+  note: "A 3D stack: the open slide in front, the others stepping back either side."
+  resolve: [partial:studio/carousel, css:carousel-cascade]
+
 card:
   name: Card
   group: "Surfaces, text & form"
