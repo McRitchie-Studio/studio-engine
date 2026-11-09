@@ -28,7 +28,9 @@ const {
 // is left out of TABS here.
 //
 // THE WAITS READ REAL CONDITIONS (engine-anchor-scroll-waits): a tab's landing is the in-page
-// module's end event (jumpEnded) and the navbar at rest; a scroll to the top is the scroll
+// module's end event (jumpEnded), the navbar at rest, and the pinned stack's settled write
+// (stackSettled: without it, red 20 in 20 unthrottled; with the stack's settle slowed to
+// 1000ms the old 500ms pause went red 2/2 and this wait stays green); a scroll to the top is the scroll
 // event heard at 0; Back is the place restored two frames after its popstate (traversed),
 // which holds when Back does not move. Two checks stay negative proofs, each over every frame
 // of the module's own timer window (twice START_CAP_MS): nothing moves after Back, and the
