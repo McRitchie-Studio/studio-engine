@@ -4,6 +4,13 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.141.1 — 2026-11-09
+
+### Fixed
+
+- **A pointer resting on Log out no longer signs the user out.** Turbo 8 prefetches a link the pointer rests on for 100ms, and a prefetch of `GET /logout` ran the sign-out. The link sidebar's Log out now carries `data-turbo-prefetch="false"`; the boot's `studio/sign_out_prefetch` cancels Turbo's prefetch of any same-origin `/logout` link; and `Studio::ErrorHandling` answers a prefetched sign-out (the engine's `sessions#destroy` or a host's own) with `204` and `no-store`, without writing the session. `/logout` answers `DELETE` too, for a host that draws Log out with `button_to`. `Studio.prefetch_request?(request)` is public. A host that copied the hub's `sign_out_prefetch.js` or `refuse_prefetched_sign_out` can drop them after this release. See `docs/DEVICE_SESSIONS.md`, "Prefetch".
+- **A morph refresh no longer draws a closed link sidebar open.** A page refresh by morph (a same-URL redirect under `turbo-refresh-method` morph, such as the hub's `/build` queued page after an admin claim) set the panel's style back to the server's and dropped the `display:none` Alpine had set, while `$store.sidebars.linkTreeOpen` stayed false. `studio/link_sidebar` now refuses the morph of a link sidebar panel's `style`. No host change.
+
 ## 0.141.0 — 2026-11-09
 
 ### Changed
