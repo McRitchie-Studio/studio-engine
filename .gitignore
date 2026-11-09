@@ -12,10 +12,12 @@ node_modules
 /playwright-report/
 /e2e-report.json
 /e2e-report-shard-*.json
-# e2e/boot.rb compiles Tailwind, copies Alpine, and copies the engine's own served
-# assets into here before serving the dummy lab. Regenerated on every boot.
+# The dummy's public folder holds no committed file. A few minitest suites write a
+# file here and remove it in teardown, and labs older than tmp/e2e-lab wrote their
+# assets here (the next boot removes those).
 /test/dummy/public/
 
-# Rails writes here when e2e/boot.rb boots the dummy (the theme CSS cache).
+# Rails writes here when e2e/boot.rb boots the dummy (the theme CSS cache), and
+# e2e/boot.rb writes the lab's own public folder and database to tmp/e2e-lab.
 /tmp/
 /test/dummy/tmp/
