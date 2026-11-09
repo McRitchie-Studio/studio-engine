@@ -42,6 +42,11 @@ const serveFeed = (page) => page.route("**/admin/style/loaders_feed*", async (ro
   await route.fulfill({ response: await route.fetch({ url: `${url.origin}/lab/loaders_feed${url.search}` }) });
 });
 
+// A feed fetch the scroll started can still be in flight when a test ends; its route
+// handler then fails on "Test ended" (red 1 in 60 unthrottled). Waiting for every handler
+// to finish closes that.
+test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: "wait" }); });
+
 async function open(page, url) {
   await blockOffsiteRequests(page);
   await watchInPageJumps(page);

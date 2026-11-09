@@ -1,6 +1,6 @@
 const { test, expect } = require("@playwright/test");
 const {
-  watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive, scrolledTo, navAtRest,
+  watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive, scrolledTo, navAtRest, stackSettled,
   watchInPageJumps, jumpEnded, traversed, scrollYAcrossWindow, inPageTimerWindow,
 } = require("./helpers");
 
@@ -130,12 +130,19 @@ const serveFeed = (page) => page.route("**/admin/style/loaders_feed*", async (ro
 });
 
 // A tab's click is a smooth scroll (studio/in_page_links). It has landed when the module's
-// jump ended (its scrollend after the last aim; jumpEnded) and the navbar's collapse that
-// the scroll drove is at rest. `count` is the jumps since the page loaded.
+// jump ended (its scrollend after the last aim; jumpEnded), the navbar's collapse that the
+// scroll drove is at rest, and the pinned stack has written its settled values to the root
+// (stackSettled), which the section bars' sticky line reads. `count` is the jumps since the
+// page loaded.
 async function landed(page, count) {
   await jumpEnded(page, count);
   await navAtRest(page);
+  await stackSettled(page);
 }
+
+// A feed fetch the scroll started can still be in flight when a test ends; its route
+// handler then fails on "Test ended". Waiting for every handler to finish closes that.
+test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: "wait" }); });
 
 const TABS = [["Modals", "modals"], ["Tricks", "tricks"], ["Tasks", "tasks"], ["Theme", "theme"]];
 
@@ -351,6 +358,11 @@ test("with no publisher the header stays a plain title in the flow", async ({ pa
   await page.setViewportSize(DESKTOP);
   await page.goto(LAB);
   await expectStickyChromeIsLive(page, expect);
-  await page.evaluate(() => document.documentElement.removeAttribute("data-pin-live"));
-  expect(await header(page, "second").evaluate((el) => getComputedStyle(el).position)).toBe("relative");
+  // Removed and read in one task: the publisher sets data-pin-live again on its next
+  // publish, so a read a round trip later could see the attribute back (red 1 in 160).
+  const position = await header(page, "second").evaluate((el) => {
+    document.documentElement.removeAttribute("data-pin-live");
+    return getComputedStyle(el).position;
+  });
+  expect(position).toBe("relative");
 });

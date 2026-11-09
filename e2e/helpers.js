@@ -180,6 +180,21 @@ function transitionsDone(locator) {
     .map((a) => a.finished.catch(() => {}))).then(() => undefined));
 }
 
+// The pinned stack has settled: studio/pinned_stack writes the root's --pin-* values only
+// once a scroll has been still for its SETTLE_MS (in motion it writes copies onto the
+// elements that read them), and a layer under a moved layer settles one publish later. So
+// the root holds what a live read measures now, the stack's bottom and every layer's height.
+// CSS that reads the root (a section bar's sticky top, a scroll margin) is then final.
+function stackSettled(page) {
+  return page.waitForFunction(() => {
+    const live = window.studioPinnedStack.read();
+    const root = getComputedStyle(document.documentElement);
+    const same = (name, px) => Math.abs((parseFloat(root.getPropertyValue(name)) || 0) - px) < 0.5;
+    return same("--pin-stack-bottom", live.bottom)
+      && Object.entries(live.layers).every(([name, layer]) => same(`--pin-${name}-h`, layer.h));
+  });
+}
+
 // ---- In-page jumps and history (studio/in_page_links) ----------------------------------
 //
 // Counts, from the document's first script on: each jump the module starts
@@ -249,6 +264,6 @@ function inPageTimerWindow() {
 
 module.exports = {
   watchPageErrors, expectStickyChromeIsLive, sampleAcrossFrames, blockOffsiteRequests,
-  scrolledTo, navAtRest, slidIn, transitionsDone,
+  scrolledTo, navAtRest, slidIn, transitionsDone, stackSettled,
   watchInPageJumps, jumpEnded, traversed, scrollYAcrossWindow, inPageTimerWindow,
 };
