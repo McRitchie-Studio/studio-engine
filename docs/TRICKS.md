@@ -56,6 +56,7 @@ lower-case word (`Border Glow · clear`). Every name is unique across the guide.
 |------|-------|--------------|
 | **Carousel** | `render layout: "studio/carousel"` | Shows a set too long to grid, a few slides at a time. |
 | **Spotlight Carousel** | `render layout: "studio/carousel", style: :spotlight` | Centres one slide with its caption; its neighbours shrink and fade. |
+| **Cascade Carousel** | `render layout: "studio/carousel", style: :cascade` | A 3D stack: the open slide in front, the others stepping back either side. |
 
 ## Surfaces, text & form
 

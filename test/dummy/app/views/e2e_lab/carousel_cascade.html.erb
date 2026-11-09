@@ -1,0 +1,35 @@
+<%# studio/_carousel, style: :cascade, rendered by name (E2eLabController#carousel_cascade).
+    e2e/carousel_cascade.spec.js. Seven captioned cards, each a link with a test hook:
+    "cascade" takes the cascade's defaults (five in view, the middle card open);
+    "cascade-three" shows three (visible: 3) from its first card (start: 0);
+    "cascade-loop" loops (loop: true) from its first card, so the last two sit on
+    its left, and autoplays only when asked (?autoplay=1, one second). %>
+<% cards = (1..7).to_a %>
+<% card = lambda do |n, prefix| %>
+  <a href="#<%= prefix %>-open-<%= n %>" class="card block p-5 aspect-[4/3] flex items-end text-white no-underline"
+     data-lab-card="<%= n %>" data-test="<%= prefix %>-card"
+     style="background: linear-gradient(160deg, hsl(<%= n * 47 %> 70% 55%), hsl(<%= n * 47 + 60 %> 70% 32%))">
+    <span class="font-semibold">Card <%= n %></span>
+  </a>
+<% end %>
+<main class="max-w-5xl mx-auto px-4 py-10 space-y-12">
+  <%= render layout: "studio/carousel",
+        locals: { label: "Cascade", items: cards, style: :cascade,
+                  slide_label: ->(n) { "Card #{n}" }, caption: ->(n) { "Card #{n}, caption" },
+                  data: { lab: "cascade" } } do |n| %>
+    <%= capture { card.call(n, "cascade") } %>
+  <% end %>
+  <%= render layout: "studio/carousel",
+        locals: { label: "Three", items: cards, style: :cascade, visible: 3, start: 0,
+                  slide_label: ->(n) { "Three #{n}" }, caption: ->(n) { "Three #{n}" },
+                  data: { lab: "cascade-three" } } do |n| %>
+    <%= capture { card.call(n, "three") } %>
+  <% end %>
+  <%= render layout: "studio/carousel",
+        locals: { label: "Loop", items: cards, style: :cascade, loop: true,
+                  autoplay: (1 if params[:autoplay].present?),
+                  slide_label: ->(n) { "Loop #{n}" }, caption: ->(n) { "Loop #{n}" },
+                  data: { lab: "cascade-loop" } } do |n| %>
+    <%= capture { card.call(n, "loop") } %>
+  <% end %>
+</main>
