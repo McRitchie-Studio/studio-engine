@@ -312,3 +312,49 @@ export function cascadeTarget(active, by, total, loop = false) {
   if (loop) return wrapIndex(to, total)
   return Math.min(total - 1, Math.max(0, to))
 }
+
+// -- the change event ----------------------------------------------------------
+//
+// THE CHANGE EVENT: the region dispatches CHANGE_EVENT once each time its open slide
+// changes, on every style, after the controller has moved data-current (a spotlight
+// and a cascade mark the open slide; a standard row marks none). It bubbles, so a
+// host listens on the region or the document and needs no MutationObserver:
+//
+//   region.addEventListener("studio:carousel:change", ({ detail }) => {
+//     detail.index     // the open slide, 0-based among the real slides
+//     detail.previous  // the one open before
+//     detail.slide     // that slide's element (never a looping row's copy)
+//     detail.total     // the real slides
+//   })
+//
+// A standard row's "open slide" is the one at its first stop. The first paint's
+// slide (start:) fires nothing; a row that opens elsewhere when its controller
+// connects (a #fragment, a restored scroll) fires once. A looping row's glide round
+// the seam fires once, for the real slide, not for the copy it rests on first.
+export const CHANGE_EVENT = "studio:carousel:change"
+
+// The event's detail when the open slide moved from `previous` to `index`, else null.
+export function changeDetail(previous, index, slides) {
+  if (!Number.isInteger(index) || index < 0 || index === previous) return null
+  const list = slides || []
+  if (index >= list.length) return null
+  return { index, previous: Number.isInteger(previous) ? previous : null, slide: list[index], total: list.length }
+}
+
+// -- the cascade's press --------------------------------------------------------
+
+// The slide a click on a cascade belongs to. A mouse press on a side slide records
+// it (pressed), since a link whose focus already moved the stack still counts as a
+// side slide's. A click with no press (detail 0: Enter or Space on a focused link, or
+// a script's click()) never reads a record a press left behind: it is the slide it
+// lands in, so Enter on the open card follows its link.
+export function clickedSlide(pressed, detail, hit) {
+  if (detail === 0) return hit
+  return pressed ?? hit
+}
+
+// The slides whose seam fade must start again: each one jumping now that still wears
+// the mark from its last jump, which a CSS animation would not replay.
+export function replayedJumps(marked, jumps) {
+  return jumps.map((jump, index) => !!jump && !!marked[index])
+}

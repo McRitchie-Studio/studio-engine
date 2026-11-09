@@ -3,8 +3,18 @@
     "cascade" takes the cascade's defaults (five in view, the middle card open);
     "cascade-three" shows three (visible: 3) from its first card (start: 0);
     "cascade-loop" loops (loop: true) from its first card, so the last two sit on
-    its left, and autoplays only when asked (?autoplay=1, one second). %>
+    its left, and autoplays only when asked (?autoplay=1, one second);
+    "cascade-five" loops five cards, all five in view, so every move takes one
+    card round the seam; "cascade-portfolio" is the image-only pattern (the hub
+    Portfolio): each card is only its picture, the row draws no dots (dots: false),
+    the open card wears a ring, and one caption under the stack follows the open
+    card on the carousel's change event (studio:carousel:change).
+    window.__carouselChanges logs every change event on the page. %>
 <% cards = (1..7).to_a %>
+<% picture = lambda do |n| %>
+  <% svg = %(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(#{n * 47} 70% 55%)"/><stop offset="1" stop-color="hsl(#{n * 47 + 60} 70% 32%)"/></linearGradient></defs><rect width="400" height="300" fill="url(#g)"/></svg>) %>
+  <%= "data:image/svg+xml,#{ERB::Util.url_encode(svg)}" %>
+<% end %>
 <% card = lambda do |n, prefix| %>
   <a href="#<%= prefix %>-open-<%= n %>" class="card block p-5 aspect-[4/3] flex items-end text-white no-underline"
      data-lab-card="<%= n %>" data-test="<%= prefix %>-card"
@@ -32,4 +42,60 @@
                   data: { lab: "cascade-loop" } } do |n| %>
     <%= capture { card.call(n, "loop") } %>
   <% end %>
+  <%= render layout: "studio/carousel",
+        locals: { label: "Five", items: cards.first(5), style: :cascade, loop: true,
+                  slide_label: ->(n) { "Five #{n}" }, caption: ->(n) { "Five #{n}" },
+                  data: { lab: "cascade-five" } } do |n| %>
+    <%= capture { card.call(n, "five") } %>
+  <% end %>
+
+  <%# THE IMAGE-ONLY PATTERN (docs: README, The carousel). The card is the picture
+      alone, filling it; the open card wears a ring (in-data-current: the slide the
+      carousel marks open); the captions sit in one stack under the row, every one in
+      the same grid cell, and the change event marks the open one. %>
+  <div data-carousel-caption-stage data-lab-stage="portfolio">
+    <%= render layout: "studio/carousel",
+          locals: { label: "Portfolio", items: cards, style: :cascade, loop: true, dots: false,
+                    slide_label: ->(n) { "App #{n}" }, data: { lab: "cascade-portfolio" } } do |n| %>
+      <a href="#portfolio-open-<%= n %>" aria-label="App <%= n %>" data-test="portfolio-card" data-lab-card="<%= n %>"
+         class="block aspect-[4/3] overflow-hidden rounded-2xl bg-surface-alt transition-shadow duration-300 in-data-current:ring-2 in-data-current:ring-primary in-data-current:shadow-xl">
+        <img src="<%= capture { picture.call(n) }.strip %>" alt="" class="h-full w-full object-cover">
+      </a>
+    <% end %>
+    <div class="grid pt-4 text-center" data-carousel-captions>
+      <% cards.each_with_index do |n, index| %>
+        <div class="col-start-1 row-start-1 opacity-0 invisible transition-opacity duration-200 data-current:opacity-100 data-current:visible"
+             data-carousel-caption data-test="portfolio-caption"<%= " data-current".html_safe if index.zero? %><%= ' aria-hidden="true"'.html_safe unless index.zero? %>>
+          <h2 class="type-h4 text-heading">App <%= n %></h2>
+          <p class="text-sm text-secondary">The caption for app <%= n %>, under the stack.</p>
+        </div>
+      <% end %>
+    </div>
+  </div>
 </main>
+
+<%= javascript_tag nonce: true do %>
+  // The image-only pattern's caption follower, as the README gives it: one listener
+  // on the document, for every stage on the page and after every Turbo visit.
+  if (!window.__carouselCaptionStage) {
+    window.__carouselCaptionStage = true
+    document.addEventListener("studio:carousel:change", ({ target, detail }) => {
+      const stage = target.closest("[data-carousel-caption-stage]")
+      if (!stage) return
+      stage.querySelectorAll("[data-carousel-captions] > [data-carousel-caption]").forEach((caption, index) => {
+        const open = index === detail.index
+        caption.toggleAttribute("data-current", open)
+        if (open) caption.removeAttribute("aria-hidden")
+        else caption.setAttribute("aria-hidden", "true")
+      })
+    })
+  }
+  // The lab's log of every change event, for e2e/carousel_cascade.spec.js.
+  window.__carouselChanges = []
+  document.addEventListener("studio:carousel:change", ({ target, detail }) => {
+    window.__carouselChanges.push({
+      lab: target.dataset.lab, index: detail.index, previous: detail.previous, total: detail.total,
+      slide: detail.slide.getAttribute("aria-label"), marked: detail.slide.hasAttribute("data-current")
+    })
+  })
+<% end %>

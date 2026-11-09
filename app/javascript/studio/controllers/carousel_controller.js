@@ -63,7 +63,7 @@
 // that leaves the window hands focus to the track, so the keys keep working.
 import { Controller } from "@hotwired/stimulus"
 import {
-  CLONE_STRIP, TOLERANCE, autoplayRunning, autoplaySeconds, autoplayStop, cascadeJumps, cascadeReach, cascadeSlot,
+  CHANGE_EVENT, CLONE_STRIP, TOLERANCE, autoplayRunning, changeDetail, clickedSlide, replayedJumps, autoplaySeconds, autoplayStop, cascadeJumps, cascadeReach, cascadeSlot,
   cascadeStep, cascadeSteps, cascadeTarget, centerStops, cloneCount, cloneLayout, dragSteps,
   currentStop, hiddenEnds, idleDelay, initialReasons, keyAction, loopPositionText, loopStop, nearestVirtual, ownsKey,
   perPage, positionText, seamJump, startStop, stops, targetStop, toggleLabel, withReason, wrapIndex
@@ -95,6 +95,8 @@ export default class extends Controller {
       this.observer.observe(this.trackTarget)
     }
     this.element.setAttribute("data-carousel-ready", "")
+    // The first paint's slide: the change event fires only when the open slide leaves it.
+    this.opened = Math.max(0, Number(this.element.dataset.carouselStart) || 0)
     this.openAtStart()
     this.addClones()
     this.sync()
@@ -107,6 +109,7 @@ export default class extends Controller {
     const slides = this.slideTargets
     const marked = slides.findIndex((slide) => slide.hasAttribute("data-current"))
     this.active = marked >= 0 ? marked : 0
+    this.opened = this.active
     // A #fragment inside a slide opens on that slide.
     const hash = window.location?.hash
     if (hash && hash.length > 1) {
@@ -119,7 +122,7 @@ export default class extends Controller {
       ["pointerdown", (event) => this.dragStart(event)],
       ["pointermove", (event) => this.dragMove(event)],
       ["pointerup", (event) => this.dragEnd(event)],
-      ["pointercancel", () => this.dragCancel()],
+      ["pointercancel", () => { this.pressed = null; this.dragCancel() }],
       ["click", (event) => this.clickSide(event), true],
       ["focusin", (event) => this.focusSide(event)],
       ["dragstart", (event) => event.preventDefault()]
@@ -159,6 +162,15 @@ export default class extends Controller {
     if (this.hasNextTarget) this.nextTarget.setAttribute("aria-disabled", String(!wraps && this.active >= total - 1))
     const steps = cascadeSteps(total, this.active, this.loop)
     const jumps = this.laid ? cascadeJumps(this.laid, steps, this.active) : steps.map(() => false)
+    // A slide that jumps again while it still wears the mark from its last jump (Next
+    // then Previous round the seam) would not replay its fade: drop the mark, let
+    // the style settle, and set it again.
+    const marked = this.slideTargets.map((slide) => slide.hasAttribute("data-cascade-jump"))
+    const replays = replayedJumps(marked, jumps)
+    if (replays.some(Boolean)) {
+      this.slideTargets.forEach((slide, index) => { if (replays[index]) slide.removeAttribute("data-cascade-jump") })
+      void this.trackTarget.offsetWidth
+    }
     this.slideTargets.forEach((slide, index) => {
       slide.setAttribute("data-cascade-step", cascadeSlot(steps[index]))
       slide.toggleAttribute("data-cascade-jump", jumps[index])
@@ -170,6 +182,16 @@ export default class extends Controller {
       if (index === this.active) dot.setAttribute("aria-current", "true")
       else dot.removeAttribute("aria-current")
     })
+    this.announceChange(this.active)
+  }
+
+  // THE CHANGE EVENT (studio/carousel CHANGE_EVENT): once per change of the open
+  // slide, after data-current has moved, bubbling from the region.
+  announceChange(index) {
+    const detail = changeDetail(this.opened, index, this.slideTargets)
+    if (!detail) return
+    this.opened = index
+    this.element.dispatchEvent(new CustomEvent(CHANGE_EVENT, { bubbles: true, detail }))
   }
 
   // Brings slide `index` to the front. A focused slide that leaves the window hands
@@ -192,7 +214,9 @@ export default class extends Controller {
 
   // A press on a side slide: the click that follows brings it to the front and opens
   // nothing. The slide is read at the press, so a link whose focus already moved the
-  // stack still counts as a side slide's.
+  // stack still counts as a side slide's. A click with no press (event.detail 0:
+  // Enter or Space on a focused link) is read where it lands (clickedSlide), so a
+  // press released off the track leaves nothing behind for Enter on the open card.
   clickSide(event) {
     if (this.dragged) {
       this.dragged = false
@@ -200,7 +224,7 @@ export default class extends Controller {
       event.stopPropagation()
       return
     }
-    const index = this.pressed ?? this.slideAt(event.target)
+    const index = clickedSlide(this.pressed, event.detail, this.slideAt(event.target))
     this.pressed = null
     if (index < 0 || index === this.active) return
     event.preventDefault()
@@ -221,8 +245,10 @@ export default class extends Controller {
     this.scrollToStop(index, { announce: false })
   }
 
+  // A press released off the track sends no pointerup here, so its record is stale:
+  // the next press of the same pointer replaces it. A second finger is ignored.
   dragStart(event) {
-    if (event.button > 0 || this.drag) return
+    if (event.button > 0 || (this.drag && this.drag.id !== event.pointerId)) return
     const index = this.slideAt(event.target)
     this.pressed = index >= 0 && index !== this.active ? index : null
     this.dragged = false
@@ -564,6 +590,7 @@ export default class extends Controller {
       if (index === this.current) dot.setAttribute("aria-current", "true")
       else dot.removeAttribute("aria-current")
     })
+    this.announceChange(this.current)
   }
 
   prev() { this.move("prev") }
