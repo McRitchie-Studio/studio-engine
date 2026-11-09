@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "minitest/autorun"
+require "test_helper"
 require "tmpdir"
 require_relative "../../e2e/lab_public"
 
