@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
+const { watchPageErrors, blockOffsiteRequests, transitionsDone } = require("./helpers");
 
 // [e2e] The survey stepper (studio/surveys/show + studio/survey), at phone width.
 //
@@ -394,7 +394,7 @@ test("an unchosen radio or checkbox ring reads at 3:1 against its card, dark and
   for (const mode of ["dark", "light"]) {
     if (mode === "light") {
       await page.evaluate(() => document.documentElement.classList.remove("dark"));
-      await page.waitForTimeout(300); // the card's background-color transition
+      await transitionsDone(page.locator("html")); // the card's background-color transition
     }
     const ratio = await mark.evaluate((el) => {
       const rgb = (c) => (c.match(/[\d.]+/g) || []).slice(0, 3).map(Number);

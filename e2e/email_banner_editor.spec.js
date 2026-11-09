@@ -22,11 +22,15 @@ test.describe("email banner editor", () => {
     // installed later would arrive after the fonts had already been requested.
     await blockOffsiteRequests(page);
     await page.goto("/lab/email_banner_editor");
-    await page.waitForTimeout(150);
+    // The component is live: Alpine has bound the fields (x-model leaves _x_model on each).
+    // The banner is server-rendered, so its text alone cannot tell a live page from a dead one.
+    await page.waitForFunction(() => document.querySelector("#header")?._x_model && document.querySelector("#subtext")?._x_model);
   });
 
   const bannerHeader = (page) => page.locator("[data-banner-header]").innerText();
   const bannerSubtext = (page) => page.locator("[data-banner-subtext]").innerText();
+  // The repaint is the condition: read until the banner says it, never after a pause.
+  const header = (page) => expect.poll(async () => (await bannerHeader(page)).trim());
 
   test("typing a header repaints the banner", async ({ page }) => {
     const errors = watchPageErrors(page);
@@ -34,29 +38,26 @@ test.describe("email banner editor", () => {
     expect((await bannerHeader(page)).trim()).toBe("Welcome Alex!");
 
     await page.fill("#header", "Good to see you, {name}");
-    await page.waitForTimeout(120);
 
-    expect((await bannerHeader(page)).trim()).toBe("Good to see you, Alex");
+    await header(page).toBe("Good to see you, Alex");
     expect(errors, errors.join(", ")).toHaveLength(0);
   });
 
   test("typing sub-text repaints the banner", async ({ page }) => {
     await page.fill("#subtext", "tap the button below");
-    await page.waitForTimeout(120);
 
-    expect((await bannerSubtext(page)).trim()).toBe("tap the button below");
+    await expect.poll(async () => (await bannerSubtext(page)).trim()).toBe("tap the button below");
   });
 
   // A raw "{name}" on screen is the most visible way the browser-side rule can
   // diverge from the server's.
   test("no placeholder is ever left unrendered", async ({ page }) => {
     await page.fill("#header", "Hi {name}, welcome to {app}");
-    await page.waitForTimeout(120);
 
-    const header = await bannerHeader(page);
-    expect(header).not.toContain("{name}");
-    expect(header).not.toContain("{app}");
-    expect(header.trim()).toBe("Hi Alex, welcome to Studio");
+    await header(page).toBe("Hi Alex, welcome to Studio");
+    const painted = await bannerHeader(page);
+    expect(painted).not.toContain("{name}");
+    expect(painted).not.toContain("{app}");
   });
 
   // The case the fallback header exists for, and the one that is easy to ship
@@ -65,11 +66,9 @@ test.describe("email banner editor", () => {
     await page.fill("#header", "Welcome {name}!");
     await page.click("[data-preview-target]");
     await page.click('[data-option-id="member-2"]');
-    await page.waitForTimeout(150);
 
-    const header = (await bannerHeader(page)).trim();
-    expect(header).toBe("Your Magic Link");
-    expect(header).not.toContain("Welcome !");
+    await header(page).toBe("Your Magic Link");
+    expect(await bannerHeader(page)).not.toContain("Welcome !");
   });
 
   test("switching recipient repaints without a reload", async ({ page }) => {
@@ -77,13 +76,11 @@ test.describe("email banner editor", () => {
 
     await page.click("[data-preview-target]");
     await page.click('[data-option-id="member-2"]');
-    await page.waitForTimeout(150);
-    expect((await bannerHeader(page)).trim()).toBe("Your Magic Link");
+    await header(page).toBe("Your Magic Link");
 
     await page.click("[data-preview-target]");
     await page.click('[data-option-id="admin-1"]');
-    await page.waitForTimeout(150);
-    expect((await bannerHeader(page)).trim()).toBe("Welcome Alex!");
+    await header(page).toBe("Welcome Alex!");
   });
 
   // The avatar is the reason this is a custom listbox rather than a <select>:
@@ -94,7 +91,6 @@ test.describe("email banner editor", () => {
     await expect(page.locator("[data-target-avatar]")).toBeVisible();
 
     await page.click("[data-preview-target]");
-    await page.waitForTimeout(120);
 
     await expect(page.locator('[data-option-id="admin-1"] [data-option-avatar]')).toBeVisible();
     const initials = page.locator('[data-option-id="member-2"] [data-option-initials]');
@@ -119,7 +115,6 @@ test.describe("email banner editor", () => {
     await expect(save).toBeHidden();
 
     await page.fill("#subtext", "changed");
-    await page.waitForTimeout(120);
     await expect(save).toBeVisible();
     await expect(save).toBeEnabled();
   });
@@ -131,11 +126,9 @@ test.describe("email banner editor", () => {
     const save = page.locator("[data-save-all]");
 
     await page.fill("#subject", "Your {app} sign-in linkA");
-    await page.waitForTimeout(120);
     await expect(save).toBeEnabled();
 
     await page.fill("#subject", "Your {app} sign-in link");
-    await page.waitForTimeout(120);
     await expect(save).toBeVisible();
     await expect(save).toBeDisabled();
     await expect(page.locator("[data-unsaved]")).toBeVisible();
@@ -153,20 +146,16 @@ test.describe("email banner editor", () => {
     const before = await scrimColor();
 
     await page.fill("[data-scrim-range]", "80");
-    await page.waitForTimeout(150);
 
-    const after = await scrimColor();
-    expect(after).not.toBe(before);
-    expect(after.replace(/\s/g, "")).toContain("0.8");
+    await expect.poll(async () => (await scrimColor()).replace(/\s/g, "")).toContain("0.8");
+    expect(await scrimColor()).not.toBe(before);
   });
 
   test("a tint of zero clears the wash rather than defaulting back", async ({ page }) => {
     await page.fill("[data-scrim-range]", "0");
-    await page.waitForTimeout(150);
 
-    const color = await page.evaluate(() =>
-      document.querySelector("[data-banner-scrim]").style.backgroundColor);
-    expect(color.replace(/\s/g, "")).toContain("0)");
+    await expect.poll(async () => (await page.evaluate(() =>
+      document.querySelector("[data-banner-scrim]").style.backgroundColor)).replace(/\s/g, "")).toContain("0)");
   });
 
   // --- the copy below the banner --------------------------------------------
@@ -181,7 +170,8 @@ test.describe("email banner editor", () => {
 
     await page.click("#cta_enabled");
     await page.click("#cta_enabled");
-    await page.waitForTimeout(150);
+    // Both clicks are through Alpine once the box reads ticked again, as it loaded.
+    await expect(page.locator("#cta_enabled")).toBeChecked();
 
     await expect(page.locator("[data-save-all]"), "ticking and unticking is not a change")
       .toBeDisabled();
@@ -196,14 +186,12 @@ test.describe("email banner editor", () => {
     expect(parseFloat(await opacity())).toBeCloseTo(1, 1);
 
     await page.uncheck("#cta_enabled");
-    await page.waitForTimeout(150);
 
-    expect(parseFloat(await opacity())).toBeLessThan(1);
+    await expect.poll(async () => parseFloat(await opacity())).toBeLessThan(1);
   });
 
   test("editing the body marks the page dirty", async ({ page }) => {
     await page.fill("#body", "Different copy entirely.");
-    await page.waitForTimeout(150);
 
     await expect(page.locator("[data-save-all]")).toBeVisible();
     await expect(page.locator("[data-save-all]")).toBeEnabled();
@@ -216,11 +204,9 @@ test.describe("email banner editor", () => {
     await expect(logo).toBeVisible();
 
     await page.click("[data-logo-hidden]");
-    await page.waitForTimeout(120);
     await expect(logo).toBeHidden();
 
     await page.click("[data-logo-standard]");
-    await page.waitForTimeout(120);
     await expect(logo).toBeVisible();
   });
 });

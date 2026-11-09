@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { blockOffsiteRequests, watchPageErrors } = require("./helpers");
+const { blockOffsiteRequests, watchPageErrors, transitionsDone, scrolledTo } = require("./helpers");
 
 // [e2e] Hold to talk in the shared agent chat's composer (studio/agent_chat/_voice,
 // studio/agent_chat_voice and its lazy "agent-chat-voice" controller) on
@@ -121,6 +121,10 @@ async function holdToTalk(page, { holdMs = 700 } = {}) {
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await expect(recorder).toHaveAttribute("data-voice-recorder-state", "recording");
+  // Heard first, then held: a hold that ends before the first audible frame is a silent take
+  // (local run, 2026-11-08: "silent" for "sent", 1 in 2). The hold that follows is the
+  // gesture's own length, which is the behaviour, not a wait.
+  await expect(recorder).toHaveAttribute("data-voice-recorder-heard", "true");
   await page.waitForTimeout(holdMs);
   await page.mouse.up();
   await expect(recorder).not.toHaveAttribute("data-voice-recorder-state", /recording|starting/);
@@ -373,7 +377,7 @@ function expectSameBox(now, before, when) {
 async function setTheme(page, theme) {
   if (theme !== "light") return;
   await page.evaluate(() => document.documentElement.classList.remove("dark"));
-  await page.waitForTimeout(400);
+  await transitionsDone(page.locator("html")); // every colour eased to the light theme
 }
 
 async function expectSteadyAt390(page, theme) {
@@ -657,7 +661,7 @@ async function expectMicAt390(page, theme) {
   if (theme === "light") {
     await page.evaluate(() => document.documentElement.classList.remove("dark"));
     // The composer's background eases over (transition-colors): read it settled.
-    await page.waitForTimeout(400);
+    await transitionsDone(page.locator("html"));
   }
   await page.locator(STATUS).evaluate((el) => { el.textContent = "Sent. Spoken by Someone new."; });
 
@@ -869,9 +873,8 @@ test("a new turn is shown above the composer: an agent's reply, and the person's
 
 test("a reader who scrolled the page up is left there when a reply lands, and followed again after their own send", async ({ page }) => {
   const thread = await openLongThread(page, { width: 320, height: 568 });
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await page.waitForFunction(() => window.scrollY === 0);
-  await page.waitForTimeout(100);
+  // Heard, not hoped for: the thread decides whether to follow from its scroll listener.
+  await scrolledTo(page, 0);
 
   thread.turns = [...thread.turns, { id: 11, role: "agent", status: "answered", text: "A reply they did not ask to jump to." }];
   await page.locator(CHAT).evaluate((chat) => chat.dispatchEvent(new CustomEvent("studio:agent-chat:refresh")));
@@ -887,8 +890,12 @@ test("a reader who scrolled the page up is left there when a reply lands, and fo
 
 test("a reader who scrolled up inside the thread is left there when a reply lands", async ({ page }) => {
   const thread = await openLongThread(page, { width: 320, height: 568 });
-  await page.locator(LOG).evaluate((log) => { log.scrollTop = 0; });
-  await page.waitForTimeout(100);
+  // The thread's own scroll listener has heard the reader leave its end.
+  await page.locator(LOG).evaluate((log) => new Promise((done) => {
+    if (log.scrollTop === 0) { done(); return; }
+    log.addEventListener("scroll", () => done(), { once: true });
+    log.scrollTop = 0;
+  }));
   const before = await layout(page);
 
   thread.turns = [...thread.turns, { id: 11, role: "agent", status: "answered", text: "A reply they did not ask to jump to." }];

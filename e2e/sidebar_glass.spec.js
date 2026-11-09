@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { watchPageErrors, blockOffsiteRequests, slidIn, animationsDone } = require("./helpers");
+const { watchPageErrors, blockOffsiteRequests, slidIn, transitionsDone } = require("./helpers");
 
 // [e2e] The glass link sidebar (Studio.sidebar_style = :glass): where the panel sits, what its
 // rows draw, a hover that moves nothing, and both ways it closes.
@@ -130,7 +130,7 @@ test("a hover moves no row and keeps both lines inside the row", async ({ page }
   const before = await tops();
 
   await row(panel(page), "Terms").hover();
-  await animationsDone(row(panel(page), "Terms"));
+  await transitionsDone(row(panel(page), "Terms"));
 
   expect(await tops()).toEqual(before);
   const fit = await row(panel(page), "Terms").evaluate((el) => {

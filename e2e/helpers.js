@@ -138,12 +138,14 @@ function scrolledTo(page, y) {
 }
 
 // The navbar's collapse is at rest: studio/nav_collapse eases --nav-p over about ten frames
-// after a hard scroll and stops writing once it lands. Two frames with the header's height
-// and --nav-p unchanged, and none queued by the controller since, is that landing.
+// after a hard scroll and stops writing once it lands. Two frames with the header's height,
+// --nav-p and its hold margin all unchanged is that landing.
 function navAtRest(page) {
   return page.evaluate(() => new Promise((done) => {
     const header = document.querySelector("header");
-    const read = () => `${header ? header.offsetHeight : 0} ${header ? header.style.getPropertyValue("--nav-p") : ""}`;
+    const read = () => (header
+      ? `${header.offsetHeight} ${header.style.getPropertyValue("--nav-p")} ${getComputedStyle(header).marginBottom}`
+      : "");
     let last = read();
     let still = 0;
     const tick = () => {
@@ -168,17 +170,17 @@ function slidIn(locator) {
   }));
 }
 
-// Every finite animation and CSS transition on the element and inside it has finished: a hover's
-// fade and lift, a colour easing to a new theme. getAnimations() flushes style first, so a
-// transition the last input started is in the list. An infinite one (a spinner) is left out,
-// since it never finishes.
-function animationsDone(locator) {
+// Every CSS transition on the element and inside it has finished: a hover's fade and lift, a
+// colour easing to a new theme. getAnimations() flushes style first, so a transition the last
+// input started is in the list. Keyframe animations are left out: a glow's ring or a spinner
+// runs on its own clock (some forever, some paused), and none of them is a settling.
+function transitionsDone(locator) {
   return locator.evaluate((el) => Promise.all(el.getAnimations({ subtree: true })
-    .filter((a) => a.effect && a.effect.getComputedTiming().endTime !== Infinity)
+    .filter((a) => typeof CSSTransition === "function" && a instanceof CSSTransition)
     .map((a) => a.finished.catch(() => {}))).then(() => undefined));
 }
 
 module.exports = {
   watchPageErrors, expectStickyChromeIsLive, sampleAcrossFrames, blockOffsiteRequests,
-  scrolledTo, navAtRest, slidIn, animationsDone,
+  scrolledTo, navAtRest, slidIn, transitionsDone,
 };

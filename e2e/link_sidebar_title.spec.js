@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { watchPageErrors, blockOffsiteRequests, slidIn, animationsDone } = require("./helpers");
+const { watchPageErrors, blockOffsiteRequests, slidIn, transitionsDone } = require("./helpers");
 
 // [e2e] The link sidebar's title, groups and rows: the word the browser writes by its own
 // clock and zone, a drawn divider, one row height, and a description that moves nothing.
@@ -220,7 +220,7 @@ test("the description sits inside the row, under the lifted label, and truncates
   const row = panel(page).locator(TERMS);
   await row.hover();
   await expect.poll(() => opacityOf(descOf(row))).toBe(1);
-  await animationsDone(row); // the transform ends with the fade; read it settled
+  await transitionsDone(row); // the transform ends with the fade; read it settled
 
   const box = await row.boundingBox();
   const label = await row.locator("[data-sidebar-row-label]").boundingBox();
@@ -310,7 +310,7 @@ test.describe("on a touch screen", () => {
     await row.tap();
     // A fade the tap wrongly started is running now (getAnimations flushes the :hover); wait it
     // out, so the opacity below is where it ends, not where it began.
-    await animationsDone(row);
+    await transitionsDone(row);
 
     expect(await row.evaluate((node) => node.matches(":hover")), "the tap left :hover behind").toBe(true);
     expect(await opacityOf(descOf(row))).toBe(0);

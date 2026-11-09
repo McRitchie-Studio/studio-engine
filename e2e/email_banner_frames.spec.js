@@ -20,6 +20,13 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 // WHY MORE THAN ONE WIDTH. At a single viewport the two can coincide by luck —
 // which is most of how this shipped. The relationship has to hold as the column
 // reflows, so it is asserted across a wide, a medium and a narrow layout.
+// The scaler has run: studio/email_banner_scale writes a scale() onto every preview on load
+// and again from its ResizeObserver. A pause of 150ms only hoped it had.
+const fitted = (page) => page.waitForFunction(() => {
+  const previews = [...document.querySelectorAll("[data-email-banner-preview]")];
+  return previews.length > 0 && previews.every((el) => /^scale\(/.test(el.style.transform));
+});
+
 test.describe("email manager preview frames", () => {
   const WIDTHS = [1500, 1100, 800];
 
@@ -31,7 +38,7 @@ test.describe("email manager preview frames", () => {
       await page.setViewportSize({ width, height: 1000 });
       await page.goto("/lab/email_banner_frames");
       // The scaler runs on load and on resize; settle before measuring.
-      await page.waitForTimeout(150);
+      await fitted(page);
 
       const box = await page.evaluate(() => {
         const rect = (selector) => {
@@ -71,7 +78,7 @@ test.describe("email manager preview frames", () => {
   test("the banner is never scaled above its real size", async ({ page }) => {
     await page.setViewportSize({ width: 2200, height: 1000 });
     await page.goto("/lab/email_banner_frames");
-    await page.waitForTimeout(150);
+    await fitted(page);
 
     const scale = await page.evaluate(() => {
       const el = document.querySelector("[data-email-banner-preview]");

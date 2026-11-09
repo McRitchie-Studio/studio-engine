@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { blockOffsiteRequests } = require("./helpers");
+const { blockOffsiteRequests, transitionsDone } = require("./helpers");
 
 // [e2e] The clear border glow (.studio-border-glow--clear) and the style guide's specimen
 // cards, on the real guide (/lab/style_nav).
@@ -68,7 +68,7 @@ test("the clear glow has no fill, keeps its ring and halo, and its label clears 
         if (glass) document.documentElement.dataset.surfaceStyle = "glass";
         else delete document.documentElement.dataset.surfaceStyle;
       }, { glass, dark });
-      await page.waitForTimeout(250);
+      await transitionsDone(page.locator("html")); // the theme's colours eased over
       const style = await read();
       expect(style.fill, "a clear face").toBe("rgba(0, 0, 0, 0)");
       expect(style.image).toBe("none");
