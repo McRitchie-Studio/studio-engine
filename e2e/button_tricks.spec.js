@@ -143,9 +143,11 @@ test("the tricks keep a lit button lit", async ({ page }) => {
     (el, name) => getComputedStyle(el)[name], property);
 
   // The bloom's box stays clear of the lit rule's inset, or its hole closes and it
-  // washes the whole face: 4px ring + 4px + 2 * 10px bloom.
+  // washes the whole face: 4px ring + 4px. The blur reaches past that box as ink
+  // and a clip-path cuts it (engine-motion.css section 9b).
   const glow = "section#button-tricks button.edge-rotate-glow";
-  expect(await after(glow, "top")).toBe("-28px");
+  expect(await after(glow, "top")).toBe("-8px");
+  expect(await after(glow, "clipPath")).toContain("polygon");
   expect(await after(glow, "boxShadow")).toBe("none");
   expect(await host(glow, "boxShadow")).toContain("inset");
   expect(await after("section#button-tricks button.studio-border-glow", "top")).toBe("-46px");

@@ -2852,7 +2852,7 @@ html[data-theme-flip]::view-transition-new(*) {
       box-shadow: var(--lit-inset-pressed);
     }
     html[data-surface-style="glass"] .btn:is(.edge-rotate-glow, .studio-team-glow):not(.btn-outline, :disabled, [aria-disabled="true"])::after {
-      inset: calc(-1 * (var(--edge-rotate-glow-thickness) + 4px + var(--edge-rotate-glow-bloom) * 2));
+      inset: calc(-1 * (var(--edge-rotate-glow-thickness) + 4px));
       box-shadow: none;
     }
     html[data-surface-style="glass"] .btn.studio-border-glow:not(.btn-outline, :disabled, [aria-disabled="true"])::after {
