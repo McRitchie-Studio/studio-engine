@@ -30,7 +30,7 @@ The second one is the whole argument for this lane. The guard written to catch
 | Specs | `e2e/*.spec.js` | Drive a real Chromium against the lab pages |
 | Lab pages | `test/dummy/app/views/e2e_lab/` | Render **engine partials by name** in a real layout |
 | Lab controller | `test/dummy/app/controllers/e2e_lab_controller.rb` | Sets up partial locals; supplies the host's asset delivery |
-| Server | `e2e/boot.rb` | Compiles Tailwind, copies the engine's served assets (Alpine among them), boots Puma |
+| Server | `e2e/boot.rb` | Compiles Tailwind, copies the engine's served assets (Alpine among them) into the lab's own public folder, `tmp/e2e-lab/public` (`E2E_LAB_ROOT` moves it), boots Puma. It never writes `test/dummy/public`, the minitest suite's public folder (`test/integration/e2e_lab_residue_test.rb`) |
 | Config | `playwright.config.js` | One chromium project, `workers: 1`, webServer |
 | Census | `bin/lib/e2e_spec_census.rb` | How many specs the lane must execute, computed from `e2e/` |
 | Contract | `config/e2e_lane.yml` | What the tree cannot compute: the shard count |

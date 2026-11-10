@@ -4,12 +4,19 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.141.3 — 2026-11-09
+
+### Fixed
+
+- **Engine migrations pass a host's omakase lint.** Hosts copy `db/migrate/*.rb` as `*.studio_engine.rb` and lint the copies as their own; four engine migrations used `["a"]` where rubocop-rails-omakase wants `[ "a" ]`, which turned moms-app's release static check red. The sources are fixed (whitespace only, no behavior change), and `test/lib/migrations_host_lint_test.rb` runs the omakase config over `db/migrate` so a lint-red migration cannot ship. A host that already copied a migration keeps its copy; a host that hand-fixed one keeps its fix.
+- **The sticky table header's copy no longer draws over the pinned page header.** As a table scrolled out, the copy was pushed up by the table's bottom into the page header's band, and at the same z-index (`--z-sticky`) it painted over the title, because it is appended to `<body>` and wins the tie (Turf Monster `/contests`, My Contests). The copy now stays at the pinned stack's bottom edge and gets shorter as the table leaves, with the copied row moving up inside it, and it stacks at `--z-sticky - 2`, under the page header and the stuck section header. `StudioStickyTableHeaders.placement` now also returns `height` and `shift`; `top` is never above `edge`. No host change.
+
 ## 0.141.2 — 2026-11-09
 
 ### Fixed
 
 - **The link-preview card shows text typed before its controller loads.** The `link-preview-card` controller is registered lazily, so an operator could type in /admin/link_preview before it listened, and the card kept the saved title. `connect()` now paints the card from the fields as they stand (`paintAll` in `studio/link_preview_card`). No host change.
-- **An in-page jump ends at the browser's scrollend, not at a quiet spell.** `studio/in_page_links` ended a smooth jump after 150 ms with no scroll event, even in a browser that fires `scrollend`. On a slow main thread (a phone, or CI at 8x CPU) a smooth scroll's frames come further apart than that, so the jump ended at its first frame: the tab highlight followed the passing sections, and a target that moved on the way (a lazy feed above it) was not aimed at again. Now only `scrollend` ends a scroll that moved, where the browser has it; the quiet spell stays for a browser without it, and the 400 ms cap still ends a scroll that never starts. Nothing for a consumer to do.
+- **An in-page jump ends at the browser's scrollend, not at a quiet spell.** `studio/in_page_links` ended a smooth jump after 150 ms with no scroll event, even in a browser that fires `scrollend`. On a slow main thread (a phone, or CI at 8x CPU) a smooth scroll's frames come further apart than that, so the jump ended at its first frame: the tab highlight followed the passing sections, and a target that moved on the way (a lazy feed above it) was not aimed at again. Now only `scrollend` ends a scroll that moved, where the browser has it; the quiet spell stays for a browser without it, and the 400 ms cap still ends a scroll that never starts. A moved target is re-aimed only for growth before `scrollend`: growth after the end, and a scroll that `scrollend` never follows, are fixed in the next release (engine-anchor-late-growth). Nothing for a consumer to do.
 
 ## 0.141.1 — 2026-11-09
 

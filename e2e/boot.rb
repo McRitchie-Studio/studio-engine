@@ -23,9 +23,38 @@ require "fileutils"
 require "base64"
 
 ROOT = File.expand_path("..", __dir__)
-PUBLIC_DIR = File.join(ROOT, "test", "dummy", "public", "e2e")
 
+# ---- THE LAB'S OWN PUBLIC FOLDER, OUTSIDE THE DUMMY ---------------------------
+#
+# Everything this script writes for the browser lands in LAB_ROOT, and the lab
+# process serves it as its public folder (the `paths["public"]` line before the
+# boot, below). Nothing goes into test/dummy/public any more.
+#
+# WHY. test/dummy/public is the public folder of the MINITEST suite too. This
+# script used to write favicon.png there, and the file outlived the lab: it is
+# ignored, so `git status` hid it, and HeadScriptNonceTest's "bare without the
+# file" half went red in the next pre-flight. Two builders lost a submit cycle
+# to it on 2026-11-09 (engine-lab-residue-reddens-gate). Clean-up on exit cannot
+# fix that: Playwright stops this server with a signal, and a SIGKILL runs no
+# handler. A separate folder makes the residue harmless however the run ends,
+# because no test reads it as a public folder.
+#
+# E2E_LAB_ROOT moves the folder, not what the lane measures: the bytes written
+# are the same. test/integration/e2e_lab_residue_test.rb sets it so that its own
+# boot does not clear the folder of a lab a builder is running.
+require_relative "lab_public"
+LAB_ROOT = E2eLabPublic.root(ROOT)
+LAB_PUBLIC = File.join(LAB_ROOT, "public")
+PUBLIC_DIR = File.join(LAB_PUBLIC, "e2e")
+
+# Fresh each boot, like the lab database: no file from an earlier run is served.
+FileUtils.rm_rf(LAB_PUBLIC)
 FileUtils.mkdir_p(PUBLIC_DIR)
+
+# Heal a desk that an older lab already wrote into: remove exactly the paths
+# that older script created in test/dummy/public, and the folder if that empties
+# it. The folder holds no committed file (it is ignored whole).
+E2eLabPublic.remove_legacy!(File.join(ROOT, "test", "dummy", "public"))
 
 # ---- The host's favicon ------------------------------------------------------
 #
@@ -34,9 +63,9 @@ FileUtils.mkdir_p(PUBLIC_DIR)
 # counts console.error and a failed load IS one, so a spec asserting a clean console
 # passes or fails on whether the browser's LAZY favicon fetch beat the assertion. It hid
 # from 2026-03-24 until a head change shifted script timing and reddened `release` at
-# b654525, 48 passed / 1 failed. Written, not committed — test/dummy/public is gitignored
-# whole. A 1x1 transparent PNG: the REQUEST must succeed; nobody looks at it.
-favicon = File.join(ROOT, "test", "dummy", "public", "favicon.png")
+# b654525, 48 passed / 1 failed. Written into the lab's own public folder (LAB_PUBLIC),
+# never the dummy's. A 1x1 transparent PNG: the REQUEST must succeed; nobody looks at it.
+favicon = File.join(LAB_PUBLIC, "favicon.png")
 File.binwrite(favicon, Base64.decode64(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk" \
   "YPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
@@ -203,7 +232,7 @@ abort "e2e/boot: loader art not copied to #{LOADER_DIR}" unless File.size?(File.
 # these have to exist under public/ or every square 404s — which this lane counts
 # as console noise, not as the missing pictures they are.
 FLAG_SOURCE = File.join(ROOT, "app", "assets", "images", "state-flags", "thumb")
-FLAG_DIR = File.join(ROOT, "test", "dummy", "public", "images", "state-flags", "thumb")
+FLAG_DIR = File.join(LAB_PUBLIC, "images", "state-flags", "thumb")
 if Dir.exist?(FLAG_SOURCE)
   FileUtils.mkdir_p(FLAG_DIR)
   FileUtils.cp_r(Dir.glob(File.join(FLAG_SOURCE, "*")), FLAG_DIR)
@@ -211,7 +240,14 @@ end
 
 # ---- Serve -------------------------------------------------------------------
 ENV["RAILS_ENV"] ||= "test"
+# The lab serves LAB_PUBLIC, set before initialize! builds the static file
+# server from it. Rails.public_path follows, so the helpers that look for a file
+# before they link it (the favicon digest, the loader art, the kit) read the
+# same folder the browser is served from.
+require_relative "../test/dummy/config/application"
+Dummy::Application.config.paths["public"] = LAB_PUBLIC
 require_relative "../test/dummy/config/environment"
+abort "e2e/boot: the lab serves #{Rails.public_path}, not #{LAB_PUBLIC}" unless Rails.public_path.to_s == LAB_PUBLIC
 
 # ---- THE LAB HOST'S OWN IDENTITY ---------------------------------------------
 #
@@ -293,7 +329,7 @@ require_relative "../db/migrate/20261005120000_create_studio_survey_responses"
 # The Theme section (/lab/style_theme) saves through the real /admin/theme.
 require_relative "../db/migrate/20261006120002_ensure_theme_settings_table"
 
-lab_db = File.join(ROOT, "tmp", "e2e-lab.sqlite3")
+lab_db = File.join(LAB_ROOT, "e2e-lab.sqlite3")
 FileUtils.mkdir_p(File.dirname(lab_db))
 FileUtils.rm_f(lab_db)
 ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: lab_db)

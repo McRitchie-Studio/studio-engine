@@ -6,8 +6,10 @@
 #
 # STYLE NOTE: reference migrations are written omakase-rubocop-compatible
 # (spaces inside array brackets) because the installed copy is linted by the
-# CONSUMER's rubocop, not this gem's — an engine-styled copy fails the
-# consumer's cert untouched (measured on the Industries adoption ship).
+# CONSUMER's rubocop — an engine-styled copy fails the consumer's cert
+# untouched (measured on the Industries adoption ship).
+# test/lib/migrations_host_lint_test.rb runs that omakase config over
+# db/migrate, so a lint-red migration fails here first.
 class CreateStudioKnowledgeDocs < ActiveRecord::Migration[7.2]
   def change
     create_table :studio_knowledge_docs do |t|

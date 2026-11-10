@@ -11,7 +11,7 @@
 
     The asset tags at the end of that partial are the HOST's job. The dummy does
     them in E2eLabController::AssetDelivery, pointing at the engine's real
-    app/assets files that e2e/boot.rb copies into public/e2e.
+    app/assets files that e2e/boot.rb copies into the lab's public/e2e (tmp/e2e-lab/public).
 
     THE LAB IS DARK-ONLY, and a spec cannot opt out of it from the page. The class
     below is hard-coded, and the head's theme script only ever ADDS `dark` - it

@@ -215,7 +215,9 @@ function watchInPageJumps(page) {
 
 // The module's jump has ended: at least `count` jumps started since the document began, and
 // every one has ended. The end is the module's own: the browser's scrollend after its last
-// aim, so the target is in place, not a guess at how long a smooth scroll takes. A page
+// aim (or its START_CAP_MS backstop when no scrollend comes), so the target is in place, not
+// a guess at how long a smooth scroll takes. Growth above the target after this is the
+// module's hold (HOLD_MS), which keeps the target's place on the screen. A page
 // without the module never starts one, and the wait times out.
 function jumpEnded(page, count = 1) {
   return page.waitForFunction((n) => {
@@ -255,15 +257,22 @@ function scrollYAcrossWindow(page, ms) {
   }), ms);
 }
 
-// The in-page module's longest timer (START_CAP_MS), twice, read from its source so the
-// window follows the module.
-function inPageTimerWindow() {
+// A number the in-page module exports (studio/in_page_links), read from its source so a
+// test follows the module.
+function inPageConstant(name) {
   const source = require("fs").readFileSync(require("path").join(__dirname, "../app/javascript/studio/in_page_links.js"), "utf8");
-  return 2 * Number(source.match(/export const START_CAP_MS = (\d+)/)[1]);
+  return Number(source.match(new RegExp(`export const ${name} = (\\d+)`))[1]);
+}
+
+// The in-page module's longest timer, twice: the cap on a scroll that never starts
+// (START_CAP_MS) or the hold after a jump's end (HOLD_MS), in which the module may still
+// move the page. Read from its source, so the window follows the module.
+function inPageTimerWindow() {
+  return 2 * Math.max(inPageConstant("START_CAP_MS"), inPageConstant("HOLD_MS"));
 }
 
 module.exports = {
   watchPageErrors, expectStickyChromeIsLive, sampleAcrossFrames, blockOffsiteRequests,
   scrolledTo, navAtRest, slidIn, transitionsDone, stackSettled,
-  watchInPageJumps, jumpEnded, traversed, scrollYAcrossWindow, inPageTimerWindow,
+  watchInPageJumps, jumpEnded, traversed, scrollYAcrossWindow, inPageTimerWindow, inPageConstant,
 };

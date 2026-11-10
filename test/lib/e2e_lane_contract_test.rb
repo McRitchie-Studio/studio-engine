@@ -318,7 +318,9 @@ class E2eLaneContractTest < Minitest::Test
       "bar_stack.html.erb" => ["studio/banners/stack", "layouts/navbar"],
       # The sticky table clone is placed off this chrome; a hand-rolled header
       # would grade the lab's header, not the stack the clone reads.
-      "sticky_table.html.erb" => ["studio/banners/stack", "layouts/navbar"],
+      # ?page_header=1 adds the engine's page row over a short table: the clone must
+      # leave under the real row, so the lab renders it by name.
+      "sticky_table.html.erb" => ["studio/banners/stack", "layouts/navbar", "studio/page_header"],
       # The page transition holds this chrome still and moves the chat head with the page.
       "page_transitions.html.erb" => ["studio/banners/stack", "layouts/navbar", "studio/agent_chat/header"],
       "admin_models.html.erb" => ["studio/banners/stack", "layouts/navbar"],

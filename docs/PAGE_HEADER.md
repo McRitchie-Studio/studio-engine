@@ -241,7 +241,10 @@ includes the row's own edge, so the row would chase itself down the page.
 
 Anything that sits under the stack positions off `--pin-stack-bottom` or, in a
 script, `window.studioPinnedStack.read()`. It needs no edit when a page adopts the
-row. The sticky table header's clone is one such reader. It needs
+row. The sticky table header's clone is one such reader. It starts at the stack's
+bottom edge, never above it: as its table leaves, the clone stays at the edge and
+gets shorter, so it never covers the row, and it stacks two rungs under the row's
+`--z-sticky`. It needs
 `config.sticky_table_headers` on in the host, or the `sticky_table_headers` local on
 the head partial. The engine draws no `position: sticky` header cells of its own: a
 page that draws them gets no clone, and points their `top` at `--pin-stack-bottom`.
@@ -372,9 +375,10 @@ Every other link is left to Turbo or the browser, as before.
 |------|--------------|
 | Scroll | A smooth scroll to the target. Its own `scroll-margin-top` (`section-target`, `section-subtarget`) sets where it stops. With none, it stops under the pinned stack, measured at the click. Under reduced motion, it jumps. |
 | A target that moves | Content that grows on the way (a lazy frame, the navbar's collapse) moves the target, so the scroll aims again until it lands, or until the reader scrolls, touches, presses or types. |
+| After the end | For 3 seconds (`HOLD_MS`) the target keeps its place on the screen: content above it that grows or shrinks (a lazy frame whose page lands after the scroll) moves the page by the same amount, in the microtask after the new elements land (or the next frame, for a size change with none), so nothing sees the target out of place, as scroll anchoring would. The body has scroll anchoring off (`studio/_head`), so the browser does not do this. The first wheel, touch, key or press, any scroll the module did not make, the next jump, or Back ends the hold. Growth later than 3 seconds is not followed. |
 | History | The fragment is pushed, with Turbo's own state, and `hashchange` fires. Back and Forward between this page's entries scroll to the reader's earlier place, or to the fragment, with no Turbo restore visit. A Back from another page is Turbo's. |
 | Focus | The target takes focus with `preventScroll`. One that is not focusable gets `tabindex="-1"` and `data-in-page-focus` (no ring) until it loses focus. |
-| Events | `studio:in-page-scroll` bubbles from the link when the scroll starts (`detail: { link, target, hash }`). `studio:in-page-scroll-end` fires on the document when it settles or the reader takes over. |
+| Events | `studio:in-page-scroll` bubbles from the link when the scroll starts (`detail: { link, target, hash }`). `studio:in-page-scroll-end` fires on the document when it settles (the browser's `scrollend`, or 400 ms after the last scroll event when `scrollend` never comes; a quiet spell of 150 ms in a browser without `scrollend`) or the reader takes over. The hold after the end runs past this event. |
 
 The style guide's tab row holds the clicked tab as current from the first event to the second,
 so the highlight does not run through every tab the scroll passes. A component that changes

@@ -30,6 +30,6 @@ class CreateStudioConnections < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :studio_connections, [:provider, :account_key], unique: true
+    add_index :studio_connections, [ :provider, :account_key ], unique: true
   end
 end
