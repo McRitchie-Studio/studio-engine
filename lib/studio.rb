@@ -307,6 +307,7 @@ module Studio
   # today. :glass floats an inset, translucent panel over the page, with line icons
   # (a link's icon:), a marked current page and no separate blurred edge. It is opt-in,
   # so an app moves only when it asks. engine.css, THE GLASS SIDEBAR, holds the look.
+  # :glass is the standard for a NEW app (docs/NEW_APP_SETUP.md); the default stays put.
   mattr_reader :sidebar_style, default: :default
 
   def self.sidebar_style=(value)
@@ -317,6 +318,7 @@ module Studio
   # How cards look. :glass makes them translucent over a soft ambient page, once the host
   # layout says so on its root: <html data-surface-style="<%= Studio.surface_style %>">.
   # :default is what every app has today. engine.css, THE GLASS SURFACES, holds the look.
+  # :glass is the standard for a NEW app (docs/NEW_APP_SETUP.md); the default stays put.
   SURFACE_STYLES = %i[default glass].freeze
   mattr_reader :surface_style, default: :default
 

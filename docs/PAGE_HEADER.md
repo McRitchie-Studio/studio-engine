@@ -10,6 +10,10 @@ A page has up to four pinned layers, each below the last, and none overlaps anot
 3. The section's header (`studio/_section_header`), on a page long enough to want one.
 4. A table's sticky header (`config.sticky_table_headers`).
 
+Glass is the standard for a new app (`surface_style = :glass`,
+[`NEW_APP_SETUP.md`](NEW_APP_SETUP.md) § 9), so design and check a page header under
+`data-surface-style="glass"` first, then in the default style.
+
 An admin page uses `studio/_page_header` for its title. It does not draw its
 own sticky row, and it does not write a pixel height. Each layer takes its place
 from the pinned stack ([`NAVBAR_SETUP.md`](NAVBAR_SETUP.md#reading-the-pinned-stack)).

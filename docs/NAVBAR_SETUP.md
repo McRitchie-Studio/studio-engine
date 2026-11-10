@@ -61,9 +61,15 @@ If your app doesn't create its own `app/views/layouts/_navbar.html.erb`, the eng
   `icon:` (a `Studio::Icons` name, rendered by `studio_icon`) replaces its emoji and its hover
   swap, and a link with no `icon:` keeps both. The current page's row is marked
   `aria-current="page"` and filled with the primary color. The default style reads none of this. `engine.css`, THE GLASS SIDEBAR, holds the look.
+  The panel's colours are four tokens the app sets on `:root` and `.dark`, unlayered:
+  `--glass-sidebar-fill` and `--glass-sidebar-tint` as `R G B`, `--glass-sidebar-ink` and
+  `--glass-sidebar-soft-ink` as colours. Their defaults are the hub's violet. The example is in
+  [`NEW_APP_SETUP.md`](NEW_APP_SETUP.md) § 9.
 - `Studio.surface_style = :glass` turns cards translucent over a soft ambient page. The host
   also writes `data-surface-style` on its root `<html>`. `engine.css`, THE GLASS SURFACES,
   says what it reaches and what stays solid.
+- Glass, both settings, is the standard for a new app (Alex McRitchie, 2026-11-09). The
+  engine default stays `:default`, so an existing app changes only when it sets them.
 
 ## How to Override
 

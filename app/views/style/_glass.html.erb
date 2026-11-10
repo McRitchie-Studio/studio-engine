@@ -11,7 +11,7 @@
 <section class="space-y-4" data-test="style-glass">
   <div>
     <h3 class="type-h4 text-heading">Glass</h3>
-    <p class="text-sm text-secondary mt-1">Each one is opt-in per app.</p>
+    <p class="text-sm text-secondary mt-1">The standard for a new app. An existing app turns each switch on itself.</p>
   </div>
   <div class="grid gap-4 md:grid-cols-2">
     <%= render layout: "style/specimen",
@@ -62,6 +62,14 @@
           <span class="badge" style="color: var(--color-success-ink); border-color: var(--color-success)">Live</span>
           <input class="input-field max-w-[12rem]" type="text" value="Input, pressed in" aria-label="Input specimen" readonly>
         </div>
+      </div>
+    <% end %>
+    <%= render layout: "style/specimen",
+          locals: { trick: "glass", variant: "tile",
+                    disabled: !surface_on, disabled_label: "surface style is off on this app" } do %>
+      <div class="flex flex-wrap items-center gap-3" data-test="style-lit-tiles">
+        <a href="#tricks" class="lit-tile inline-flex min-h-12 items-center bg-primary px-5 text-xs font-bold uppercase tracking-wide text-white">.lit-tile</a>
+        <a href="#tricks" class="lit-tile-soft inline-flex min-h-12 items-center border border-subtle px-5 text-xs font-bold uppercase tracking-wide text-heading">.lit-tile-soft</a>
       </div>
     <% end %>
     <%= render layout: "style/specimen",
