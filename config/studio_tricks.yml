@@ -211,7 +211,7 @@ glass:
   name: Glass
   group: Glass
   token: "config.surface_style = :glass"
-  note: "Frosts the cards and lights the controls from above; the standard for a new app."
+  note: "Frosts the cards and lights the controls; the standard for a new app."
   resolve: [config:surface_style, css:surface-glass-blur]
   variants:
     lit:
@@ -227,7 +227,7 @@ glass_sidebar:
   name: Glass Sidebar
   group: Glass
   token: "config.sidebar_style = :glass"
-  note: "A frosted link sidebar in the app's --glass-sidebar-* colours; the standard for a new app."
+  note: "A frosted link sidebar in the app's colours; the standard for a new app."
   resolve: [config:sidebar_style]
 
 icon:
