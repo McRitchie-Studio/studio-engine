@@ -65,10 +65,10 @@ class AddEngineNotNullChecks < ActiveRecord::Migration[7.2]
     "studio_geo_settings" => "geo",
     "studio_site_identities" => "site-identity"
   }.freeze
-  SLUG_TABLES = (["error_logs"] + NAMED.keys).freeze
+  SLUG_TABLES = ([ "error_logs" ] + NAMED.keys).freeze
 
   # [table, column] pairs, in the order `up` runs them.
-  COLUMNS = (SLUG_TABLES.map { |table| [table, "slug"] } + [%w[users role]]).freeze
+  COLUMNS = (SLUG_TABLES.map { |table| [ table, "slug" ] } + [ %w[users role] ]).freeze
 
   def self.constraint_name(table, column) = "#{table}_#{column}_present"
 
