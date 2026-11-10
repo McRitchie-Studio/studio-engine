@@ -442,9 +442,20 @@ not reach the CSS. A new app writes it as above, with `surface_style = :glass` a
 it sets both: the engine's default stays `:default`.
 
 **Glass in the brand's colours.** The glass sidebar reads four tokens from the
-root, and their defaults are the hub's violet. Set them in
-`app/assets/tailwind/application.css`, after the engine import and outside any
-layer, in both themes. A token set only on `:root` also wins in the dark theme.
+root, and the glass surfaces (the card hairline and shadow, and the soft light on a
+neutral button, a badge and an input) read two more. Their defaults are the hub's
+violet. Set them in `app/assets/tailwind/application.css`, after the engine import.
+
+- **Outside any layer.** Write the tokens as plain, unlayered rules. Never put them
+  in `@layer components`, even when the file's header suggests that layer for app
+  CSS. The engine declares the defaults in `@layer utilities`, and that layer wins
+  over `components`, so a token there is ignored and nothing reports it. An
+  unlayered rule wins over every layer.
+- **Both themes.** A token set only on `:root` also applies in the dark theme,
+  because the root element matches `:root` in both themes. Set each sidebar token
+  again on `.dark`. The surface tokens are the exception: the dark theme's
+  hairline, lights and shadows are white and black and read no token, so a
+  `:root`-only surface tint is safe.
 
 ```css
 :root {
@@ -452,6 +463,8 @@ layer, in both themes. A token set only on `:root` also wins in the dark theme.
   --glass-sidebar-ink: #0B1824;        /* labels */
   --glass-sidebar-soft-ink: #3B4F63;   /* headers, descriptions: 4.5:1 on the fill */
   --glass-sidebar-tint: 11 24 36;      /* light hover, hairline, shadow, "R G B" */
+  --glass-surface-tint: 11 24 36;      /* light card hairline, soft lights' shade, "R G B" */
+  --glass-surface-shadow-tint: 31 95 168; /* light card shadow, "R G B" */
 }
 .dark {
   --glass-sidebar-fill: 18 41 63;

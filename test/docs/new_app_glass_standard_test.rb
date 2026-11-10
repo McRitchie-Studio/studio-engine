@@ -73,6 +73,31 @@ class NewAppGlassStandardTest < Minitest::Test
     assert_match(/^<html[^>]*\bdata-surface-style="<%= Studio\.surface_style %>"/, layout)
   end
 
+  # The brand-colour paragraph names the override layer and the dark trap. A token in
+  # @layer components loses to the engine's @layer utilities default and nothing reports
+  # it; e2e/glass_surface_tokens.spec.js shows that in a browser.
+  def glass_colours
+    DOC[/^\*\*Glass in the brand's colours\.\*\*(.*?)^```\n/m, 1] ||
+      flunk("no **Glass in the brand's colours.** paragraph with a css example in docs/NEW_APP_SETUP.md")
+  end
+
+  def test_the_glass_colours_paragraph_names_the_layer_and_the_dark_trap
+    text = glass_colours.gsub(/\s+/, " ")
+
+    assert_includes text, "**Outside any layer.**"
+    assert_includes text, "Never put them in `@layer components`"
+    assert_includes text, "A token set only on `:root` also applies in the dark theme"
+  end
+
+  def test_the_css_example_sets_every_root_glass_token_the_engine_declares
+    css = File.read(File.join(ROOT, "app/assets/tailwind/studio_engine/engine.css"))
+    declared = css.scan(/^\s*:root \{[^}]*\}/).join.scan(/(--glass-(?:sidebar|surface)-[a-z-]+):/).flatten.uniq
+    example = glass_colours[/```css\n(.*)/m, 1]
+
+    assert_operator declared.size, :>=, 6, "the engine declares the sidebar's four and the surfaces' two"
+    declared.each { |token| assert_includes example, "#{token}:", "the § 9 example must set #{token}" }
+  end
+
   def test_the_engine_default_does_not_move_for_existing_apps
     source = File.read(File.join(ROOT, "lib/studio.rb"))
 
