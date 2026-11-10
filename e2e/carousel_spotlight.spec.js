@@ -471,6 +471,48 @@ test("Next at the last slide glides across the seam and rests on the first, the 
   expect(seam[back[0]].card, "the jump shows the same card").toBe("1");
 });
 
+// A scroll that scrollend never follows (Chrome, when the page shortens and the
+// browser pulls the scroll back, sends one scroll event and no scrollend). The spec
+// swallows every scrollend of the looping row before the row hears it, so only the
+// backstop (studio/carousel REST_CAP_MS) can rest the row.
+//   CONTROL (2026-11-09): watchRest's backstop removed: red (the row rests on the
+//   clone of card 7, no real slide is marked, and no change event fires).
+test("a glide across the seam that gets no scrollend still jumps home and fires the change event once", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__swallowed = 0;
+    window.__carouselChanges = [];
+    window.addEventListener("scrollend", (event) => {
+      if (!event.target.closest?.("[data-lab='spot-loop']")) return;
+      window.__swallowed += 1;
+      event.stopImmediatePropagation();
+    }, true);
+    document.addEventListener("studio:carousel:change", ({ target, detail }) => {
+      if (target.dataset.lab === "spot-loop") window.__carouselChanges.push({ index: detail.index, previous: detail.previous });
+    });
+  });
+  const errors = await openLoop(page);
+  const spot = loopRegion(page);
+  await recordSeam(page);
+  await spot.getByRole("button", { name: "Previous slide", exact: true }).click();
+
+  await expect.poll(async () => (await loopRow(page)).centre).toMatchObject({ card: "7", clone: false, current: true });
+  await expect(spot.locator(".carousel-slide[data-current]:not([data-carousel-clone])")).toHaveAttribute("aria-label", "Loop 7");
+  await expect(spot).not.toHaveAttribute("data-carousel-wrapping", "");
+  await restingLoop(page);
+  expect(await page.evaluate(() => window.__swallowed), "the browser sent scrollend and the row never heard it").toBeGreaterThan(0);
+  // It glided to the copy first, then jumped home.
+  const seam = await page.evaluate(() => window.__seam);
+  expect(new Set(seam.map((s) => Math.round(s.left))).size, "it glided through several frames").toBeGreaterThan(2);
+  expect(await page.evaluate(() => window.__carouselChanges)).toEqual([{ index: 6, previous: 0 }]);
+
+  // The next press moves on from the real slide, and fires once more.
+  await spot.getByRole("button", { name: "Next slide", exact: true }).click();
+  await expect.poll(async () => (await loopRow(page)).centre).toMatchObject({ card: "1", clone: false, current: true });
+  await restingLoop(page);
+  expect(await page.evaluate(() => window.__carouselChanges)).toEqual([{ index: 6, previous: 0 }, { index: 0, previous: 6 }]);
+  expect(errors).toEqual([]);
+});
+
 test("under reduced motion the seam is crossed with no glide", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await openLoop(page);
