@@ -1709,6 +1709,19 @@ body.modal-open .studio-app-banner {
   @apply px-8 py-3 text-base rounded-xl shadow-sm;
 }
 
+/* A busy button (Studio::ButtonComponent loading:, or a submit Turbo marks busy) is
+   disabled so it takes no second click, but it is working, not unavailable: it keeps
+   its full colour and shows the progress cursor. The busy words sit in the button's
+   own gap-2, so the Pending rule's margin (engine-motion.css) is dropped here. */
+.btn[aria-busy="true"]:disabled {
+  opacity: 1;
+  cursor: progress;
+}
+
+.btn[aria-busy="true"] [data-loader-busy] {
+  margin-inline-start: 0;
+}
+
 /* -- Link sidebar (out-of-the-box navigation) ------------------------------
    Paired with components/_link_sidebar + _link_sidebar_trigger and the
    Studio.sidebar_sections config. A full-cover drawer, so it takes the shared

@@ -298,6 +298,50 @@ actions; the engine supplies only the banner.
 
 ## UI Primitives
 
+### Button, empty state and table — `Studio::ButtonComponent`, `Studio::EmptyStateComponent`, `Studio::TableComponent`
+
+Three ViewComponents every app renders instead of hand-building the part. Each
+one's class comment lists its public surface; `/admin/style` draws every tone,
+size and state live (Components section), and the gallery has a preview per state.
+
+```erb
+<%= render Studio::ButtonComponent.new(label: "Save", type: "submit") %>
+<%= render Studio::ButtonComponent.new(label: "Delete", tone: :danger, size: :sm) %>
+<%= render Studio::ButtonComponent.new(label: "Docs", tone: :quiet, href: docs_path) %>
+<%= render Studio::ButtonComponent.new(label: "Save", type: "submit", loading: true, busy_label: "Saving…") %>
+
+<%= render(Studio::EmptyStateComponent.new(detail: "Invite someone to start.")) do |empty| %>
+  <% empty.with_action(label: "Invite", href: new_invite_path) %>
+  No members yet.
+<% end %>
+
+<%= render Studio::TableComponent.new(
+      rows: @users, sort: params[:sort], direction: params[:direction], empty: "No users yet.",
+      columns: [
+        { key: :name, label: "User", sortable: true },
+        { key: :created_at, label: "Joined", align: :right, cell: ->(u) { l(u.created_at.to_date) } }
+      ]) %>
+```
+
+- **Button.** Tones map onto the shipped utilities: `primary` is `btn-primary`,
+  `secondary` is `btn-secondary` (the success role, or the app's
+  `--btn-secondary-*` retune), `quiet` is `btn-neutral`, `danger` is `btn-danger`.
+  Sizes are `btn-sm`, bare `btn` and `btn-lg`. `loading:` uses the aria-busy
+  contract (docs/LOADER.md): the button is `aria-busy` and disabled and shows the
+  pending spinner. A submit button always carries the hidden spinner, so a Turbo
+  form that marks itself busy shows it with no script. A link cannot be loading.
+- **Empty state.** The `.empty-state` card, the message at `type-body`, the
+  detail at `type-fine`, an optional icon, and at most one action, which is a
+  `Studio::ButtonComponent`. `framed: false` drops the card. The
+  `components/empty_state` partial renders it for one release.
+- **Table.** Columns and rows. Sorting is plain links: a sortable header links to
+  the current URL with `?sort=<key>&direction=<asc|desc>` (page dropped), the
+  sorted header carries `aria-sort` and an arrow, and the controller sorts.
+  `sort_url:` takes a callable for another URL shape. No rows renders one row with
+  a bare empty state. On a phone the table scrolls sideways, as every engine table
+  does; `min_width:` sets where. `sticky_header: true` adds
+  `data-sticky-table-header`.
+
 ### The page header — `studio/_page_header`
 
 An admin page's title: a crumb trail from the app's one parent map (`Studio.crumbs`,

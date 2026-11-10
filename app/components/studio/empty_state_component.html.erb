@@ -1,0 +1,12 @@
+<div class="<%= root_classes %>" data-empty-state>
+  <% if icon? %>
+    <div class="<%= Studio::EmptyStateComponent::ICON %>" aria-hidden="true"><%= icon %></div>
+  <% end %>
+  <p class="<%= Studio::EmptyStateComponent::MESSAGE %>"><%= message %></p>
+  <% if detail.present? %>
+    <p class="<%= Studio::EmptyStateComponent::DETAIL %>"><%= detail %></p>
+  <% end %>
+  <% if action? %>
+    <div class="<%= Studio::EmptyStateComponent::ACTION %>"><%= action %></div>
+  <% end %>
+</div>

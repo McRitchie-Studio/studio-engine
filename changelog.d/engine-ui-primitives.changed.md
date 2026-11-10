@@ -1,0 +1,1 @@
+- **`components/empty_state` renders `Studio::EmptyStateComponent`.** The partial keeps its locals (`message:`, `detail:`) and the `.empty-state` class for one release. Its message moves from `text-lg` to the type scale's `type-body` and its detail from `text-sm` to `type-fine`, so an existing empty state reads a step smaller. New code renders the component.

@@ -1,0 +1,32 @@
+<div class="<%= Studio::TableComponent::WRAPPER %>" data-table>
+  <%= tag.table(**table_attributes) do %>
+    <thead class="<%= Studio::TableComponent::HEAD %>">
+      <tr>
+        <% columns.each do |column| %>
+          <%= tag.th(**header_attributes(column)) do %>
+            <% if column.sortable %>
+              <a href="<%= sort_href(column) %>" class="<%= Studio::TableComponent::SORT_LINK %>"><span><%= column.label %></span><% if sorted?(column) %><span class="<%= Studio::TableComponent::SORT_ARROW %>" aria-hidden="true"><%= arrow %></span><% end %></a>
+            <% else %>
+              <%= column.label %>
+            <% end %>
+          <% end %>
+        <% end %>
+      </tr>
+    </thead>
+    <tbody class="<%= Studio::TableComponent::BODY %>">
+      <% if rows.any? %>
+        <% rows.each do |row| %>
+          <tr class="<%= Studio::TableComponent::ROW %>">
+            <% columns.each do |column| %>
+              <td class="<%= cell_classes(column) %>"><%= cell_value(column, row) %></td>
+            <% end %>
+          </tr>
+        <% end %>
+      <% else %>
+        <tr data-table-empty>
+          <td colspan="<%= columns.size %>"><%= render Studio::EmptyStateComponent.new(message: empty, framed: false) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  <% end %>
+</div>

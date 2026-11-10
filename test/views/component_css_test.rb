@@ -127,12 +127,14 @@ class ComponentCssTest < Minitest::Test
     assert_includes defined_utilities, "badge"
   end
 
-  def test_empty_state_partial_renders_shipped_empty_state_class
-    html = view.render(partial: "components/empty_state", locals: { message: "Nothing here", detail: "Yet" })
+  # The empty_state partial renders Studio::EmptyStateComponent, which needs a
+  # booted Rails app to render; test/components/studio/empty_state_component_test.rb
+  # renders both there. This holds the component to the shipped .empty-state class.
+  def test_empty_state_component_emits_shipped_empty_state_class
+    source = File.read(File.expand_path("../../app/components/studio/empty_state_component.rb", __dir__))
 
-    assert_includes html, 'class="empty-state"'
+    assert_includes source, 'FRAMED = "empty-state"'
     assert_includes defined_utilities, "empty-state"
-    assert_includes html, "Nothing here"
   end
 
   # The card and input-field utilities ship without a partial: apps write

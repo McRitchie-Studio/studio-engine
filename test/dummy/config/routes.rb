@@ -106,6 +106,7 @@ Rails.application.routes.draw do
   get "lab/board", to: "e2e_lab#board"
   get "lab/chips", to: "e2e_lab#chips"
   get "lab/scrims", to: "e2e_lab#scrims"
+  get "lab/ui_primitives", to: "e2e_lab#ui_primitives"
   get "lab/session_drift", to: "e2e_lab#session_drift"
   get "lab/sidebar_panels", to: "e2e_lab#sidebar_panels"
   get "lab/sidebar_panels_turbo", to: "e2e_lab#sidebar_panels_turbo"

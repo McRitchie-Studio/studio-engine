@@ -869,6 +869,21 @@ class E2eLabController < ActionController::Base
   # The style guide's Tints and shades group (style/_scrims). `?palette=<name>`
   # paints the page in one consumer palette through the resolver's own CSS, as
   # #chips does, so a custom dark or light base reaches --color-shade/-tint.
+  # The style guide's UI primitives (style/_primitives), for the screenshot check
+  # (e2e/ui_primitives_screenshots.spec.js). No knobs: the spec flips the theme.
+  #
+  # ALWAYS the engine-default palette, painted over whatever the lab's theme row
+  # says. That row is shared, and style_theme_save.spec.js leaves it at a primary
+  # it saved (#333333 among them); it sorts before this spec in the same shard, so
+  # the baselines read the default only while nothing else wrote the row first.
+  # Measured on CI run 42715576702: every primary button #333333 against a
+  # #7268CB baseline. The chips page pins its palette for the same reason.
+  def ui_primitives
+    require_relative "../../../support/consumer_palettes"
+    @palette_css = Studio::ThemeResolver.new(ConsumerPalettes::ALL.fetch("engine-default")).to_css
+    render(:ui_primitives)
+  end
+
   def scrims
     require_relative "../../../support/consumer_palettes"
     palette = ConsumerPalettes::ALL[params[:palette].to_s]

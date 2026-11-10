@@ -330,6 +330,8 @@ class E2eLaneContractTest < Minitest::Test
       # (studio/page_header/_assets), so the page names the row and holds no script.
       "plain_css_page_header.html.erb" => ["studio/page_header"],
       "plain_css_legal.html.erb" => ["studio/legal_page"],
+      # The screenshot check grades the components as the style guide draws them.
+      "ui_primitives.html.erb" => ["style/primitives"],
       "style_chrome.html.erb" => ["studio/banners/stack", "layouts/navbar"],
       "section_header.html.erb" => ["studio/banners/stack", "layouts/navbar", "studio/page_header", "studio/section_header"],
       "toast_over_banner.html.erb" => [

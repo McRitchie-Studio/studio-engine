@@ -1,0 +1,14 @@
+<%
+  tones = { "passed" => :success, "blocked" => :danger, "waiting" => :warning }
+  columns = [
+    { key: :name, label: "Member", sortable: true },
+    { key: :role, label: "Role" },
+    { key: :tasks, label: "Tasks", sortable: true, align: :right },
+    { key: :status, label: "Status", align: :center,
+      cell: ->(row) { render Studio::BadgeComponent.new(text: row[:status], tone: tones.fetch(row[:status], :muted)) } }
+  ]
+%>
+<div class="card overflow-hidden" data-specimen="table">
+  <%= render Studio::TableComponent.new(rows: rows, columns: columns, sort: sort, direction: direction,
+        sort_url: ->(key, dir) { "?sort=#{key}&direction=#{dir}" }, empty: "No members yet.", min_width: 520) %>
+</div>
