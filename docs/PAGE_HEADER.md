@@ -375,9 +375,10 @@ Every other link is left to Turbo or the browser, as before.
 |------|--------------|
 | Scroll | A smooth scroll to the target. Its own `scroll-margin-top` (`section-target`, `section-subtarget`) sets where it stops. With none, it stops under the pinned stack, measured at the click. Under reduced motion, it jumps. |
 | A target that moves | Content that grows on the way (a lazy frame, the navbar's collapse) moves the target, so the scroll aims again until it lands, or until the reader scrolls, touches, presses or types. |
+| After the end | For 3 seconds (`HOLD_MS`) the target keeps its place on the screen: content above it that grows or shrinks (a lazy frame whose page lands after the scroll) moves the page by the same amount, in the microtask after the new elements land (or the next frame, for a size change with none), so nothing sees the target out of place, as scroll anchoring would. The body has scroll anchoring off (`studio/_head`), so the browser does not do this. The first wheel, touch, key or press, any scroll the module did not make, the next jump, or Back ends the hold. Growth later than 3 seconds is not followed. |
 | History | The fragment is pushed, with Turbo's own state, and `hashchange` fires. Back and Forward between this page's entries scroll to the reader's earlier place, or to the fragment, with no Turbo restore visit. A Back from another page is Turbo's. |
 | Focus | The target takes focus with `preventScroll`. One that is not focusable gets `tabindex="-1"` and `data-in-page-focus` (no ring) until it loses focus. |
-| Events | `studio:in-page-scroll` bubbles from the link when the scroll starts (`detail: { link, target, hash }`). `studio:in-page-scroll-end` fires on the document when it settles or the reader takes over. |
+| Events | `studio:in-page-scroll` bubbles from the link when the scroll starts (`detail: { link, target, hash }`). `studio:in-page-scroll-end` fires on the document when it settles (the browser's `scrollend`, or 400 ms after the last scroll event when `scrollend` never comes; a quiet spell of 150 ms in a browser without `scrollend`) or the reader takes over. The hold after the end runs past this event. |
 
 The style guide's tab row holds the clicked tab as current from the first event to the second,
 so the highlight does not run through every tab the scroll passes. A component that changes

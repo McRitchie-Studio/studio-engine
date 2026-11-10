@@ -1,7 +1,7 @@
 const { test, expect } = require("@playwright/test");
 const {
   watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive, navAtRest,
-  watchInPageJumps, traversed, scrollYAcrossWindow, inPageTimerWindow,
+  watchInPageJumps, traversed, scrollYAcrossWindow, inPageTimerWindow, inPageConstant,
 } = require("./helpers");
 
 // [e2e] IN-PAGE LINKS (studio/in_page_links, docs/PAGE_HEADER.md "In-page links"). Alex
@@ -138,6 +138,42 @@ test("a style tab scrolls down the page, with no Turbo visit and no page transit
   // Focus goes to the section, for the next Tab.
   expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe("modals");
   expect(errors).toEqual([]);
+});
+
+// LATE GROWTH (engine-anchor-late-growth). The smooth scroll to Modals passes the Loaders
+// feed, whose next page is a lazy frame: it asks for the page as it nears the viewport, and
+// the page lands later, 88px of items above Modals. Scroll anchoring is off on the body
+// (studio/_head: the navbar's collapse made it bounce), so the browser leaves scrollY where
+// it was and Modals slides down under the row. At 8x CPU that landing came 0.5 to 1.7s after
+// the jump's end, red 10 in 10 on the first test above. Here the feed is held until the end
+// event, so the growth comes after the end at any CPU speed, and released; then the section
+// must be where the jump left it. CONTROL: with the module's hold after the end removed,
+// this test is red on the section's place (88px off) and on the highlight.
+test("a section that a lazy frame above pushes down after the jump stays under the row", async ({ page }) => {
+  await open(page, TURBO);
+  let release;
+  const gate = new Promise((done) => { release = done; });
+  let asked = 0;
+  // Registered after open's serveFeed, so it runs first, and then hands the request on.
+  await page.route("**/admin/style/loaders_feed*", async (route) => {
+    asked += 1;
+    await gate;
+    await route.fallback();
+  });
+  await watch(page);
+  await clickAndSettle(page, "Modals", "modals");
+  const place = () => page.locator("#modals").evaluate((el) => ({ top: el.getBoundingClientRect().top, pageTop: el.getBoundingClientRect().top + window.scrollY }));
+  const before = await place();
+  await expect.poll(() => asked, "the scroll passed the feed and asked for its next page").toBeGreaterThan(0);
+
+  release();
+  // The next page is in and no frame is loading; then two frames, for the module's own frame.
+  await page.waitForFunction(() => document.querySelectorAll("[data-feed-item]").length > 4 && !document.querySelector("turbo-frame[busy]"));
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+  const after = await place();
+  expect(after.pageTop - before.pageTop, "the feed grew above the section after the jump").toBeGreaterThan(inPageConstant("AIM_SLACK_PX"));
+  expect(Math.abs(after.top - before.top), `the section stays where the jump left it (${before.top} then ${after.top})`).toBeLessThanOrEqual(inPageConstant("AIM_SLACK_PX"));
+  await expect(pill(page, "Modals"), "the tab still names the section").toHaveAttribute("aria-current", "true");
 });
 
 test("the clicked tab is current for the whole scroll, not each tab it passes", async ({ page }) => {
