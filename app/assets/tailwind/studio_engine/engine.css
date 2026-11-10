@@ -2545,13 +2545,27 @@ html[data-theme-flip]::view-transition-new(*) {
        .bg-surface.rounded-xl.border. NOT a menu, popover or modal: anything .absolute, .fixed,
        .sticky or .shadow-2xl, or inside a .fixed scrim or a dialog, stays solid, because it
        floats over text and has no blur to protect it. Under prefers-reduced-transparency
-       every surface goes solid. */
+       every surface goes solid.
+
+       THE TINT IS THE APP'S, from two tokens on the root, as "R G B". The values below are the
+       hub's violet, so an app that sets none looks like the hub. An app sets them in its own
+       stylesheet, unlayered (in @layer components the engine's default wins):
+         --glass-surface-tint         the light theme's hairline (--surface-glass-line) and the
+                                      soft lights' shade (--lit-soft-bottom, --lit-soft-pressed,
+                                      --lit-badge, --lit-input)
+         --glass-surface-shadow-tint  the light theme's card shadow (--surface-glass-shadow)
+       The dark theme's hairline, lights and shadows are white and black, so neither token
+       reaches it, and a token set only on :root is safe there. */
+    :root {
+      --glass-surface-tint: 29 24 50;
+      --glass-surface-shadow-tint: 60 50 120;
+    }
     html[data-surface-style="glass"] {
       --surface-glass-fill: color-mix(in srgb, var(--color-surface) 62%, transparent);
       --surface-glass-fill-hover: color-mix(in srgb, var(--color-surface) 80%, transparent);
-      --surface-glass-line: rgb(29 24 50 / 0.1);
+      --surface-glass-line: rgb(var(--glass-surface-tint) / 0.1);
       --surface-glass-highlight: inset 0 1px 0 rgb(255 255 255 / 0.7);
-      --surface-glass-shadow: 0 6px 20px rgb(60 50 120 / 0.08);
+      --surface-glass-shadow: 0 6px 20px rgb(var(--glass-surface-shadow-tint) / 0.08);
       --surface-glass-filter: blur(16px) saturate(140%);
       --surface-glass-ambient:
         radial-gradient(60vw 55vh at 10% 5%, rgb(var(--color-primary-rgb) / 0.17), transparent 70%),
@@ -2685,11 +2699,11 @@ html[data-theme-flip]::view-transition-new(*) {
       --lit-glow: 0 8px 24px -6px;
       --lit-glow-alpha: 0.6;
       --lit-soft-top: inset 0 1px 0 rgb(255 255 255 / 0.8);
-      --lit-soft-bottom: inset 0 -1px 0 rgb(29 24 50 / 0.08);
+      --lit-soft-bottom: inset 0 -1px 0 rgb(var(--glass-surface-tint) / 0.08);
       --lit-pressed: inset 0 2px 4px rgb(0 0 0 / 0.27);
-      --lit-soft-pressed: inset 0 2px 3px rgb(29 24 50 / 0.16);
-      --lit-badge: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 1px 1px rgb(29 24 50 / 0.12);
-      --lit-input: inset 0 1px 2px rgb(29 24 50 / 0.14), inset 0 -1px 0 rgb(255 255 255 / 0.6);
+      --lit-soft-pressed: inset 0 2px 3px rgb(var(--glass-surface-tint) / 0.16);
+      --lit-badge: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 1px 1px rgb(var(--glass-surface-tint) / 0.12);
+      --lit-input: inset 0 1px 2px rgb(var(--glass-surface-tint) / 0.14), inset 0 -1px 0 rgb(255 255 255 / 0.6);
     }
     html.dark[data-surface-style="glass"] {
       --lit-bottom: inset 0 -2px 0 rgb(0 0 0 / 0.3);
