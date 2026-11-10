@@ -35,6 +35,7 @@ resolved.
 - **Session drift**: every page carries a session stamp and loads `window.StudioSession`, which notices when another tab signs in or out, the session expires, or the server revokes it; `session:changed` / `session:mismatch` events, cross-tab sync, an identity-source plug-in interface, and `expectChange` holds for deliberate switches. The rehydrate endpoint (`GET /session/state`) is opt-in. See [`docs/SESSION_DRIFT.md`](docs/SESSION_DRIFT.md).
 - **Device sessions**: a logout ends that device's session on the server, so a copy of the pre-logout cookie no longer signs in; other devices stay signed in. One indexed lookup per signed-in request, legacy cookies accepted until a grace date, rows pruned after 90 idle days, no host code. See [`docs/DEVICE_SESSIONS.md`](docs/DEVICE_SESSIONS.md).
 - **Theme system**: Dynamic CSS custom properties generated from 7 role colors (primary, dark, light, success, accent, warning, danger). Dark/light mode toggle. Admin theme editor at `/admin/theme`.
+- **Glass is the standard** (Alex McRitchie, 2026-11-09): a new app sets `config.surface_style = :glass` and `config.sidebar_style = :glass`, and writes `data-surface-style` on its layout's `<html>` ([`docs/NEW_APP_SETUP.md`](docs/NEW_APP_SETUP.md) § 4 and § 9). The engine default stays `:default`, so an existing app moves only when it asks. The glass sidebar takes the app's colours from four root tokens, `--glass-sidebar-fill`, `--glass-sidebar-ink`, `--glass-sidebar-soft-ink` and `--glass-sidebar-tint`, whose defaults are the hub's violet. `.lit-tile` and `.lit-tile-soft` light an app's own call-to-action tile.
 - **UI primitives**: Shared component partials and CSS primitives such as `components/emoji_swap` for nav/sidebar emoji hover transitions.
 - **Operator tooling**: Shared `studio/banners/environment` banner with Dev Mode + email connector controls and `studio/banners/impersonation`.
 - **Sluggable concern**: a human-readable slug written once at create (`to_param` returns it); `rename_slug!` changes it and cascades to every child column in one transaction, any other write that changes a persisted slug is invalid, and a refused rename answers 422
@@ -1130,7 +1131,7 @@ Two seams, both empty by default, so the navbar is unchanged until an app opts i
 - `sidebar_sections` fills the slide-out link sidebar (the cog trigger in the icon
   rail). Rules: `lib/studio/sidebar_sections.rb`. `Studio.sidebar_style = :glass` floats it
   as an inset translucent panel with line icons (`studio_icon`, `lib/studio/icons/README.md`);
-  see `docs/NAVBAR_SETUP.md`.
+  see `docs/NAVBAR_SETUP.md`. Glass is the standard for a new app.
 - `navbar_links` fills the navbar's own link slots: the desktop bar beside the
   logo and the phone row under it. Rules: `lib/studio/navbar_links.rb`.
 

@@ -659,6 +659,11 @@ class LinkSidebarTest < Minitest::Test
     css = glass_stylesheet
     light = css[/^\s*\[data-sidebar-glass-shell\] \{\s*--glass-row-height.*?\n    \}/m]
     dark = css[/^\s*\.dark \[data-sidebar-glass-shell\] \{.*?\n    \}/m]
+    # The shell reads the app's --glass-sidebar-* tokens; this grades their defaults, the hub's.
+    root_tokens = sidebar_tokens(css, ":root")
+    dark_tokens = root_tokens.merge(sidebar_tokens(css, ".dark"))
+    light = resolve_sidebar_tokens(light, root_tokens)
+    dark = resolve_sidebar_tokens(dark, dark_tokens)
 
     { dark => [255, 255, 255], light => [0, 0, 0] }.each do |tokens, page|
       fill, alpha = thin_fill(tokens)
@@ -684,6 +689,17 @@ class LinkSidebarTest < Minitest::Test
 
   def glass_stylesheet
     File.read(File.expand_path("../../app/assets/tailwind/studio_engine/engine.css", __dir__))
+  end
+
+  # The --glass-sidebar-* defaults declared on one root selector, by name.
+  def sidebar_tokens(css, selector)
+    rule = css.scan(/^\s*#{Regexp.escape(selector)} \{[^}]*\}/).find { |r| r.include?("--glass-sidebar-") }
+    refute_nil rule, "no #{selector} rule declares the --glass-sidebar-* tokens"
+    rule.scan(/(--glass-sidebar-[a-z-]+): ([^;]+);/).to_h
+  end
+
+  def resolve_sidebar_tokens(rule, values)
+    rule.gsub(/var\((--glass-sidebar-[a-z-]+)\)/) { values.fetch(Regexp.last_match(1)) }
   end
 
   def thin_fill(tokens)

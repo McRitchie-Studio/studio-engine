@@ -211,19 +211,23 @@ glass:
   name: Glass
   group: Glass
   token: "config.surface_style = :glass"
-  note: "Frosts the cards and lights the controls from above; opt-in per app."
+  note: "Frosts the cards and lights the controls; the standard for a new app."
   resolve: [config:surface_style, css:surface-glass-blur]
   variants:
     lit:
       token: ".btn, .badge, .input-field under surface_style = :glass"
       note: "Buttons, badges and inputs lit from above, in every state."
       resolve: [config:surface_style]
+    tile:
+      token: ".lit-tile, .lit-tile-soft under surface_style = :glass"
+      note: "An app's own call-to-action tile, lit like a button."
+      resolve: [css:lit-tile, css:lit-tile-soft]
 
 glass_sidebar:
   name: Glass Sidebar
   group: Glass
   token: "config.sidebar_style = :glass"
-  note: "A frosted link sidebar; opt-in per app."
+  note: "A frosted link sidebar in the app's colours; the standard for a new app."
   resolve: [config:sidebar_style]
 
 icon:

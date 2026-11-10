@@ -97,6 +97,13 @@ Studio.configure do |config|
     { file: "logo.png",    title: "Auth Logo" },
   ]
   config.theme_primary = "#8E82FE"             # pick your brand color
+  # Glass is the standard (Alex McRitchie, 2026-11-09): glass cards and lit buttons,
+  # and the floating glass link sidebar. The layout's <html> also writes
+  # data-surface-style (§ 9). Set the sidebar's colours from the brand (§ 9, "Glass
+  # in the brand's colours"); unset, it takes the hub's violet. Check white on a light
+  # primary first: the lit buttons are tuned on the hub's.
+  config.surface_style = :glass
+  config.sidebar_style = :glass
   # Smooth-load convention (default OFF): view-transition page swaps + a
   # single render per navigation. Opt in only once every page answers fast —
   # no-preview holds the old page until the fresh response arrives. Pair with
@@ -120,10 +127,7 @@ Studio.configure do |config|
   # + slide-out panel. A callable receives the view context (route helpers,
   # logged_in? walls); sections flagged admin: true show to admins only. A group
   # shows a divider and no word; header: true also shows its title above its rows.
-  # config.sidebar_style = :glass               # a floating panel; a link's icon: draws a line icon
-  # config.surface_style = :glass               # glass cards and lit buttons; also write
-  #                                             # data-surface-style on the layout's <html>. Check
-  #                                             # white on a light primary first: it is untuned.
+  # With sidebar_style = :glass (above) a link's icon: draws a line icon.
   # config.sidebar_sections = ->(view) {
   #   [ { title: "Site", links: [
   #         { label: "Home", href: view.root_path, emoji: "🏠", desc: "Front door" } ] },
@@ -409,7 +413,7 @@ bespoke layout. Use Turf Monster's `/signin` flow as the full-featured reference
 
 ```erb
 <!DOCTYPE html>
-<html>
+<html data-surface-style="<%= Studio.surface_style %>">
   <head>
     <title><%= content_for(:title) || "X App" %></title>
     <%= render "layouts/studio/head" %>
@@ -430,6 +434,36 @@ bespoke layout. Use Turf Monster's `/signin` flow as the full-featured reference
 ```
 
 The last line of `<body>` is the site footer (§ 10).
+
+**Glass is the standard.** `data-surface-style` on `<html>` is what turns the glass
+cards, the lit buttons and the ambient page on; `Studio.surface_style` alone does
+not reach the CSS. A new app writes it as above, with `surface_style = :glass` and
+`sidebar_style = :glass` in its initializer (§ 4). An existing app moves only when
+it sets both: the engine's default stays `:default`.
+
+**Glass in the brand's colours.** The glass sidebar reads four tokens from the
+root, and their defaults are the hub's violet. Set them in
+`app/assets/tailwind/application.css`, after the engine import and outside any
+layer, in both themes. A token set only on `:root` also wins in the dark theme.
+
+```css
+:root {
+  --glass-sidebar-fill: 249 251 253;   /* the panel, "R G B" */
+  --glass-sidebar-ink: #0B1824;        /* labels */
+  --glass-sidebar-soft-ink: #3B4F63;   /* headers, descriptions: 4.5:1 on the fill */
+  --glass-sidebar-tint: 11 24 36;      /* light hover, hairline, shadow, "R G B" */
+}
+.dark {
+  --glass-sidebar-fill: 18 41 63;
+  --glass-sidebar-ink: #F1F5F9;
+  --glass-sidebar-soft-ink: #D5E2EE;
+}
+```
+
+A call to action that is not a `.btn`, such as a square brand tile, takes the
+buttons' light with `.lit-tile` (a filled tile) or `.lit-tile-soft` (an outlined
+or pale one). Both do nothing without glass on the root. `engine.css`, THE GLASS
+SIDEBAR and THE GLASS SURFACES, hold the rest.
 
 **Bar stack**: render `studio/banners/stack` — not the individual banners — as
 the navbar's **sibling, immediately above it**. The stack decides which bars

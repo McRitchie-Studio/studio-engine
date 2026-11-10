@@ -73,9 +73,10 @@ lower-case word (`Border Glow · clear`). Every name is unique across the guide.
 
 | Name | Write | What it does |
 |------|-------|--------------|
-| **Glass** | `config.surface_style = :glass` | Frosts the cards and lights the controls from above; opt-in per app. |
+| **Glass** | `config.surface_style = :glass` | Frosts the cards and lights the controls; the standard for a new app. |
 | Glass · lit | `.btn, .badge, .input-field under surface_style = :glass` | Buttons, badges and inputs lit from above, in every state. |
-| **Glass Sidebar** | `config.sidebar_style = :glass` | A frosted link sidebar; opt-in per app. |
+| Glass · tile | `.lit-tile, .lit-tile-soft under surface_style = :glass` | An app's own call-to-action tile, lit like a button. |
+| **Glass Sidebar** | `config.sidebar_style = :glass` | A frosted link sidebar in the app's colours; the standard for a new app. |
 | **Icon** | `studio_icon("rocket", size: 22)` | A line icon by name. |
 
 ## Tints & shades

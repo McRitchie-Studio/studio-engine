@@ -2350,7 +2350,30 @@ html[data-theme-flip]::view-transition-new(*) {
        and below them.
 
        THE PHONE gets a narrower inset, the full width and a lighter blur, which costs less
-       through the slide. */
+       through the slide.
+
+       THE COLOURS ARE THE APP'S, from four tokens on the root. The values below are the hub's
+       violet, so an app that sets none looks like the hub. An app sets them in its own
+       stylesheet, unlayered, on :root and again on .dark (an unlayered :root also wins in the
+       dark theme, so a token set only on :root carries into it):
+         --glass-sidebar-fill      the panel, as "R G B" (the shell adds the alpha)
+         --glass-sidebar-ink       the label colour
+         --glass-sidebar-soft-ink  headers and descriptions; keep 4.5:1 on the fill
+         --glass-sidebar-tint      the light theme's hover, hairline and shadow, as "R G B"
+       The light theme's thin fill stays white, and the dark theme's hover, hairline and shadow
+       stay white and black, so the dark block sets no tint. The --glass-* variables on the shell
+       still take a direct override, as the apps that adopted glass before these tokens do. */
+    :root {
+      --glass-sidebar-fill: 250 249 253;
+      --glass-sidebar-ink: #1d1832;
+      --glass-sidebar-soft-ink: #474260;
+      --glass-sidebar-tint: 29 24 50;
+    }
+    .dark {
+      --glass-sidebar-fill: 36 30 62;
+      --glass-sidebar-ink: #f1effa;
+      --glass-sidebar-soft-ink: #dedaed; /* 4.5:1 on the thin fill alone over white, if a blur never paints */
+    }
     [data-sidebar-glass] {
       --sidebar-glass-inset: 0.75rem;
       width: 19.5rem;
@@ -2364,14 +2387,14 @@ html[data-theme-flip]::view-transition-new(*) {
       --glass-icon-gap: 0.625rem;
       --glass-section-gap: 1rem;
       --sidebar-row-lift: 0.4375rem;
-      --glass-fill: rgb(250 249 253 / 0.97);
+      --glass-fill: rgb(var(--glass-sidebar-fill) / 0.97);
       --glass-thin-fill: rgb(255 255 255 / 0.72);
       --glass-filter: blur(24px) saturate(150%) brightness(1.15);
-      --glass-ink: #1d1832;
-      --glass-soft-ink: #474260;
-      --glass-hover: rgb(29 24 50 / 0.08);
-      --glass-line: rgb(29 24 50 / 0.14);
-      --glass-shadow: 0 24px 60px rgb(29 24 50 / 0.24);
+      --glass-ink: var(--glass-sidebar-ink);
+      --glass-soft-ink: var(--glass-sidebar-soft-ink);
+      --glass-hover: rgb(var(--glass-sidebar-tint) / 0.08);
+      --glass-line: rgb(var(--glass-sidebar-tint) / 0.14);
+      --glass-shadow: 0 24px 60px rgb(var(--glass-sidebar-tint) / 0.24);
       pointer-events: auto;
       overflow: hidden;
       min-height: 0;
@@ -2384,11 +2407,11 @@ html[data-theme-flip]::view-transition-new(*) {
       font-size: 0.84375rem;
     }
     .dark [data-sidebar-glass-shell] {
-      --glass-fill: rgb(36 30 62 / 0.97);
-      --glass-thin-fill: rgb(36 30 62 / 0.72);
+      --glass-fill: rgb(var(--glass-sidebar-fill) / 0.97);
+      --glass-thin-fill: rgb(var(--glass-sidebar-fill) / 0.72);
       --glass-filter: blur(24px) saturate(150%) brightness(0.8);
-      --glass-ink: #f1effa;
-      --glass-soft-ink: #dedaed; /* 4.5:1 on the thin fill alone over white, if a blur never paints */
+      --glass-ink: var(--glass-sidebar-ink);
+      --glass-soft-ink: var(--glass-sidebar-soft-ink);
       --glass-hover: rgb(255 255 255 / 0.1);
       --glass-line: rgb(255 255 255 / 0.14);
       --glass-shadow: 0 24px 60px rgb(0 0 0 / 0.5);
@@ -2766,6 +2789,28 @@ html[data-theme-flip]::view-transition-new(*) {
     }
     html[data-surface-style="glass"] .badge { box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--lit-badge); }
     html[data-surface-style="glass"] .input-field { box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--lit-input); }
+
+    /* A LIT TILE: an app's own call to action that is not a .btn, such as a square tile with a
+       brand fill, takes the same light. .lit-tile is a filled tile: a top light, a bottom shade
+       and a contact shadow. .lit-tile-soft is an outlined or pale one, with the outline button's
+       softer light. Shadows only, so no box moves, the corners stay the app's and the fill stays
+       exact. A press flips the light inset and, with motion allowed, moves the tile 1px. With no
+       glass on the root, both classes do nothing. */
+    html[data-surface-style="glass"] .lit-tile {
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--lit-top), var(--lit-bottom), var(--lit-contact);
+    }
+    html[data-surface-style="glass"] .lit-tile-soft {
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--lit-soft-top), var(--lit-soft-bottom), var(--lit-contact);
+    }
+    html[data-surface-style="glass"] .lit-tile:is(:active, [data-lit-state="pressed"]) {
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--lit-pressed);
+    }
+    html[data-surface-style="glass"] .lit-tile-soft:is(:active, [data-lit-state="pressed"]) {
+      box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--lit-soft-pressed);
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      html[data-surface-style="glass"] :is(.lit-tile, .lit-tile-soft):is(:active, [data-lit-state="pressed"]) { translate: 0 1px; }
+    }
 
     /* BUTTON TRICKS ON A LIT BUTTON (the lit rules above).
        A lit button already uses its box-shadow for its contact shadow and glow, and
