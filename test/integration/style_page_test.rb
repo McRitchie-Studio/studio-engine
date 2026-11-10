@@ -232,6 +232,24 @@ class StylePageTest < ActiveSupport::TestCase
     Studio.surface_style = prior
   end
 
+  # [integration] glass-is-the-standard: the style guide shows the lit tile classes on real
+  # elements, as the Glass · tile card, and says glass is the standard for a new app.
+  test "the Glass section names glass the standard and shows the lit tiles" do
+    prior = Studio.surface_style
+    Studio.surface_style = :glass
+    glass = Nokogiri::HTML.fragment(render_index).at_css('[data-test="style-glass"]')
+
+    assert_includes glass.text, "The standard for a new app."
+    refute_includes glass.text, "opt-in per app"
+    tiles = glass.at_css('[data-test="style-lit-tiles"]')
+    assert tiles, "the lit tile specimen renders"
+    assert_equal %w[lit-tile lit-tile-soft], tiles.css("a").map { |a| a["class"].split.first }
+    card = tiles.ancestors("[data-trick]").first
+    assert_equal %w[glass tile], [card["data-trick"], card["data-trick-variant"]]
+  ensure
+    Studio.surface_style = prior
+  end
+
   # --- 2. the require_admin gate actually gates ------------------------------
 
   # A bare controller including the SAME concern the real controller inherits
