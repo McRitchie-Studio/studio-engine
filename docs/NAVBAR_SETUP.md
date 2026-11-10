@@ -67,7 +67,11 @@ If your app doesn't create its own `app/views/layouts/_navbar.html.erb`, the eng
   [`NEW_APP_SETUP.md`](NEW_APP_SETUP.md) § 9.
 - `Studio.surface_style = :glass` turns cards translucent over a soft ambient page. The host
   also writes `data-surface-style` on its root `<html>`. `engine.css`, THE GLASS SURFACES,
-  says what it reaches and what stays solid.
+  says what it reaches and what stays solid. The light theme's tint is two tokens the app
+  sets on `:root`, unlayered, as `R G B`: `--glass-surface-tint` (the card hairline and the
+  soft lights' shade) and `--glass-surface-shadow-tint` (the card shadow). Their defaults
+  are the hub's violet. The dark theme reads neither. The example is in
+  [`NEW_APP_SETUP.md`](NEW_APP_SETUP.md) § 9.
 - Glass, both settings, is the standard for a new app (Alex McRitchie, 2026-11-09). The
   engine default stays `:default`, so an existing app changes only when it sets them.
 
