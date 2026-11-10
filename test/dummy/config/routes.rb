@@ -68,6 +68,8 @@ Rails.application.routes.draw do
   get "lab/birthday_gate", to: "e2e_lab#birthday_gate"
   get "lab/modal_host", to: "e2e_lab#modal_host"
   get "lab/modal_blocks", to: "e2e_lab#modal_blocks"
+  get "lab/modal_remote", to: "e2e_lab#modal_remote"
+  get "lab/modal_remote_b", to: "e2e_lab#modal_remote_b"
   post "lab/modal_blocks/newsletter", to: "e2e_lab#modal_blocks_newsletter"
   post "lab/modal_blocks/newsletter/leave", to: "e2e_lab#modal_blocks_newsletter_leave"
   get "lab/newsletter_fetcher", to: "e2e_lab#newsletter_fetcher"

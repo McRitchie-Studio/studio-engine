@@ -212,9 +212,17 @@
     bound to this host by the modal-host controller on the template below. The
     store registers before Alpine starts; see that module's header. %>
 
+<%# ON-DEMAND MODALS (Studio.modals). Only when the app registers one does the
+    host advertise them (data-modal-host-remote-value), mark its card
+    (data-modal-host-card) and carry the loading and error cards below; an app
+    that registers none renders this partial exactly as before. studio/modal_host
+    fetches a registered id the first time it opens and inserts its
+    <template x-if> into the card. See the README, "Modals on demand". %>
+<% studio_remote_modals = Studio.modals.any? %>
 <template x-if="$store.modals.current()"
           data-studio-controller="modal-host"
-          data-modal-host-store-value="modals">
+          data-modal-host-store-value="modals"<% if studio_remote_modals %>
+          data-modal-host-remote-value="<%= Studio.modals.client_config(url_template: studio_modal_path(id: "0").delete_suffix("0") + "__id__", logged_in: respond_to?(:logged_in?) && logged_in?).to_json %>"<% end %>>
   <%# Backdrop + card use CSS keyframe animations (NOT Alpine
       x-transition), all shipped in the inline style block above. On
       mount, the .modal-backdrop-mount + card mount classes fire fade-in
@@ -271,7 +279,8 @@
     <%# No max-w-* here — cardClasses() supplies exactly one, per modal id, from
         the CARD_WIDTHS registry (studio/modal_host). max-h/overflow are unrelated and stay. %>
     <div class="bg-surface rounded-xl border border-subtle shadow-2xl p-6 w-full max-h-[85dvh] overflow-y-auto"
-         :class="$store.modals.cardClasses()">
+         :class="$store.modals.cardClasses()"<% if studio_remote_modals %>
+         data-modal-host-card<% end %>>
       <%# Consumer-provided content registrations. Each block typically
           contains a <template x-if="$store.modals.current().id === 'X'">
           render "modals/X" </template>.
@@ -298,6 +307,29 @@
           template x-if above is what guarantees current() is non-null here. %>
       <% if lookup_context.exists?("host_extras", ["modals"], true) %>
         <%= render "modals/host_extras" %>
+      <% end %>
+
+      <%# The on-demand states, keyed on $store.modals._remote[id], which only
+          studio/modal_host sets and only for a registered id: 'loading' while a
+          slow first fetch runs (the processing card, held MIN_LOAD_MS so it
+          never flashes), 'error' when the fetch fails (the error card, whose
+          button closes). Fetched registrations are appended after these. %>
+      <% if studio_remote_modals %>
+        <template x-if="$store.modals._remote && $store.modals._remote[$store.modals.current()?.id] === 'loading'">
+          <div data-modal-remote-state="loading">
+            <%= render "studio/modals/blocks/processing_card", title: "Loading…" %>
+          </div>
+        </template>
+        <template x-if="$store.modals._remote && $store.modals._remote[$store.modals.current()?.id] === 'error'">
+          <div data-modal-remote-state="error">
+            <%= render "studio/modals/blocks/error_card",
+                  title: "Couldn't open this",
+                  message: "Check your connection and try again.",
+                  icon_emoji: "⚠️",
+                  cta_label: "Close",
+                  cta_close: true %>
+          </div>
+        </template>
       <% end %>
     </div>
   </div>

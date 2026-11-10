@@ -377,6 +377,16 @@ class ApplicationController < ActionController::Base
   layout -> { cookies[:survey_lab_turbo] == "1" ? "survey_turbo_lab" : "e2e_lab" }
 end
 
+# On-demand modals (Studio.modals) for /lab/modal_remote and
+# e2e/modal_remote.spec.js, registered as a host's initializer would. Every
+# lab page that renders the shared host advertises them; only that page opens
+# them. lab-prefetch is the flagged one, so every such page fetches it on idle.
+Studio.modals.register "lab-rules", partial: "e2e_lab/modals/remote_rules",
+                       locals: ->(_view) { { greeting: "Hello from the registered locals" } }
+Studio.modals.register "lab-prefetch", partial: "e2e_lab/modals/remote_rules", prefetch: true
+Studio.modals.register "lab-member", partial: "e2e_lab/modals/remote_member", auth: :user
+Studio.modals.register "lab-broken", partial: "e2e_lab/modals/remote_broken"
+
 class User < ApplicationRecord
   def admin? = role == "admin"
   def display_name = username.presence || email.to_s.split("@").first

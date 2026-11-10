@@ -284,6 +284,170 @@ function focusTrap(env, held) {
   }
 }
 
+// ---- on-demand modals (Studio.modals) ---------------------------------------
+//
+// A host whose app registers modals with Studio.modals advertises them on its
+// template:
+//
+//   data-modal-host-remote-value='{"url":"/_studio/modals/__id__",
+//                                  "ids":["contest-rules",…],"prefetch":["auth"]}'
+//
+// and marks its card data-modal-host-card. open(id) for an advertised id whose
+// registration is not in the host yet fetches GET /_studio/modals/<id> once,
+// wraps the fragment in the same <template x-if> a layout would have rendered,
+// appends it to the card (in the host template's content, so every later mount
+// has it, and in a card already on screen), then opens. An id the host does not
+// advertise takes the plain open() path untouched.
+//
+// THE WAIT. A fetch that answers inside LOAD_DELAY_MS opens with no loading
+// state at all. A slower one opens the card with $store.modals._remote[id] =
+// 'loading' (the host's processing card), held at least MIN_LOAD_MS so it never
+// flashes, then clears the flag and the content takes its place. A failure sets
+// 'error' (the host's error card) and forgets the fetch, so the next open
+// retries. So for the first LOAD_DELAY_MS of a first open, isOpen(id) is false.
+//
+// THE CACHE lives for the page's lifetime: fragments by id, beside the store,
+// not on it. A Turbo visit brings a fresh host without the inserted templates
+// (or a snapshot clone with them), so insertion checks the host every time and
+// inserts only what is missing; that check is what keeps a Turbo visit from
+// inserting a modal twice. A fetch that resolves after a Turbo visit replaced
+// the body (doc.body changed) opens nothing on the new page.
+
+export const REMOTE_MODAL_ATTR = 'data-studio-remote-modal'
+export const LOAD_DELAY_MS = 150
+
+// The host template advertising on-demand modals, if this page has one.
+export function remoteHost(doc) {
+  return doc.querySelector ? doc.querySelector('template[data-modal-host-remote-value]') : null
+}
+
+// The advertised config, or null on a page without one (or with bad JSON).
+export function remoteConfig(doc) {
+  var el = remoteHost(doc)
+  if (!el) return null
+  try {
+    var cfg = JSON.parse(el.getAttribute('data-modal-host-remote-value'))
+    if (!cfg || typeof cfg.url !== 'string' || !Array.isArray(cfg.ids)) return null
+    if (!Array.isArray(cfg.prefetch)) cfg.prefetch = []
+    return cfg
+  } catch (e) {
+    return null
+  }
+}
+
+// The <template x-if> a layout would have rendered around the partial. Ids are
+// held to [a-z0-9_-] by Studio::Modals, so splicing one into the expression
+// needs no escaping; anything else is refused before it gets here.
+export function remoteTemplate(doc, id, markup) {
+  var t = doc.createElement('template')
+  t.setAttribute(REMOTE_MODAL_ATTR, id)
+  t.setAttribute('x-if', "$store.modals.current()?.id === '" + id + "' && !$store.modals._remote['" + id + "']")
+  t.innerHTML = markup
+  return t
+}
+
+// Every card the fragment belongs in: the one inside the host template's
+// content, and any mounted on screen.
+function remoteCards(doc) {
+  var cards = []
+  var host = remoteHost(doc)
+  var inner = host && host.content && host.content.querySelector('[data-modal-host-card]')
+  if (inner) cards.push(inner)
+  var live = doc.querySelectorAll ? doc.querySelectorAll('[data-modal-host-card]') : []
+  for (var i = 0; i < live.length; i++) cards.push(live[i])
+  return cards
+}
+
+function hasRemote(card, id) {
+  var kids = card.children || []
+  for (var i = 0; i < kids.length; i++) {
+    if (kids[i].getAttribute && kids[i].getAttribute(REMOTE_MODAL_ATTR) === id) return true
+  }
+  return false
+}
+
+// Appends the registration to every card missing it. Answers whether the host
+// template now carries it (false: no marked card on this page).
+export function insertRemoteModal(doc, id, markup) {
+  var cards = remoteCards(doc)
+  if (cards.length === 0) return false
+  for (var i = 0; i < cards.length; i++) {
+    if (!hasRemote(cards[i], id)) cards[i].appendChild(remoteTemplate(doc, id, markup))
+  }
+  return true
+}
+
+export function remoteModalUrl(cfg, id) {
+  return cfg.url.replace('__id__', encodeURIComponent(id))
+}
+
+// One fetch. Rejects unless the answer is the fragment the endpoint sends
+// (X-Studio-Modal names the id): a host filter's redirect to a full page, or a
+// 401, is an error, never a modal.
+export function fetchRemoteModal(win, cfg, id) {
+  return win.fetch(remoteModalUrl(cfg, id), {
+    credentials: 'same-origin',
+    headers: { 'Accept': 'text/html', 'X-Requested-With': 'XMLHttpRequest' }
+  }).then(function (res) {
+    if (!res.ok || !res.headers || res.headers.get('X-Studio-Modal') !== id) {
+      throw new Error('studio/modal_host: ' + id + ' answered ' + res.status)
+    }
+    return res.text()
+  })
+}
+
+// requestIdleCallback where the browser has it, else a timeout.
+export function whenIdle(win, fn) {
+  if (typeof win.requestIdleCallback === 'function') win.requestIdleCallback(fn, { timeout: 4000 })
+  else win.setTimeout(fn, 1500)
+}
+
+// The loader one shared store keeps in its closure.
+export function createRemoteModals(env) {
+  var doc = env.doc
+  var win = env.win
+  var pending = {}   // id -> Promise<markup>, while in flight or resolved
+  var ready = {}     // id -> markup, once resolved
+
+  function load(cfg, id) {
+    if (ready[id] !== undefined) return Promise.resolve(ready[id])
+    if (!pending[id]) {
+      pending[id] = fetchRemoteModal(win, cfg, id).then(function (markup) {
+        ready[id] = markup
+        return markup
+      }, function (err) {
+        delete pending[id]
+        throw err
+      })
+    }
+    return pending[id]
+  }
+
+  return {
+    // The config when id is advertised here, else null.
+    handles: function (id) {
+      if (typeof id !== 'string') return null
+      var cfg = remoteConfig(doc)
+      return (cfg && cfg.ids.indexOf(id) !== -1) ? cfg : null
+    },
+    load: load,
+    // Synchronous when the fragment is already here: inserts what this host
+    // lacks and answers true, so open() needs no wait.
+    insertIfReady: function (id) {
+      return ready[id] !== undefined && insertRemoteModal(doc, id, ready[id])
+    },
+    insert: function (id, markup) { return insertRemoteModal(doc, id, markup) },
+    prefetch: function () {
+      var cfg = remoteConfig(doc)
+      if (!cfg || typeof win.fetch !== 'function') return
+      cfg.prefetch.forEach(function (id) {
+        // A failed prefetch is retried by the open that needs it.
+        load(cfg, id).catch(function () {})
+      })
+    }
+  }
+}
+
 // ---- the shared host's store, $store.modals --------------------------------
 //
 // env is { doc, win }: the document, and the window that carries setTimeout,
@@ -293,13 +457,68 @@ export function createModalStore(env) {
   var held = { returnFocusTo: null, backdrop: null }
   var store = focusTrap(env, held)
   store.stack = []
+  // id -> 'loading' | 'error' for an on-demand modal; read by the host's
+  // loading and error cards and by each fetched registration's x-if.
+  store._remote = {}
+  var remote = createRemoteModals(env)
 
   // open(id, props, opts)
   //   opts.replace: swap the top entry. With a visible card, a directional
   //     slide: it exits right (modal-card-swap-out) and the new one enters
   //     left; opts.direction 'back' mirrors both. A plain mount when empty.
   //   otherwise: push. Closing the new card reveals the one beneath.
+  //   An on-demand id not yet in the host loads first (openRemote below).
   store.open = function (id, props, opts) {
+    var cfg = remote.handles(id)
+    if (cfg && !remote.insertIfReady(id)) return openRemote(this, cfg, id, props, opts)
+    return openNow.call(this, id, props, opts)
+  }
+
+  // The first open of an on-demand id. Never throws and never leaves a promise
+  // unhandled: every outcome is the modal, the loading card, or the error card.
+  function openRemote(self, cfg, id, props, opts) {
+    var body = env.doc.body
+    var shown = false
+    var hold = null
+    var done = false
+    if (self._remote[id] === 'error') delete self._remote[id]
+
+    var timer = win.setTimeout(function () {
+      if (done || env.doc.body !== body) return
+      shown = true
+      hold = holdAtLeast((win.StudioModals && win.StudioModals.MIN_LOAD_MS) || MIN_LOAD_MS)
+      self._remote[id] = 'loading'
+      openNow.call(self, id, props, opts)
+    }, LOAD_DELAY_MS)
+
+    function fail() {
+      if (done) return
+      done = true
+      win.clearTimeout && win.clearTimeout(timer)
+      if (env.doc.body !== body) return
+      self._remote[id] = 'error'
+      if (!shown) openNow.call(self, id, props, opts)
+    }
+
+    remote.load(cfg, id).then(function (markup) {
+      if (done) return
+      if (env.doc.body !== body) { done = true; win.clearTimeout && win.clearTimeout(timer); return }
+      if (!remote.insert(id, markup)) { fail(); return }
+      done = true
+      win.clearTimeout && win.clearTimeout(timer)
+      if (!shown) { openNow.call(self, id, props, opts); return }
+      hold.then(function () {
+        if (self._remote[id] === 'loading') delete self._remote[id]
+      })
+    }).catch(fail)
+  }
+
+  // Schedules the advertised prefetches once, when the browser idles.
+  if (env.doc && typeof env.doc.querySelector === 'function') {
+    whenIdle(win, function () { remote.prefetch() })
+  }
+
+  function openNow(id, props, opts) {
     props = props || {}
     opts = opts || {}
     var self = this

@@ -261,6 +261,7 @@ components:
 | Nav spinner, success confetti | `studio/head_chrome` | the boot | `showNavSpinner`, `hideNavSpinner`, `fireSuccessConfetti` |
 | Branded loader: page-load overlay, pending buttons (docs/LOADER.md) | `studio/loader` | the boot | `window.StudioLoader.show`, `.hide`, `.setPercent` |
 | Modal host, scoped host | `studio/modal_host` | `modal-host`, its own module tag | `$store.modals`, each scoped `$store.<name>`, `window.ModalAnimations`, `window.StudioModals` |
+| On-demand modals (`Studio.modals.register`, fetched from `GET /_studio/modals/:id` on first open; shared `$store.modals` host only) | `studio/modal_host` (no new import; fetch-once cache in the module) | `modal-host`; the endpoint URL rides a data attribute on the host | `$store.modals.open(id)` unchanged; see README "Modals on demand" |
 | Toast queue (`layouts/studio/_flash`) | `studio/toast` | `toast`, its own module tag | none needed: the API is the `toast` window event; the queue is `$store.toasts` |
 | Link sidebar flag | `studio/link_sidebar` | `link-sidebar`, its own module tag | `$store.sidebars.linkTreeOpen`. A morph refresh keeps the panel's style (`turbo:before-morph-attribute`), so a closed panel stays drawn closed |
 | Sign-out prefetch guard | `studio/sign_out_prefetch` | the boot | none: it cancels `turbo:before-prefetch` for a same-origin `/logout` link (docs/DEVICE_SESSIONS.md, "Prefetch") |

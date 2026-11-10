@@ -715,6 +715,63 @@ the block:
 <% end %>
 ```
 
+#### Modals on demand — `Studio.modals`
+
+A layout that renders every modal template into every page ships them all on
+every request, opened or not. Register a modal instead, and the shared host
+fetches it the first time it opens:
+
+```ruby
+# config/initializers/studio.rb
+Studio.modals.register :contest_rules, partial: "modals/contest_rules"
+Studio.modals.register :wallet_setup,  partial: "modals/wallet_setup",
+                       auth: :user, locals: :wallet_setup_modal_locals
+Studio.modals.register :auth,          partial: "modals/auth", prefetch: true
+```
+
+Then delete that modal's `<template x-if>` from the layout. Call sites do not
+change: `$store.modals.open("contest_rules", props)` works as before.
+
+| Option | Meaning |
+|--------|---------|
+| `partial:` | The content partial, as the layout rendered it. The two rules below still apply (one root, no double quote in `x-data`). |
+| `auth:` | `:any` (default) or `:user`. A `:user` modal answers `401` to a signed-out request and is never prefetched for one. |
+| `prefetch:` | `true` fetches the modal when the browser idles after load (`requestIdleCallback`, else a timeout), so it opens with no wait. Use it for a modal opened on most visits. |
+| `locals:` | A Hash, a Symbol naming a helper the view answers (an existing `*_modal_locals` helper), or a callable taking the view. Resolved per request, in the view. |
+
+Ids are lower-case letters, digits, `-` and `_`.
+
+**What happens.** The host advertises the registered ids on its template
+(`data-modal-host-remote-value`). `open(id)` for one that is not in the page
+yet fetches `GET /_studio/modals/<id>` (`Studio::ModalsController`), wraps the
+fragment in the same `<template x-if>` a layout would render, appends it to the
+card, and opens. A fetch that answers within 150 ms opens with no loading state.
+A slower one opens the card with the engine's processing card, held at least
+`StudioModals.MIN_LOAD_MS`, then the content replaces it. A failed fetch (a
+network error, a `500`, a `401`, or a host filter's redirect) shows the
+engine's error card, whose button closes; the next open tries again.
+
+The fragment is held for the page's lifetime, across Turbo visits: a later open
+inserts it from memory into the new page's host, once, with no second request.
+A fetch that lands after a Turbo visit opens nothing on the new page.
+
+**What does not change.** An id the registry does not name takes the old
+synchronous `open()` path, and an app that registers nothing renders the host
+exactly as before (no advertisement, no card marker, no loading or error card).
+One difference for a registered id: during the first open's fetch,
+`isOpen(id)` is false until the card appears.
+
+**The endpoint.** It renders only registered ids (any other answers `404`),
+with no layout. It skips the host's `require_authentication` so an `:any`
+modal serves a signed-out visitor, and answers a `:user` modal's signed-out
+request with a bare `401`, never the `/login` redirect. Each answer is
+`private` with `Vary: Cookie` and an ETag. A fragment carries no script, so
+the page's CSP is unchanged. Only the shared host (`$store.modals`) loads on
+demand; a scoped host renders its modals as before.
+
+**Do not do both.** An id that the registry names and the layout still
+renders mounts twice. Move each modal in one change.
+
 #### Writing a modal's content partial — two rules the host imposes
 
 Both rules let the card render and then do less than it looks like it does.

@@ -1,0 +1,33 @@
+<%# ON-DEMAND MODALS (Studio.modals) in a browser, under Turbo. e2e/boot.rb
+    registers the lab-* ids; this page renders the shared host with ONE
+    layout-rendered registration (lab-local) and none of the lab-* ones, so
+    every lab-* open goes through the endpoint. Two pages (?page=b is the
+    other), linked, so a spec can open, visit, and open again.
+
+    THE LAB RULE (see E2eLabController): locals and nothing else. The buttons
+    call the ordinary $store.modals.open(); everything under test is
+    studio/modal_host and studio/modals/_host. %>
+<main class="max-w-3xl mx-auto px-4 py-10" x-data>
+  <h1 class="text-2xl font-bold mb-6" data-test="remote-page"><%= @lab_page == "b" ? "Remote modals B" : "Remote modals A" %></h1>
+
+  <div class="flex flex-wrap gap-3 mb-6">
+    <button type="button" data-test="open-local" class="btn btn-outline"
+            @click="$store.modals.open('lab-local', { title: 'Local card' })">Open local</button>
+    <button type="button" data-test="open-rules" class="btn btn-primary"
+            @click="$store.modals.open('lab-rules', { title: 'Rules card' })">Open rules</button>
+    <button type="button" data-test="open-broken" class="btn btn-outline"
+            @click="$store.modals.open('lab-broken', {})">Open broken</button>
+    <button type="button" data-test="open-member" class="btn btn-outline"
+            @click="$store.modals.open('lab-member', {})">Open member</button>
+    <a href="<%= @lab_other_url %>" data-test="other-page" class="btn btn-outline">Other page</a>
+  </div>
+
+  <%= render "studio/modals/host" do %>
+    <template x-if="$store.modals.current().id === 'lab-local'">
+      <div class="p-2" data-test="local-card">
+        <h2 class="text-lg font-bold" x-text="$store.modals.current().props.title"></h2>
+        <button type="button" data-test="local-close" class="btn btn-outline" @click="$store.modals.close()">Close</button>
+      </div>
+    </template>
+  <% end %>
+</main>
