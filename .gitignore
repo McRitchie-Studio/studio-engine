@@ -21,3 +21,10 @@ node_modules
 # e2e/boot.rb writes the lab's own public folder and database to tmp/e2e-lab.
 /tmp/
 /test/dummy/tmp/
+
+# Screenshots dropped at the repo root by a build or review pass. No root image is
+# source (engine images live under app/assets/images/), so a stray capture here is
+# never committed by accident again.
+/*.png
+/*.jpg
+/*.jpeg
