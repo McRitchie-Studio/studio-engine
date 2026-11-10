@@ -4,6 +4,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.143.0 — 2026-11-10
+
+### Fixed
+
+- **`.edge-rotate-glow` no longer widens a phone page.** The bloom layer (its `::after`) carried a transparent border of 2 x bloom so its mask had room for the blur, which put its box 28px past the host on every side. That box is layout: at 390px the living style guide measured 402px wide, from glow cards in a 16px gutter, also at opacity 0. The bloom is now cut by an evenodd `clip-path` (drawn after the filter, but not layout), so its box stops 8px past the host and the blur spreads past it as ink. The halo looks the same on desktop, except that its corners now follow the host's radius. Keep a glow host 8px or more from the viewport edge. A consumer that overrides the bloom's `inset` (as the glass button rule does) uses `calc(-1 * (var(--edge-rotate-glow-thickness) + 4px))`. The deprecated `.studio-team-glow` alias gets the same fix.
+
 ## 0.142.0 — 2026-11-09
 
 ### Added
