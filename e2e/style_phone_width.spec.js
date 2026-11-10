@@ -28,40 +28,56 @@ const PHONE = { width: 390, height: 844 };
 
 // Glass too, because a glass page changes the lit buttons and their bloom rule
 // (engine.css). The CONTROL note above says what this does and does not prove.
-for (const surface of ["", "glass"]) for (const scheme of ["light", "dark"]) {
-  test(`the style guide does not scroll sideways at 390px (${scheme}${surface && ", " + surface})`, async ({ page }) => {
-    const errors = watchPageErrors(page);
-    await blockOffsiteRequests(page);
-    await page.setViewportSize(PHONE);
-    await page.goto(`/lab/style_nav${surface && "?surface=" + surface}`);
-    // The lab layout hard-codes `dark`; light is the same page with the class off.
-    await page.evaluate((dark) => document.documentElement.classList.toggle("dark", dark), scheme === "dark");
+// Each case is a bare test() because bin/e2e-executed-set-check counts bare
+// declarations; a test declared in a loop reads as an extra spec.
+async function expectNoSidewaysScroll(page, scheme, surface) {
+  const errors = watchPageErrors(page);
+  await blockOffsiteRequests(page);
+  await page.setViewportSize(PHONE);
+  await page.goto(`/lab/style_nav${surface && "?surface=" + surface}`);
+  // The lab layout hard-codes `dark`; light is the same page with the class off.
+  await page.evaluate((dark) => document.documentElement.classList.toggle("dark", dark), scheme === "dark");
 
-    const read = await page.evaluate(() => {
-      const de = document.documentElement;
-      return {
-        clientWidth: de.clientWidth,
-        scrollWidth: de.scrollWidth,
-        bodyScrollWidth: document.body.scrollWidth,
-        dark: de.classList.contains("dark"),
-        surface: de.getAttribute("data-surface-style"),
-        glowHosts: document.querySelectorAll(".edge-rotate-glow").length
-      };
-    });
-
-    expect(read.dark).toBe(scheme === "dark");
-    if (surface) expect(read.surface).toBe(surface);
-    // The page is the one this defect was found on only while it has glow hosts.
-    expect(read.glowHosts, "the style guide renders no .edge-rotate-glow host").toBeGreaterThan(0);
-    expect(read.clientWidth).toBe(PHONE.width);
-    expect(
-      read.scrollWidth,
-      `the style guide is ${read.scrollWidth}px wide in a ${read.clientWidth}px viewport`
-    ).toBe(read.clientWidth);
-    expect(read.bodyScrollWidth).toBe(read.clientWidth);
-    expect(errors).toEqual([]);
+  const read = await page.evaluate(() => {
+    const de = document.documentElement;
+    return {
+      clientWidth: de.clientWidth,
+      scrollWidth: de.scrollWidth,
+      bodyScrollWidth: document.body.scrollWidth,
+      dark: de.classList.contains("dark"),
+      surface: de.getAttribute("data-surface-style"),
+      glowHosts: document.querySelectorAll(".edge-rotate-glow").length
+    };
   });
+
+  expect(read.dark).toBe(scheme === "dark");
+  if (surface) expect(read.surface).toBe(surface);
+  // The page is the one this defect was found on only while it has glow hosts.
+  expect(read.glowHosts, "the style guide renders no .edge-rotate-glow host").toBeGreaterThan(0);
+  expect(read.clientWidth).toBe(PHONE.width);
+  expect(
+    read.scrollWidth,
+    `the style guide is ${read.scrollWidth}px wide in a ${read.clientWidth}px viewport`
+  ).toBe(read.clientWidth);
+  expect(read.bodyScrollWidth).toBe(read.clientWidth);
+  expect(errors).toEqual([]);
 }
+
+test("the style guide does not scroll sideways at 390px (light)", async ({ page }) => {
+  await expectNoSidewaysScroll(page, "light", "");
+});
+
+test("the style guide does not scroll sideways at 390px (dark)", async ({ page }) => {
+  await expectNoSidewaysScroll(page, "dark", "");
+});
+
+test("the style guide does not scroll sideways at 390px (light, glass)", async ({ page }) => {
+  await expectNoSidewaysScroll(page, "light", "glass");
+});
+
+test("the style guide does not scroll sideways at 390px (dark, glass)", async ({ page }) => {
+  await expectNoSidewaysScroll(page, "dark", "glass");
+});
 
 test("a full-width glow card keeps its bloom at 390px", async ({ page }) => {
   await blockOffsiteRequests(page);
