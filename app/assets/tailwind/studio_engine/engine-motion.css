@@ -573,6 +573,10 @@
    The host must still NOT be clipped by an overflow-hidden ancestor near its
    border, or the ring is cut off with it.
 
+   ON A PHONE the bloom does not widen the page: its blur reaches past its box as
+   ink, and a clip-path (not a mask) cuts it, so only 8px past the host is layout.
+   Keep a glow host 8px or more from the viewport edge. The bloom rule says why.
+
    Usage:  <button class="btn btn-primary edge-rotate-glow">Save</button>
            wrapper shape, when the face is its own element:
              <div class="edge-rotate-glow rounded-xl">
@@ -678,20 +682,41 @@
   /* Blurred bloom twin, a touch larger: its wedges reach 4px PAST the ring, which
      is what makes the bloom read as a halo, not a soft edge on the ring. Drop the
      4px and every WRAPPER consumer's ring visibly lightens (measured: 26% of the
-     pixels on style/_modal_specimen, 13% on the hub's release-phase-meter). The
-     box then carries a transparent BORDER of bloom-reach on top of that, and the
-     mask still holes out the host's box — so the blur
-     spreads outward into that reach and is cut where it has already faded, while
-     the inward half is cut at the host's edge (invisible: that edge is either the
-     card's own or the wrapper child's). Mask applies AFTER filter, which is why
-     the reach has to out-measure the blur — without it the halo ends on a hard
-     line at the layer's own box. */
-  inset: calc(-1 * (var(--edge-rotate-glow-thickness) + 4px + var(--edge-rotate-glow-bloom) * 2));
+     pixels on style/_modal_specimen, 13% on the hub's release-phase-meter).
+
+     THE BOX STOPS THERE, and the blur spreads past it. A filter's spread is ink
+     overflow, which never widens a page. A box is layout, and it does. This layer
+     used to carry a transparent border of 2 x bloom so the mask (clipped to the
+     border box) had room for the blur: 28px past the host on every side, and that
+     box widened a 390px phone page to 402px wherever a glow host sat in a 16px
+     gutter, at opacity 0 too (task edge-glow-phone-overflow).
+
+     So the cut is a clip-path, not a mask. clip-path also applies AFTER filter,
+     but its shape may reach past the box and it is not layout. The shape is the
+     same region the mask cut: out to 2 x bloom past this box, where the blur has
+     faded, minus the host's own box (the hole; the inward half of the blur is cut
+     at the host's edge, invisible because that edge is the card's own or the
+     wrapper child's). evenodd makes the inner rectangle a hole. Measured at
+     1280px against the mask version: the same halo, except that the bloom's
+     corners now follow the host's radius.
+
+     What is still layout: this box, 8px past the host (4px ring + 4px), and the
+     ring, 4px. Keep a glow host 8px or more from the viewport edge. */
+  inset: calc(-1 * (var(--edge-rotate-glow-thickness) + 4px));
   padding: calc(var(--edge-rotate-glow-thickness) + 4px);
-  border: calc(var(--edge-rotate-glow-bloom) * 2) solid transparent;
-  /* The wedges stop at the padding box (host + ring + the 4px); the border is empty
-     room the blur is allowed to spread into. */
-  background-clip: padding-box;
+  -webkit-mask: none;
+  mask: none;
+  clip-path: polygon(evenodd,
+    calc(var(--edge-rotate-glow-bloom) * -2) calc(var(--edge-rotate-glow-bloom) * -2),
+    calc(100% + var(--edge-rotate-glow-bloom) * 2) calc(var(--edge-rotate-glow-bloom) * -2),
+    calc(100% + var(--edge-rotate-glow-bloom) * 2) calc(100% + var(--edge-rotate-glow-bloom) * 2),
+    calc(var(--edge-rotate-glow-bloom) * -2) calc(100% + var(--edge-rotate-glow-bloom) * 2),
+    calc(var(--edge-rotate-glow-bloom) * -2) calc(var(--edge-rotate-glow-bloom) * -2),
+    calc(var(--edge-rotate-glow-thickness) + 4px) calc(var(--edge-rotate-glow-thickness) + 4px),
+    calc(var(--edge-rotate-glow-thickness) + 4px) calc(100% - var(--edge-rotate-glow-thickness) - 4px),
+    calc(100% - var(--edge-rotate-glow-thickness) - 4px) calc(100% - var(--edge-rotate-glow-thickness) - 4px),
+    calc(100% - var(--edge-rotate-glow-thickness) - 4px) calc(var(--edge-rotate-glow-thickness) + 4px),
+    calc(var(--edge-rotate-glow-thickness) + 4px) calc(var(--edge-rotate-glow-thickness) + 4px));
   z-index: -2;
   filter: blur(var(--edge-rotate-glow-bloom)) saturate(1.35);
 }

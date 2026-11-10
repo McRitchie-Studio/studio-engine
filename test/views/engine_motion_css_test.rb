@@ -249,13 +249,26 @@ class EngineMotionCssTest < Minitest::Test
     assert_match(/mask:\s*\n?\s*linear-gradient\(#000 0 0\) content-box/, wedges,
       "the punched-out region is the CONTENT box — the host's own box")
 
-    # The bloom twin blurs BEFORE the mask applies, so its box has to out-measure
-    # the blur or the halo ends on a hard line at its own edge.
+    # The bloom twin blurs BEFORE its cut applies, so the cut has to reach past the
+    # blur or the halo ends on a hard line. The cut is a clip-path, not a mask:
+    # a mask clips to the border box, so the box itself had to carry 2 x bloom of
+    # transparent border, and that box widened a 390px phone page to 402px (task
+    # edge-glow-phone-overflow). A clip-path shape may reach past the box and is
+    # not layout.
     bloom = rule_body(BLOOM)
-    assert_match(/border:\s*calc\(var\(--edge-rotate-glow-bloom\) \* 2\) solid transparent/, bloom,
-      "the bloom layer needs transparent border room for the blur to fade into")
-    assert_match(/background-clip:\s*padding-box/, bloom,
-      "the bloom's wedges must stop at the padding box, leaving that border room empty")
+    refute_match(/border:\s*calc\(var\(--edge-rotate-glow-bloom\)/, bloom,
+      "the bloom's box must not carry the blur's room as a border: a box is layout, " \
+      "and 28px past the host widens a phone page")
+    assert_match(/inset:\s*calc\(-1 \* \(var\(--edge-rotate-glow-thickness\) \+ 4px\)\);/, bloom,
+      "the bloom's box stops 4px past the ring")
+    assert_match(/mask:\s*none/, bloom,
+      "the shared mask clips to the border box, which would cut the blur at the box")
+    assert_match(/clip-path:\s*polygon\(evenodd,/, bloom,
+      "the bloom is cut by an evenodd clip-path: out to 2 x bloom, minus the host's box")
+    assert_match(/calc\(100% \+ var\(--edge-rotate-glow-bloom\) \* 2\)/, bloom,
+      "the clip reaches 2 x bloom past the box, where the blur has faded")
+    assert_match(/calc\(var\(--edge-rotate-glow-thickness\) \+ 4px\) calc\(var\(--edge-rotate-glow-thickness\) \+ 4px\)\)/, bloom,
+      "the clip's inner rectangle is the host's box, the hole that keeps the face clear")
 
     # ...and that padding box must reach 4px PAST the ring — the "a touch larger"
     # the bloom always had, respelled as padding once the hole landed. At the bare
