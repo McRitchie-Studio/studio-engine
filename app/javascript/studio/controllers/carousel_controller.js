@@ -30,8 +30,8 @@
 // continuous. connect() copies the last slides before the first and the first slides
 // after the last (cloneLayout), so the space beside either end shows the slides
 // round the seam. Next at the last slide glides on to the clone of the first;
-// once the row rests there (scrollend, or a short quiet spell where the browser has
-// no scrollend) it jumps, with no glide and no transition, to the real first slide,
+// once the row rests there (studio/carousel watchRest: scrollend with a backstop, or
+// a short quiet spell where the browser has no scrollend) it jumps, with no glide and no transition, to the real first slide,
 // whose neighbours look the same. Previous at the first does the same backwards, and
 // a swipe that rests on a clone too. Under reduced motion the row goes straight to
 // the real slide. Neither arrow is ever aria-disabled.
@@ -77,7 +77,7 @@ import {
   CHANGE_EVENT, CLONE_STRIP, TOLERANCE, autoplayRunning, changeDetail, clickedSlide, autoplaySeconds, autoplayStop, cascadeJumps, cascadeReach, cascadeSlot,
   cascadeStep, cascadeSteps, cascadeTarget, centerStops, cloneCount, cloneLayout, dragSteps,
   currentStop, hiddenEnds, idleDelay, initialReasons, keyAction, loopPositionText, loopStop, nearestVirtual, ownsKey,
-  perPage, positionText, seamJump, startStop, stops, targetStop, toggleLabel, withReason, wrapIndex
+  perPage, positionText, seamJump, startStop, stops, targetStop, toggleLabel, watchRest, withReason, wrapIndex
 } from "studio/carousel"
 
 const REDUCE = "(prefers-reduced-motion: reduce)"
@@ -97,9 +97,8 @@ export default class extends Controller {
       this.connectCascade()
       return
     }
-    this.scrollEnd = "onscrollend" in window
     this.trackTarget.addEventListener("scroll", this.schedule, { passive: true })
-    if (this.scrollEnd) this.trackTarget.addEventListener("scrollend", this.settle, { passive: true })
+    this.rest = watchRest(this.trackTarget, this.settle, { scrollend: "onscrollend" in window })
     this.trackTarget.addEventListener("click", this.clickClone)
     if (typeof ResizeObserver === "function") {
       this.observer = new ResizeObserver(this.schedule)
@@ -331,13 +330,12 @@ export default class extends Controller {
   disconnect() {
     if (this.cascade) this.disconnectCascade()
     this.trackTarget.removeEventListener("scroll", this.schedule)
-    this.trackTarget.removeEventListener("scrollend", this.settle)
+    this.rest?.stop()
+    this.rest = null
     this.trackTarget.removeEventListener("click", this.clickClone)
     this.observer?.disconnect()
     if (this.frame) cancelAnimationFrame(this.frame)
     this.frame = null
-    clearTimeout(this.settleTimer)
-    this.settleTimer = null
     this.stopAutoplay()
     this.removeClones()
   }
@@ -389,7 +387,6 @@ export default class extends Controller {
   // The row came to rest. On a clone it jumps to the real slide the clone copies,
   // at the same place in the row, so nothing on screen changes.
   settle() {
-    this.settleTimer = null
     if (!this.cloned) return
     this.sync()
     const real = seamJump(this.virtual, this.positions.length)
@@ -524,10 +521,6 @@ export default class extends Controller {
   }
 
   schedule() {
-    if (this.cloned && !this.scrollEnd) {
-      clearTimeout(this.settleTimer)
-      this.settleTimer = setTimeout(this.settle, 150)
-    }
     if (this.frame) return
     this.frame = requestAnimationFrame(() => {
       this.frame = null
@@ -660,6 +653,7 @@ export default class extends Controller {
       const real = wrapIndex(index, total)
       const left = reduce ? this.positions[real] : this.full[index + this.cloned]
       if (left === undefined) return
+      this.rest?.aimed()
       this.trackTarget.scrollTo({ left, behavior: reduce ? "auto" : "smooth" })
       if (announce && this.hasStatusTarget) this.statusTarget.textContent = loopPositionText(real, this.page, total)
       return

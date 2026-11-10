@@ -232,6 +232,58 @@ export function seamJump(virtual, total) {
   return virtual < 0 || virtual >= total ? wrapIndex(virtual, total) : null
 }
 
+// -- the row's rest ----------------------------------------------------------------
+
+// No scroll for this long is the row's rest, where the browser has no scrollend event.
+export const SETTLE_MS = 150
+// Where the browser has scrollend, this long after the last scroll event is the
+// backstop: a scroll that scrollend never follows still rests. Chrome can send one
+// scroll event and no scrollend, as when the page shortens and the browser pulls the
+// scroll back; a looping row left on a clone then never jumped home and never fired
+// its change event. Three quiet spells, so a slow frame mid-glide (260ms at 8x CPU,
+// as studio/in_page_links measured) does not end the glide: settle() jumps only from
+// a clone's own stop, so a rest read early does nothing.
+export const REST_CAP_MS = SETTLE_MS * 3
+
+// Calls onRest each time the track rests: on scrollend where the browser has it, with
+// REST_CAP_MS after each scroll event as the backstop, and SETTLE_MS after the last
+// scroll event where it does not. After an aim (aimed(): the controller's scrollTo),
+// scrollend counts only once a scroll event has come since that aim: Chrome can send
+// the end of the scroll the aim replaced before the new scroll's first frame. One
+// rest per scroll: a scrollend after the backstop fired, or the backstop after
+// scrollend, finds nothing to end. stop() removes the listeners and the timer.
+export function watchRest(track, onRest, { scrollend = false, timers = globalThis } = {}) {
+  let timer = null
+  let scrolled = false
+  let pending = false
+  const rest = () => {
+    timers.clearTimeout(timer)
+    timer = null
+    if (!pending) return
+    pending = false
+    onRest()
+  }
+  const onScroll = () => {
+    scrolled = true
+    pending = true
+    timers.clearTimeout(timer)
+    timer = timers.setTimeout(rest, scrollend ? REST_CAP_MS : SETTLE_MS)
+  }
+  const onScrollend = () => { if (scrolled) rest() }
+  track.addEventListener("scroll", onScroll, { passive: true })
+  if (scrollend) track.addEventListener("scrollend", onScrollend, { passive: true })
+  return {
+    aimed() { scrolled = false },
+    stop() {
+      timers.clearTimeout(timer)
+      timer = null
+      pending = false
+      track.removeEventListener("scroll", onScroll)
+      if (scrollend) track.removeEventListener("scrollend", onScrollend)
+    }
+  }
+}
+
 // The attributes a clone drops: ids and names (a clone must not answer a #fragment or
 // join a form), test hooks, and Stimulus wiring (a clone runs no controller and is
 // no one's target), and the carousel's own marks.
