@@ -614,6 +614,22 @@ test("a server-marker change while the modal is open keeps its template until it
   assert.equal(next.innerCard.children.length, 0)
 })
 
+test("a late answer for a closed modal leaves focus on the card now open", async () => {
+  const { store, fetches, doc } = setup()
+  doc.contains = () => true
+  let focused = 0
+  store.open("rules")
+  await sleep(LOAD_DELAY_MS + 20)
+  store.captureFocus({ focus: () => { focused++ } })
+  store.close()
+  store.open("plain")
+  await sleep(400)
+  focused = 0
+  fetches[0].status(503)
+  await sleep(5)
+  assert.equal(focused, 0, "the open card keeps its focus")
+})
+
 test("Try again puts focus back on the backdrop, and again when the content lands", async () => {
   const { store, fetches, doc } = setup()
   doc.contains = () => true

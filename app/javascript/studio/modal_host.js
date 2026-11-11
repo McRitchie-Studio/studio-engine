@@ -738,6 +738,8 @@ export function createModalStore(env) {
     }
 
     function stopTimer() { if (timer !== null && win.clearTimeout) win.clearTimeout(timer) }
+    // Only while this modal is on top: a late answer must not pull focus off another card.
+    function refocusIfTop() { var top = self.current(); if (top && top.id === id) self.refocus() }
 
     function fail(err) {
       if (done) return
@@ -747,7 +749,7 @@ export function createModalStore(env) {
       if (cfg.debug && err && err.studioModal) self._remoteReason[id] = err.message
       self._remote[id] = 'error'
       if (!shown) openNow.call(self, id, props, opts)
-      else self.refocus()
+      else refocusIfTop()
     }
 
     remote.load(cfg, id).then(function (markup) {
@@ -758,7 +760,7 @@ export function createModalStore(env) {
       stopTimer()
       if (!shown) { openNow.call(self, id, props, opts); return }
       hold.then(function () {
-        if (self._remote[id] === 'loading') { delete self._remote[id]; self.refocus() }
+        if (self._remote[id] === 'loading') { delete self._remote[id]; refocusIfTop() }
       })
     }).catch(fail)
   }
