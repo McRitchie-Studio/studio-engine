@@ -590,6 +590,13 @@ test("sessionIdentityChange: only a settled move to another viewer is real", () 
   assert.equal(sessionIdentityChange(undefined, null).real, false)
 })
 
+test("sessionIdentityChange: a rehydrate as someone new is real even with no bound identities", () => {
+  const at = (previous, state, fingerprint) => ({ state, previous, snapshot: { state, identities: {}, fingerprint } })
+  const id = sessionIdentityChange(at(null, "authenticated", "fp-alex"), null).identity
+  assert.equal(sessionIdentityChange(at("stale", "authenticated", "fp-alex"), id).real, false)
+  assert.equal(sessionIdentityChange(at("stale", "rehydrated", "fp-sam"), id).real, true)
+})
+
 test("a server-marker change while the modal is open keeps its template until it closes", async () => {
   const page = withConfig({ session: "s1" })
   const { store, fetches, doc } = setup({ page })

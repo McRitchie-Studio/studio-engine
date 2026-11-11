@@ -507,10 +507,10 @@ function removeRemoteModals(doc, keep) {
   return kept
 }
 
-// THE SETTLED STATES of studio/session (docs/SESSION_DRIFT.md). Only a move
-// between these, or a change of the snapshot's identities, is an identity
-// change; stale and rehydrated are revalidation of the same viewer.
-var SETTLED_SESSION_STATES = ['anonymous', 'authenticated', 'signed_out', 'changed']
+// THE SETTLED STATES of studio/session (docs/SESSION_DRIFT.md). A settled
+// event whose fingerprint (user + bound identities) differs from the last is an
+// identity change; rehydrated is one ("possibly as someone new"); stale is not.
+var SETTLED_SESSION_STATES = ['anonymous', 'authenticated', 'signed_out', 'changed', 'rehydrated']
 
 // Is this session:changed detail a REAL change of who is viewing? studio/session
 // sends the event on every transition, including the first seating on page
@@ -523,7 +523,7 @@ export function sessionIdentityChange(detail, lastIdentity) {
   var snap = d.snapshot || {}
   var identity = snap.state === 'anonymous' || snap.state === 'signed_out' || d.state === 'anonymous' || d.state === 'signed_out'
     ? 'anonymous'
-    : JSON.stringify(snap.identities || {})
+    : (snap.fingerprint || JSON.stringify(snap.identities || {}))
   // First seating, or the store has no state yet: remember, never drop.
   if (d.previous === null || d.previous === undefined || !d.state) return { real: false, identity: identity }
   // Someone else observed (changed) or the server reports nobody (signed_out).
@@ -534,7 +534,7 @@ export function sessionIdentityChange(detail, lastIdentity) {
   if (SETTLED_SESSION_STATES.indexOf(d.state) !== -1 && lastIdentity !== null && identity !== lastIdentity) {
     return { real: true, identity: identity }
   }
-  // stale, rehydrated, or a return to the same identity: revalidation.
+  // stale, or a return to the same identity: revalidation.
   return { real: false, identity: SETTLED_SESSION_STATES.indexOf(d.state) !== -1 ? identity : lastIdentity }
 }
 
