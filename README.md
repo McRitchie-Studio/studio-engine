@@ -742,6 +742,17 @@ change: `$store.modals.open("contest_rules", props)` works as before.
 
 Ids are lower-case letters, digits, `-` and `_`.
 
+**Locals run in the modal endpoint, not on the page.** The view that resolves
+`locals:` belongs to `Studio::ModalsController`, so it has the helpers and the
+session (`current_user`, `logged_in?`) but none of the page's instance
+variables. A `*_modal_locals` helper that reads `@contest` or any other
+page-scoped ivar gets `nil` there. Such a helper cannot move as it is: derive
+what it needs from the session or the user, or keep that modal in the layout.
+
+**The fetch timeout.** `Studio.modals.fetch_timeout_ms` (default `8000`) is how
+long the host waits for a fragment. Set it in the initializer:
+`Studio.modals.fetch_timeout_ms = 12_000`.
+
 **What happens.** The host advertises the registered ids on its template
 (`data-modal-host-remote-value`). `open(id)` for one that is not in the page
 yet fetches `GET /_studio/modals/<id>` (`Studio::ModalsController`), wraps the
@@ -749,12 +760,36 @@ fragment in the same `<template x-if>` a layout would render, appends it to the
 card, and opens. A fetch that answers within 150 ms opens with no loading state.
 A slower one opens the card with the engine's processing card, held at least
 `StudioModals.MIN_LOAD_MS`, then the content replaces it. A failed fetch (a
-network error, a `500`, a `401`, or a host filter's redirect) shows the
-engine's error card, whose button closes; the next open tries again.
+network error, a `500`, a `401`, a host filter's redirect, or no answer within
+`fetch_timeout_ms`) shows the engine's error card. **Try again** re-runs the
+fetch with the card in place; **Close** closes it, even on a card opened
+`dismissible: false` (Escape and the backdrop still respect that flag). The next
+open tries again too. The loading card is `role="status"` (`aria-live`
+polite); the error card is `role="alert"`.
 
-The fragment is held for the page's lifetime, across Turbo visits: a later open
-inserts it from memory into the new page's host, once, with no second request.
-A fetch that lands after a Turbo visit opens nothing on the new page.
+**A fragment with a `<script>` is refused**, never inserted: it shows the error
+card. In development and test the card names the reason; in production it shows
+the generic line. Nothing is logged to the console either way. Put behaviour in
+a module or a Stimulus controller.
+
+The fragment is held across Turbo visits: a later open inserts it from memory
+into the new page's host, once, with no second request. A fetch that lands
+after a Turbo visit opens nothing on the new page.
+
+**The cache follows the session.** A fragment can carry the viewer's data and a
+form's CSRF token. The host advertises a session marker
+(`Studio::Modals.session_marker`: a digest of the session id and the user id
+under `Studio.session_key`). The browser compares it on every open and every
+`turbo:load`. When it changes (sign-out, a sign-in, a user switch, by Turbo
+visit), the browser drops every cached fragment, every fetch in flight and every
+template already inserted, so the next open fetches fresh. The session id is
+what `reset_session` rotates, and the CSRF secret rotates with it; the user id
+catches a sign-in that keeps the session. The `csrf-token` meta is not used: it
+is masked anew on every render, so it would empty the cache on every visit.
+
+**Prefetch** runs when the browser idles after the first load and again after
+every Turbo visit (`turbo:load`). An id already cached or in flight is not
+fetched twice.
 
 **What does not change.** An id the registry does not name takes the old
 synchronous `open()` path, and an app that registers nothing renders the host
@@ -766,8 +801,8 @@ One difference for a registered id: during the first open's fetch,
 with no layout. It skips the host's `require_authentication` so an `:any`
 modal serves a signed-out visitor, and answers a `:user` modal's signed-out
 request with a bare `401`, never the `/login` redirect. Each answer is
-`private` with `Vary: Cookie` and an ETag. A fragment carries no script, so
-the page's CSP is unchanged. Only the shared host (`$store.modals`) loads on
+`private` with `Vary: Cookie` and an ETag. A fragment carries no script (the
+browser refuses one that does), so the page's CSP is unchanged. Only the shared host (`$store.modals`) loads on
 demand; a scoped host renders its modals as before.
 
 **Do not do both.** An id that the registry names and the layout still
