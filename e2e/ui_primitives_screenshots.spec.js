@@ -88,6 +88,12 @@ async function capture(page, viewport, theme) {
   expect(found, "style/_primitives and SPECIMENS disagree").toEqual(SPECIMENS);
   expect(errors).toEqual([]);
 
+  // The md button's label is on the type scale: btn-md (body, 1x --type-base)
+  // must win over the bare .btn's text-sm in the compiled cascade, which no unit
+  // test can see.
+  const md = await page.locator('[data-specimen="button-tones"] .btn-md').first().evaluate((el) => getComputedStyle(el).fontSize);
+  expect(md, "btn-md lost to .btn's text-sm: the md label is off the type scale").toBe("16px");
+
   if (!COMPARES) {
     test.info().annotations.push({ type: "note", description: "screenshot baselines are Linux-only; compared in the lane (docs/E2E_LANE.md)" });
     return;
