@@ -94,11 +94,14 @@ end
 # — by 3h, 2h20m, 14h15m and 1h10m — and the worst case was not the longest but
 # the fastest, a lock that went stale 36 minutes after the previous fix was
 # committed. While it is stale EVERY open engine PR is red, over a line no PR
-# author owns. So .github/dependabot.yml now opens the bump PR daily (scoped to
-# solana-studio ALONE, so this repo never inherits the third-party graveyard),
-# and .github/workflows/engine-lock-automerge.yml merges it when — and only
-# when — all four of bin/lock-bump-mergeable's conditions hold. A breaking bump
-# still stops, stays open and red, and still waits for a human.
+# author owns. So every solana-studio release now moves this lock itself:
+# `bin/release ship` (mcritchie-studio bin/release.rb, step 5d,
+# settle_producer_locks -> bump_producer_locks_for_accepted) runs
+# `bundle lock --update solana-studio --conservative` on this repo's `accepted`
+# the moment the final is live, and warns by name when it cannot. That replaced
+# a daily, solana-studio-only Dependabot check and its auto-merge lane (task
+# ci-runs-reactive-and-once, 2026-11-10), which arrived up to a day late. A lock
+# that still trails is drift, handled by the dependency-update SOP.
 group :development, :test do
   gem "solana-studio", ">= 0.5.3"
 end
