@@ -894,11 +894,16 @@ a real test:
 ```ruby
 # test/application_system_test_case.rb
 require "test_helper"
+require "studio/system_test_case"
 
-class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
+class ApplicationSystemTestCase < Studio::SystemTestCase
   driven_by :selenium, using: :headless_chrome, screen_size: [ 1400, 1400 ]
 end
 ```
+
+`Studio::SystemTestCase` carries the browser harness fixes (window reset, script
+timeout, phone emulation, a 180s read timeout) and the app's own customizations
+sit on top of it: [`SYSTEM_TESTS.md`](SYSTEM_TESTS.md).
 
 **The mechanic is in the generator:** on Rails 8, `test/system` and
 `application_system_test_case.rb` are scaffolded only behind a

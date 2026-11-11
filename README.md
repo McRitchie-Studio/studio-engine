@@ -55,6 +55,7 @@ resolved.
 - **Connections**: generic OAuth 2.0 tooling to connect a third-party account. A host declares each provider with `Studio.define_connection` (endpoints, static or per-account; scopes; form or HTTP Basic client auth; a rotating, cached or client-credentials refresh policy). The engine gives it `Studio::Connection` (one table, tokens encrypted, `bin/rails g studio:connections`), the connect, callback and disconnect actions (`Studio::ConnectionFlow`) behind the host's admin guard, `Studio.draw_connection_routes`, an exact-key log filter, and a stand-in for the e2e lane. The tooling names no provider; the engine's own definitions are the Integrations below. See [`docs/CONNECTIONS.md`](docs/CONNECTIONS.md).
 - **Integrations**: ready connection definitions on that tooling for QuickBooks, Egnyte and Microsoft 365: the URLs, scopes, token behaviour and a minimal describe, never a reader. A host turns one on with `Studio.enable_integration :quickbooks, env: { client_id: "...", client_secret: "..." }` (env var names) and mounts the admin page with `Studio.draw_integrations_routes(self)`: a list with each status and Connect, and one page per integration with Disconnect and a host panel for the host's own live read. See [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md).
 - **Surveys**: define a survey in app code (`config/surveys/*.rb`, `Studio.define_survey`) with six question types — emoji scale, 1–5 rating, single and multiple choice, short and long text — and the engine serves it at `/surveys/:slug`: one question per screen, autosave, resume, keyboard shortcuts, and a no-JavaScript fallback. `config.on_survey_completed` and `config.survey_ref_resolver` let the app fire its own goals and attribute email arrivals. An admin panel at `/admin/surveys` breaks results down per question and exports CSV. Opt in with `config.draw_survey_routes = true` and `config.draw_admin_survey_routes = true`. See [`docs/SURVEYS.md`](docs/SURVEYS.md).
+- **System tests**: `Studio::SystemTestCase`, the one Capybara base every host's `ApplicationSystemTestCase` inherits (`require "studio/system_test_case"`). It resets the window before each test, restores the script timeout Capybara 3.40.0's `evaluate_async_script` leaves at 2s, clears phone emulation after each test, and gives Selenium a 180s read timeout. An app keeps its own settings (`phone_width`), setup, helpers and tests, and opts out of one hook by name with `skip_harness_hook`, which is logged. See [`docs/SYSTEM_TESTS.md`](docs/SYSTEM_TESTS.md).
 
 ## Tailwind
 
@@ -309,6 +310,7 @@ size and state live (Components section), and the gallery has a preview per stat
 <%= render Studio::ButtonComponent.new(label: "Save", type: "submit") %>
 <%= render Studio::ButtonComponent.new(label: "Delete", tone: :danger, size: :sm) %>
 <%= render Studio::ButtonComponent.new(label: "Docs", tone: :quiet, href: docs_path) %>
+<%= render Studio::ButtonComponent.new(label: "Export", tone: :outline) %>
 <%= render Studio::ButtonComponent.new(label: "Save", type: "submit", loading: true, busy_label: "Saving…") %>
 
 <%= render(Studio::EmptyStateComponent.new(detail: "Invite someone to start.")) do |empty| %>
@@ -318,6 +320,7 @@ size and state live (Components section), and the gallery has a preview per stat
 
 <%= render Studio::TableComponent.new(
       rows: @users, sort: params[:sort], direction: params[:direction], empty: "No users yet.",
+      caption: "Team members",
       columns: [
         { key: :name, label: "User", sortable: true },
         { key: :created_at, label: "Joined", align: :right, cell: ->(u) { l(u.created_at.to_date) } }
@@ -326,11 +329,19 @@ size and state live (Components section), and the gallery has a preview per stat
 
 - **Button.** Tones map onto the shipped utilities: `primary` is `btn-primary`,
   `secondary` is `btn-secondary` (the success role, or the app's
-  `--btn-secondary-*` retune), `quiet` is `btn-neutral`, `danger` is `btn-danger`.
-  Sizes are `btn-sm`, bare `btn` and `btn-lg`. `loading:` uses the aria-busy
+  `--btn-secondary-*` retune), `quiet` is `btn-neutral`, `danger` is `btn-danger`,
+  `outline` is `btn-outline` (a primary border, unfilled until hover).
+  Sizes are `btn-sm`, `btn-md` and `btn-lg`. `btn-md` puts the medium label on
+  the type scale at body size (1x `--type-base`); a bare `btn` keeps `text-sm`,
+  so hand-built buttons do not move. `loading:` uses the aria-busy
   contract (docs/LOADER.md): the button is `aria-busy` and disabled and shows the
   pending spinner. A submit button always carries the hidden spinner, so a Turbo
   form that marks itself busy shows it with no script. A link cannot be loading.
+  **A busy form hides the icon on every button in it**, not only on the submit
+  button: the aria-busy contract hides every `[data-loader-idle]` under the busy
+  element, and the icon slot is idle content. A Cancel or Back button with an
+  icon inside the form loses its icon while the form submits. Put such a button
+  outside the form, or give it no icon.
 - **Empty state.** The `.empty-state` card, the message at `type-body`, the
   detail at `type-fine`, an optional icon, and at most one action, which is a
   `Studio::ButtonComponent`. `framed: false` drops the card. The
@@ -341,7 +352,10 @@ size and state live (Components section), and the gallery has a preview per stat
   `sort_url:` takes a callable for another URL shape. No rows renders one row with
   a bare empty state. On a phone the table scrolls sideways, as every engine table
   does; `min_width:` sets where. `sticky_header: true` adds
-  `data-sticky-table-header`.
+  `data-sticky-table-header`. Give every table a name: `caption:` renders a
+  visually hidden `<caption>`, `aria_label:` labels the table without one. The
+  scroll wrapper is always `tabindex="0"`, so a keyboard user can scroll it, and a
+  name also makes it a labelled `role="region"`.
 
 ### The page header — `studio/_page_header`
 
@@ -737,10 +751,21 @@ change: `$store.modals.open("contest_rules", props)` works as before.
 |--------|---------|
 | `partial:` | The content partial, as the layout rendered it. The two rules below still apply (one root, no double quote in `x-data`). |
 | `auth:` | `:any` (default) or `:user`. A `:user` modal answers `401` to a signed-out request and is never prefetched for one. |
-| `prefetch:` | `true` fetches the modal when the browser idles after load (`requestIdleCallback`, else a timeout), so it opens with no wait. Use it for a modal opened on most visits. |
+| `prefetch:` | `true` fetches the modal when the browser idles after load and after every Turbo visit (`requestIdleCallback`, else a timeout), so it opens with no wait. Use it for a modal opened on most visits. |
 | `locals:` | A Hash, a Symbol naming a helper the view answers (an existing `*_modal_locals` helper), or a callable taking the view. Resolved per request, in the view. |
 
 Ids are lower-case letters, digits, `-` and `_`.
+
+**Locals run in the modal endpoint, not on the page.** The view that resolves
+`locals:` belongs to `Studio::ModalsController`, so it has the helpers and the
+session (`current_user`, `logged_in?`) but none of the page's instance
+variables. A `*_modal_locals` helper that reads `@contest` or any other
+page-scoped ivar gets `nil` there. Such a helper cannot move as it is: derive
+what it needs from the session or the user, or keep that modal in the layout.
+
+**The fetch timeout.** `Studio.modals.fetch_timeout_ms` (default `8000`) is how
+long the host waits for a fragment. Set it in the initializer:
+`Studio.modals.fetch_timeout_ms = 12_000`.
 
 **What happens.** The host advertises the registered ids on its template
 (`data-modal-host-remote-value`). `open(id)` for one that is not in the page
@@ -749,12 +774,41 @@ fragment in the same `<template x-if>` a layout would render, appends it to the
 card, and opens. A fetch that answers within 150 ms opens with no loading state.
 A slower one opens the card with the engine's processing card, held at least
 `StudioModals.MIN_LOAD_MS`, then the content replaces it. A failed fetch (a
-network error, a `500`, a `401`, or a host filter's redirect) shows the
-engine's error card, whose button closes; the next open tries again.
+network error, a `500`, a `401`, a host filter's redirect, or no answer within
+`fetch_timeout_ms`) shows the engine's error card. **Try again** re-runs the
+fetch with the card in place; **Close** closes it, even on a card opened
+`dismissible: false` (Escape and the backdrop still respect that flag). The next
+open tries again too. The loading card is `role="status"` (`aria-live`
+polite); the error card is `role="alert"`.
 
-The fragment is held for the page's lifetime, across Turbo visits: a later open
-inserts it from memory into the new page's host, once, with no second request.
-A fetch that lands after a Turbo visit opens nothing on the new page.
+**A fragment with a `<script>` is refused**, never inserted: it shows the error
+card. In development and test the card names the reason; in production it shows
+the generic line. Nothing is logged to the console either way; the endpoint
+records an `ErrorLog` row instead, once per modal id per process. Put behaviour in a module or a Stimulus
+controller.
+
+The fragment is held across Turbo visits: a later open inserts it from memory
+into the new page's host, once, with no second request. A fetch that lands
+after a Turbo visit opens nothing on the new page.
+
+**The cache follows the session.** A fragment can carry the viewer's data and a
+form's CSRF token. The host advertises a session marker
+(`Studio::Modals.session_marker`: a digest of the session id and the user id
+under `Studio.session_key`). The browser compares it on every open and every
+`turbo:load`. When it changes (sign-out, a sign-in, a user switch, by Turbo
+visit, or a `session:changed` from studio/session that is a real identity
+change: `signed_out`, `changed`, or another viewer's identities, never the first
+seating at load or a `stale` → `authenticated` revalidation), the browser drops
+every cached fragment, every fetch in flight and every template already
+inserted, so the next open fetches fresh. A modal open at that moment keeps its
+template until it closes: a card is never emptied in place. The session id is
+what `reset_session` rotates, and the CSRF secret rotates with it; the user id
+catches a sign-in that keeps the session. The `csrf-token` meta is not used: it
+is masked anew on every render, so it would empty the cache on every visit.
+
+**Prefetch** runs when the browser idles after the first load and again after
+every Turbo visit (`turbo:load`). An id already cached or in flight is not
+fetched twice.
 
 **What does not change.** An id the registry does not name takes the old
 synchronous `open()` path, and an app that registers nothing renders the host
@@ -766,8 +820,8 @@ One difference for a registered id: during the first open's fetch,
 with no layout. It skips the host's `require_authentication` so an `:any`
 modal serves a signed-out visitor, and answers a `:user` modal's signed-out
 request with a bare `401`, never the `/login` redirect. Each answer is
-`private` with `Vary: Cookie` and an ETag. A fragment carries no script, so
-the page's CSP is unchanged. Only the shared host (`$store.modals`) loads on
+`private` with `Vary: Cookie` and an ETag. A fragment carries no script (the
+browser refuses one that does), so the page's CSP is unchanged. Only the shared host (`$store.modals`) loads on
 demand; a scoped host renders its modals as before.
 
 **Do not do both.** An id that the registry names and the layout still

@@ -1,5 +1,6 @@
-<div class="<%= Studio::TableComponent::WRAPPER %>" data-table>
+<%= tag.div(**wrapper_attributes) do %>
   <%= tag.table(**table_attributes) do %>
+    <% if caption %><caption class="<%= Studio::TableComponent::CAPTION %>"><%= caption %></caption><% end %>
     <thead class="<%= Studio::TableComponent::HEAD %>">
       <tr>
         <% columns.each do |column| %>
@@ -29,4 +30,4 @@
       <% end %>
     </tbody>
   <% end %>
-</div>
+<% end %>

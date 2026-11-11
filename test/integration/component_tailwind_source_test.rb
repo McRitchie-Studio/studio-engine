@@ -93,9 +93,10 @@ class ComponentTailwindSourceTest < Minitest::Test
       require_relative "../../app/components/studio/table_component"
     end
     strings = Studio::BadgeComponent::TONES.values +
+              Studio::ButtonComponent::TONES.values + Studio::ButtonComponent::SIZES.values.compact +
               [Studio::ButtonComponent::LAYOUT, Studio::ButtonComponent::DISABLED_LINK] +
               %w[BARE MESSAGE DETAIL ICON ACTION].map { |c| Studio::EmptyStateComponent.const_get(c) } +
-              %w[WRAPPER TABLE HEAD BODY ROW HEADER_CELL CELL SORT_LINK SORT_ARROW].map { |c| Studio::TableComponent.const_get(c) } +
+              %w[WRAPPER CAPTION TABLE HEAD BODY ROW HEADER_CELL CELL SORT_LINK SORT_ARROW].map { |c| Studio::TableComponent.const_get(c) } +
               Studio::TableComponent::ALIGN.values
     classes = strings.flat_map(&:split).uniq
     views = Dir[File.join(B::ROOT, "app/views/**/*.erb")].map { |path| File.read(path) }.join("\n")

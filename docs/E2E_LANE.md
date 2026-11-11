@@ -490,19 +490,23 @@ CI artifact is the word on it.
 **To draw a first draft** after a deliberate visual change, use the lane's own
 image with Docker. Boot the lab on the Mac, copy the tree without its linked
 `node_modules`, and run Playwright in the image against it through a loopback
-proxy (`blockOffsiteRequests` only lets 127.0.0.1 through):
+proxy (`blockOffsiteRequests` only lets 127.0.0.1 through). Pick a lab port
+outside reserved app ranges (see mcritchie-studio
+`docs/agents/modules/ports-and-processes.md`); 4811 below is one. Stop the lab by
+its own PID or port (`lsof -ti tcp:4811 | xargs kill`), never by a pattern kill,
+which stops other desks' labs too:
 
 ```bash
-E2E_PORT=3627 bundle exec ruby e2e/boot.rb &          # the lab, on the Mac
+E2E_PORT=4811 bundle exec ruby e2e/boot.rb &          # the lab, on the Mac
 W=$(mktemp -d) && rsync -a --exclude node_modules --exclude .git --exclude .npmrc ./ "$W/"
 cat > "$W/proxy.js" <<'JS'
 const net = require("node:net");
-net.createServer((c) => { const u = net.connect(3627, "host.docker.internal"); c.pipe(u); u.pipe(c); })
-  .listen(3627, "127.0.0.1");
+net.createServer((c) => { const u = net.connect(4811, "host.docker.internal"); c.pipe(u); u.pipe(c); })
+  .listen(4811, "127.0.0.1");
 JS
 docker run --rm --platform linux/amd64 --shm-size=2g --init \
   --add-host=host.docker.internal:host-gateway -v "$W":/work -w /work \
-  -e PW_BASE_URL=http://127.0.0.1:3627 ghcr.io/mcritchie-studio/ci-rails:24.04 bash -lc \
+  -e PW_BASE_URL=http://127.0.0.1:4811 ghcr.io/mcritchie-studio/ci-rails:24.04 bash -lc \
   '(node proxy.js &); npm ci --ignore-scripts && npx playwright install chromium &&
    npx playwright test e2e/ui_primitives_screenshots.spec.js --update-snapshots=all'
 cp "$W"/e2e/ui_primitives_screenshots.spec.js-snapshots/*.png e2e/ui_primitives_screenshots.spec.js-snapshots/

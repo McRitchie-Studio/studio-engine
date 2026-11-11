@@ -27,8 +27,9 @@ class Studio::ButtonComponentTest < ViewComponent::TestCase
 
   # Written out here, not read from the component, so a change to the mapping
   # shows up as a diff someone has to agree to.
-  TONE_CLASSES = { primary: "btn-primary", secondary: "btn-secondary", quiet: "btn-neutral", danger: "btn-danger" }.freeze
-  SIZE_CLASSES = { sm: "btn-sm", md: nil, lg: "btn-lg" }.freeze
+  TONE_CLASSES = { primary: "btn-primary", secondary: "btn-secondary", quiet: "btn-neutral", danger: "btn-danger",
+                   outline: "btn-outline" }.freeze
+  SIZE_CLASSES = { sm: "btn-sm", md: "btn-md", lg: "btn-lg" }.freeze
 
   test "each tone renders .btn and the tone's shipped btn-* class" do
     TONE_CLASSES.each do |tone, css|
@@ -41,7 +42,7 @@ class Studio::ButtonComponentTest < ViewComponent::TestCase
     end
   end
 
-  test "each size renders btn-sm, bare btn or btn-lg" do
+  test "each size renders btn-sm, btn-md or btn-lg" do
     SIZE_CLASSES.each do |size, css|
       render_inline(Studio::ButtonComponent.new(label: "Go", size: size))
 
@@ -65,6 +66,7 @@ class Studio::ButtonComponentTest < ViewComponent::TestCase
 
     assert_equal "button", element[:type]
     assert_includes classes, "btn-primary"
+    assert_includes classes, "btn-md"
     refute element.key?("disabled")
     refute element.key?("aria-busy")
   end
@@ -164,7 +166,7 @@ class Studio::ButtonComponentTest < ViewComponent::TestCase
   end
 
   test "an unknown tone, size or type is refused, naming the choices" do
-    assert_match(/primary, secondary, quiet, danger/, assert_raises(ArgumentError) { Studio::ButtonComponent.new(label: "x", tone: :mint) }.message)
+    assert_match(/primary, secondary, quiet, danger, outline/, assert_raises(ArgumentError) { Studio::ButtonComponent.new(label: "x", tone: :mint) }.message)
     assert_match(/sm, md, lg/, assert_raises(ArgumentError) { Studio::ButtonComponent.new(label: "x", size: :xl) }.message)
     assert_match(/button, submit, reset/, assert_raises(ArgumentError) { Studio::ButtonComponent.new(label: "x", type: "link") }.message)
   end
@@ -175,5 +177,29 @@ class Studio::ButtonComponentTest < ViewComponent::TestCase
 
   test "no label and no block is refused" do
     assert_raises(ArgumentError) { render_inline(Studio::ButtonComponent.new) }
+  end
+
+  # md's label is on the type scale (body, 1x --type-base), not the bare .btn's
+  # text-sm: the component adds btn-md, and btn-md is compiled from that multiple.
+  test "the md size sets its label on the type scale through btn-md" do
+    render_inline(Studio::ButtonComponent.new(label: "Go"))
+    refute_includes classes, "text-sm"
+
+    css = File.read(File.expand_path("../../../app/assets/tailwind/studio_engine/engine.css", __dir__))
+    rule = css[/@utility btn-md \{[^}]*\}/]
+    refute_nil rule, "engine.css defines no btn-md utility"
+    assert_includes rule, "font-size: calc(var(--type-base, 16px) * 1)"
+  end
+
+  test "the outline tone draws btn-outline as a button, a link and a loading button" do
+    render_inline(Studio::ButtonComponent.new(label: "Export", tone: :outline))
+    assert_includes classes, "btn-outline"
+
+    render_inline(Studio::ButtonComponent.new(label: "Export", tone: :outline, href: "/export"))
+    assert_includes classes("a"), "btn-outline"
+
+    render_inline(Studio::ButtonComponent.new(label: "Export", tone: :outline, loading: true))
+    assert_equal "true", element["aria-busy"]
+    assert_includes classes, "btn-outline"
   end
 end

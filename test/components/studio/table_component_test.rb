@@ -149,4 +149,50 @@ class Studio::TableComponentTest < ViewComponent::TestCase
     assert_raises(ArgumentError) { Studio::TableComponent.new(rows: [], columns: [{ key: :a, label: "A", width: 3 }]) }
     assert_raises(ArgumentError) { Studio::TableComponent.new(rows: [], columns: [{ key: :a, label: "A", align: :middle }]) }
   end
+
+  def wrapper = @fragment.at_css("div[data-table]")
+
+  test "the scroll wrapper is keyboard-focusable, with an inset focus ring" do
+    render_table
+
+    assert_equal "0", wrapper[:tabindex]
+    assert_includes wrapper[:class].split, "focus-visible:-outline-offset-2"
+  end
+
+  test "with no name the wrapper takes no role: a region with no name is noise" do
+    render_table
+
+    assert_nil wrapper[:role]
+    assert_nil wrapper["aria-label"]
+    assert_nil table.at_css("caption")
+    assert_nil table["aria-label"]
+  end
+
+  test "caption renders a visually hidden caption and names the wrapper region" do
+    render_table(caption: "Team members")
+
+    caption = table.at_css("caption")
+    assert_equal "Team members", caption.text
+    assert_includes caption[:class].split, "sr-only"
+    assert_equal table.element_children.first, caption, "a caption must be the table's first child"
+    assert_equal "region", wrapper[:role]
+    assert_equal "Team members", wrapper["aria-label"]
+    assert_nil table["aria-label"], "the caption already names the table"
+  end
+
+  test "aria_label labels the table and the wrapper region without a caption" do
+    render_table(aria_label: "Team members")
+
+    assert_equal "Team members", table["aria-label"]
+    assert_nil table.at_css("caption")
+    assert_equal "region", wrapper[:role]
+    assert_equal "Team members", wrapper["aria-label"]
+  end
+
+  test "a caption is escaped" do
+    render_table(caption: "<b>x</b>")
+
+    assert_equal "<b>x</b>", table.at_css("caption").text
+    assert_empty table.css("b")
+  end
 end

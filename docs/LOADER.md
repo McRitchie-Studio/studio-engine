@@ -140,7 +140,11 @@ loaded machine the click alone can take a quarter of a second to land.
   Breathe in the button's text colour) and mark what it replaces
   `data-loader-idle`. It shows while the button or its form is
   `aria-busy="true"`: Turbo marks a submitting form itself; for a form Turbo
-  does not drive, `studio/loader` marks the submitter.
+  does not drive, `studio/loader` marks the submitter. A busy FORM hides the
+  `data-loader-idle` content of EVERY button inside it, not only the submit
+  (`:where(form, button)[aria-busy="true"] [data-loader-idle]`), so a Cancel or
+  Back button with an icon loses that icon while the form submits. Put such a
+  button outside the form, or give it no icon.
 - **Percent.** `StudioLoader.setPercent(el, n)` moves a `percent:` loader.
 
 ## The family

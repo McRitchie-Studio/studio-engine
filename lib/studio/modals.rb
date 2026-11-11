@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "digest"
+
 module Studio
   # The on-demand modal registry: modals the shared host (studio/modals/_host)
   # fetches the first time they open, instead of the layout rendering every
@@ -22,11 +24,14 @@ module Studio
   #             (one root element; see the README's "Modal host" rules).
   #   auth:     :any (default) or :user. A :user modal answers 401 to a
   #             signed-out request, and is never prefetched for one.
-  #   prefetch: true fetches the modal when the browser idles after load, for a
-  #             modal that should open with no wait (the sign-in card).
+  #   prefetch: true fetches the modal when the browser idles after load and
+  #             after every Turbo visit, for a modal that should open with no
+  #             wait (the sign-in card).
   #   locals:   the partial's locals. A Hash, a Symbol naming a helper the view
   #             answers (Turf's existing *_modal_locals helpers), or a callable
-  #             taking the view. Resolved per request, inside the view.
+  #             taking the view. Resolved per request, inside the view of
+  #             Studio::ModalsController: helpers and the session are there,
+  #             the page's instance variables (@contest) are not.
   module Modals
     AUTH_LEVELS = %i[any user].freeze
 
@@ -54,8 +59,23 @@ module Studio
     end
 
     class Registry
+      # How long studio/modal_host waits for a fragment before it gives up and
+      # shows the error card (with Try again and Close), in milliseconds.
+      DEFAULT_FETCH_TIMEOUT_MS = 8000
+
+      # Settable from the initializer: Studio.modals.fetch_timeout_ms = 12_000.
+      attr_reader :fetch_timeout_ms
+
       def initialize
         @entries = {}
+        @fetch_timeout_ms = DEFAULT_FETCH_TIMEOUT_MS
+      end
+
+      def fetch_timeout_ms=(value)
+        ms = Integer(value)
+        raise ArgumentError, "Studio.modals.fetch_timeout_ms must be positive, got #{value.inspect}" unless ms.positive?
+
+        @fetch_timeout_ms = ms
       end
 
       def register(id, partial:, auth: :any, prefetch: false, locals: nil)
@@ -85,13 +105,45 @@ module Studio
       # What the host template advertises to studio/modal_host. Every id, so a
       # signed-out open of a :user modal still reaches the endpoint and shows
       # the error card; prefetch only what this viewer may load.
-      def client_config(url_template:, logged_in:)
+      #
+      # session: the marker studio/modal_host keys its fragment cache on (see
+      # Modals.session_marker). debug: true in development and test, where a
+      # refused fragment names its reason on the error card.
+      def client_config(url_template:, logged_in:, session: nil, debug: false)
         {
           url: url_template,
           ids: ids,
-          prefetch: entries.select { |e| e.prefetch && (!e.user_only? || logged_in) }.map(&:id)
+          prefetch: entries.select { |e| e.prefetch && (!e.user_only? || logged_in) }.map(&:id),
+          timeout_ms: fetch_timeout_ms,
+          session: session.to_s,
+          debug: debug == true
         }
       end
+    end
+  end
+
+  module Modals
+    # THE SESSION MARKER. A fetched fragment can carry the viewer's data and a
+    # form's CSRF token, and studio/modal_host keeps it for the page's life. A
+    # Turbo visit across sign-in, sign-out or a user switch keeps that page, so
+    # the browser compares this marker on every open and every turbo:load and
+    # drops its cache when it changes.
+    #
+    # It digests two things the request already has:
+    #   - the session id, which reset_session rotates (sign-out, and the
+    #     sign-ins that reset), and with it the session's CSRF secret: a cached
+    #     form token stops being valid exactly when this changes;
+    #   - the signed-in user id under Studio.session_key, which a sign-in that
+    #     does NOT reset the session (an OAuth or wallet sign-in) still changes.
+    # Digested so neither value reaches the page. A request with no session
+    # (a view rendered outside a controller) answers the digest of nothing:
+    # a constant, so the cache simply lives for the page, as before.
+    def self.session_marker(session)
+      sid = session.respond_to?(:id) ? session.id.to_s : ""
+      uid = session.respond_to?(:[]) ? session[Studio.session_key].to_s : ""
+      Digest::SHA256.hexdigest("#{sid}|#{uid}")[0, 16]
+    rescue StandardError
+      Digest::SHA256.hexdigest("|")[0, 16]
     end
   end
 

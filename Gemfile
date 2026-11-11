@@ -29,6 +29,13 @@ group :development, :test do
   # Rails.application directly rather than growing Rails-app scaffolding inside a
   # test fixture. Not a runtime dependency — consuming apps bring their own server.
   gem "puma", ">= 6.0"
+
+  # Capybara and selenium-webdriver drive Studio::SystemTestCase's own tests
+  # (test/lib/system_test_case_test.rb, test/system/). The gem does not declare
+  # them: lib/studio.rb never loads lib/studio/system_test_case.rb, and every
+  # host that inherits the base bundles both in its own test group.
+  gem "capybara", ">= 3.39"
+  gem "selenium-webdriver", ">= 4.20"
 end
 
 # solana-studio backs the style guide's THREE web3 specimens (Connect wallet and
