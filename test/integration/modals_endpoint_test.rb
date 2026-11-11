@@ -139,4 +139,24 @@ class ModalsEndpointTest < ActionDispatch::IntegrationTest
     assert_includes response.headers["Vary"].to_s, "Cookie"
     assert response.headers["ETag"].present?, "Rails' ETag lets a revisit answer 304"
   end
+
+  # ---- engine-modals-fetch-hardening ----
+
+  def test_a_fragment_with_a_script_is_recorded_as_an_error_log
+    Studio.modals.register :scripted, partial: "e2e_lab/modals/remote_script"
+    before = ErrorLog.count
+    fetch_modal("scripted")
+
+    assert_response :success
+    assert_equal "scripted", response.headers["X-Studio-Modal"], "still sent: the browser refuses it"
+    assert_equal before + 1, ErrorLog.count
+    assert_includes ErrorLog.last.message, "renders a <script>"
+  end
+
+  def test_a_fragment_without_a_script_records_nothing
+    before = ErrorLog.count
+    fetch_modal("rules")
+    assert_response :success
+    assert_equal before, ErrorLog.count
+  end
 end

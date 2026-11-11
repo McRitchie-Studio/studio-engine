@@ -737,7 +737,7 @@ change: `$store.modals.open("contest_rules", props)` works as before.
 |--------|---------|
 | `partial:` | The content partial, as the layout rendered it. The two rules below still apply (one root, no double quote in `x-data`). |
 | `auth:` | `:any` (default) or `:user`. A `:user` modal answers `401` to a signed-out request and is never prefetched for one. |
-| `prefetch:` | `true` fetches the modal when the browser idles after load (`requestIdleCallback`, else a timeout), so it opens with no wait. Use it for a modal opened on most visits. |
+| `prefetch:` | `true` fetches the modal when the browser idles after load and after every Turbo visit (`requestIdleCallback`, else a timeout), so it opens with no wait. Use it for a modal opened on most visits. |
 | `locals:` | A Hash, a Symbol naming a helper the view answers (an existing `*_modal_locals` helper), or a callable taking the view. Resolved per request, in the view. |
 
 Ids are lower-case letters, digits, `-` and `_`.
@@ -769,8 +769,9 @@ polite); the error card is `role="alert"`.
 
 **A fragment with a `<script>` is refused**, never inserted: it shows the error
 card. In development and test the card names the reason; in production it shows
-the generic line. Nothing is logged to the console either way. Put behaviour in
-a module or a Stimulus controller.
+the generic line. Nothing is logged to the console either way; the endpoint
+records an `ErrorLog` row instead. Put behaviour in a module or a Stimulus
+controller.
 
 The fragment is held across Turbo visits: a later open inserts it from memory
 into the new page's host, once, with no second request. A fetch that lands
@@ -781,8 +782,9 @@ form's CSRF token. The host advertises a session marker
 (`Studio::Modals.session_marker`: a digest of the session id and the user id
 under `Studio.session_key`). The browser compares it on every open and every
 `turbo:load`. When it changes (sign-out, a sign-in, a user switch, by Turbo
-visit), the browser drops every cached fragment, every fetch in flight and every
-template already inserted, so the next open fetches fresh. The session id is
+visit, or studio/session's `session:changed`), the browser drops every cached
+fragment, every fetch in flight and every template already inserted, so the
+next open fetches fresh. The session id is
 what `reset_session` rotates, and the CSRF secret rotates with it; the user id
 catches a sign-in that keeps the session. The `csrf-token` meta is not used: it
 is masked anew on every render, so it would empty the cache on every visit.

@@ -325,7 +325,8 @@ function focusTrap(env, held) {
 // digest of the session id and the signed-in user id (Studio::Modals.
 // session_marker), and every open and every turbo:load compares it: a change
 // drops every cached fragment, every fetch in flight, and every template
-// already inserted on this page. Why that signal: the session id is what
+// already inserted on this page. studio/session's session:changed event drops
+// them too. Why that signal: the session id is what
 // reset_session rotates, and the CSRF secret rotates with it, so a cached form
 // token goes stale exactly when it changes; the user id catches a sign-in
 // that keeps the session. The page's csrf-token meta would not do: it is
@@ -335,7 +336,8 @@ function focusTrap(env, held) {
 // inserted: an inserted script would run (or not) by accident of how Alpine
 // clones the template, and it carries no CSP nonce. It shows the error card;
 // with cfg.debug (development and test) the card names the reason. There is
-// no console output in either case.
+// no console output in either case: the endpoint records it server-side in an
+// ErrorLog row (Studio::ModalsController).
 //
 // PREFETCH runs when the browser idles after the first load AND after every
 // Turbo visit (turbo:load), so a page reached by Turbo prefetches what it
@@ -501,6 +503,13 @@ export function createRemoteModals(env) {
   var session = null // the cfg.session the cache was filled under
   var generation = 0 // bumped by a drop, so a fetch from before it caches nothing
 
+  function drop() {
+    pending = {}
+    ready = {}
+    generation++
+    removeRemoteModals(doc)
+  }
+
   // Drops the cache when the advertised session differs from the one it was
   // filled under. The first config seen only sets the key.
   function sync(cfg) {
@@ -508,10 +517,17 @@ export function createRemoteModals(env) {
     if (session === null) { session = cfg.session; return }
     if (cfg.session === session) return
     session = cfg.session
-    pending = {}
-    ready = {}
-    generation++
-    removeRemoteModals(doc)
+    drop()
+  }
+
+  // studio/session's session:changed (a real sign-out, identity change or
+  // rehydration, never a plain visit) drops the cache too, at once, for a
+  // change that happens without a page render to carry a new marker.
+  if (doc && typeof doc.addEventListener === 'function') {
+    doc.addEventListener('session:changed', function () {
+      session = null
+      drop()
+    })
   }
 
   function load(cfg, id) {

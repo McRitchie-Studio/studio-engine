@@ -503,3 +503,17 @@ test("prefetch runs again after a Turbo visit", async () => {
   store.open("auth")
   assert.equal(store.current().id, "auth")
 })
+
+test("studio/session's session:changed drops the cache at once", async () => {
+  const { store, fetches, doc, page } = setup()
+  store.open("rules")
+  fetches[0].ok(markup, "rules")
+  await sleep(5)
+  store.closeAll()
+  assert.equal(page.innerCard.children.length, 1)
+
+  doc.dispatch("session:changed")
+  assert.equal(page.innerCard.children.length, 0, "the inserted template is removed")
+  store.open("rules")
+  assert.equal(fetches.length, 2)
+})

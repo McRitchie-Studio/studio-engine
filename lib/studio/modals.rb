@@ -24,11 +24,14 @@ module Studio
   #             (one root element; see the README's "Modal host" rules).
   #   auth:     :any (default) or :user. A :user modal answers 401 to a
   #             signed-out request, and is never prefetched for one.
-  #   prefetch: true fetches the modal when the browser idles after load, for a
-  #             modal that should open with no wait (the sign-in card).
+  #   prefetch: true fetches the modal when the browser idles after load and
+  #             after every Turbo visit, for a modal that should open with no
+  #             wait (the sign-in card).
   #   locals:   the partial's locals. A Hash, a Symbol naming a helper the view
   #             answers (Turf's existing *_modal_locals helpers), or a callable
-  #             taking the view. Resolved per request, inside the view.
+  #             taking the view. Resolved per request, inside the view of
+  #             Studio::ModalsController: helpers and the session are there,
+  #             the page's instance variables (@contest) are not.
   module Modals
     AUTH_LEVELS = %i[any user].freeze
 
