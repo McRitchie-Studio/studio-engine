@@ -1709,6 +1709,15 @@ body.modal-open .studio-app-banner {
   @apply px-8 py-3 text-base rounded-xl shadow-sm;
 }
 
+/* The medium button's label on the type scale: body size (1x --type-base), where a
+   bare .btn keeps text-sm (14px, off the scale) so no host's hand-built button moves.
+   Studio::ButtonComponent size: :md adds it. The 1.25 line height holds the bare
+   .btn's 20px line, so the button grows no taller. Follows type-dense like type-body. */
+@utility btn-md {
+  font-size: calc(var(--type-base, 16px) * 1);
+  line-height: 1.25;
+}
+
 /* A busy button (Studio::ButtonComponent loading:, or a submit Turbo marks busy) is
    disabled so it takes no second click, but it is working, not unavailable: it keeps
    its full colour and shows the progress cursor. The busy words sit in the button's

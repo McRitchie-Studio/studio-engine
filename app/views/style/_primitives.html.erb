@@ -93,14 +93,15 @@
     <h3 class="type-h4 text-heading">Table · sorted by member, a badge cell</h3>
     <div class="card overflow-hidden">
       <%= render Studio::TableComponent.new(rows: people, columns: columns, sort: "name", direction: "asc",
-            sort_url: sort_url, min_width: 520) %>
+            sort_url: sort_url, min_width: 520, caption: "Team members, sorted by member") %>
     </div>
   </div>
 
   <div class="space-y-3" data-specimen="table-empty">
     <h3 class="type-h4 text-heading">Table · no rows</h3>
     <div class="card overflow-hidden">
-      <%= render Studio::TableComponent.new(rows: [], columns: columns, sort_url: sort_url, empty: "No members yet.") %>
+      <%= render Studio::TableComponent.new(rows: [], columns: columns, sort_url: sort_url, empty: "No members yet.",
+            aria_label: "Team members") %>
     </div>
   </div>
 </div>

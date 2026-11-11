@@ -309,6 +309,7 @@ size and state live (Components section), and the gallery has a preview per stat
 <%= render Studio::ButtonComponent.new(label: "Save", type: "submit") %>
 <%= render Studio::ButtonComponent.new(label: "Delete", tone: :danger, size: :sm) %>
 <%= render Studio::ButtonComponent.new(label: "Docs", tone: :quiet, href: docs_path) %>
+<%= render Studio::ButtonComponent.new(label: "Export", tone: :outline) %>
 <%= render Studio::ButtonComponent.new(label: "Save", type: "submit", loading: true, busy_label: "Saving…") %>
 
 <%= render(Studio::EmptyStateComponent.new(detail: "Invite someone to start.")) do |empty| %>
@@ -318,6 +319,7 @@ size and state live (Components section), and the gallery has a preview per stat
 
 <%= render Studio::TableComponent.new(
       rows: @users, sort: params[:sort], direction: params[:direction], empty: "No users yet.",
+      caption: "Team members",
       columns: [
         { key: :name, label: "User", sortable: true },
         { key: :created_at, label: "Joined", align: :right, cell: ->(u) { l(u.created_at.to_date) } }
@@ -326,11 +328,19 @@ size and state live (Components section), and the gallery has a preview per stat
 
 - **Button.** Tones map onto the shipped utilities: `primary` is `btn-primary`,
   `secondary` is `btn-secondary` (the success role, or the app's
-  `--btn-secondary-*` retune), `quiet` is `btn-neutral`, `danger` is `btn-danger`.
-  Sizes are `btn-sm`, bare `btn` and `btn-lg`. `loading:` uses the aria-busy
+  `--btn-secondary-*` retune), `quiet` is `btn-neutral`, `danger` is `btn-danger`,
+  `outline` is `btn-outline` (a primary border, unfilled until hover).
+  Sizes are `btn-sm`, `btn-md` and `btn-lg`. `btn-md` puts the medium label on
+  the type scale at body size (1x `--type-base`); a bare `btn` keeps `text-sm`,
+  so hand-built buttons do not move. `loading:` uses the aria-busy
   contract (docs/LOADER.md): the button is `aria-busy` and disabled and shows the
   pending spinner. A submit button always carries the hidden spinner, so a Turbo
   form that marks itself busy shows it with no script. A link cannot be loading.
+  **A busy form hides the icon on every button in it**, not only on the submit
+  button: the aria-busy contract hides every `[data-loader-idle]` under the busy
+  element, and the icon slot is idle content. A Cancel or Back button with an
+  icon inside the form loses its icon while the form submits. Put such a button
+  outside the form, or give it no icon.
 - **Empty state.** The `.empty-state` card, the message at `type-body`, the
   detail at `type-fine`, an optional icon, and at most one action, which is a
   `Studio::ButtonComponent`. `framed: false` drops the card. The
@@ -341,7 +351,10 @@ size and state live (Components section), and the gallery has a preview per stat
   `sort_url:` takes a callable for another URL shape. No rows renders one row with
   a bare empty state. On a phone the table scrolls sideways, as every engine table
   does; `min_width:` sets where. `sticky_header: true` adds
-  `data-sticky-table-header`.
+  `data-sticky-table-header`. Give every table a name: `caption:` renders a
+  visually hidden `<caption>`, `aria_label:` labels the table without one. The
+  scroll wrapper is always `tabindex="0"`, so a keyboard user can scroll it, and a
+  name also makes it a labelled `role="region"`.
 
 ### The page header — `studio/_page_header`
 
