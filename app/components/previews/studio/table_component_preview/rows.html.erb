@@ -10,5 +10,5 @@
 %>
 <div class="card overflow-hidden" data-specimen="table">
   <%= render Studio::TableComponent.new(rows: rows, columns: columns, sort: sort, direction: direction,
-        sort_url: ->(key, dir) { "?sort=#{key}&direction=#{dir}" }, empty: "No members yet.", min_width: 520) %>
+        sort_url: ->(key, dir) { "?sort=#{key}&direction=#{dir}" }, empty: "No members yet.", min_width: 520, caption: "Team members") %>
 </div>

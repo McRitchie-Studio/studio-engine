@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
 module Studio
-  # Every state Studio::ButtonComponent can show: the four tones, the three
+  # Every state Studio::ButtonComponent can show: the five tones, the three
   # sizes, a link, an icon, disabled and loading. No @param tags: the gallery
   # takes no input.
   class ButtonComponentPreview < ViewComponent::Preview
-    # The four tones, at the default size.
+    # The five tones, at the default size.
     def tones
       render_with_template(locals: { tones: Studio::ButtonComponent::TONES.keys })
     end

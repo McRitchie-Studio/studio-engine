@@ -1,0 +1,1 @@
+- **`Studio::ButtonComponent`'s default `md` size puts its label on the type scale.** It now adds the new `btn-md` utility: body size (1x `--type-base`, 16px; 14px under `type-dense`) at a 1.25 line height, so the button grows no taller. A bare `.btn` keeps `text-sm`, so hand-built buttons do not move. A host that relied on the 14px component label sees it at 16px.
