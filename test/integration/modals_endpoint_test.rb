@@ -142,7 +142,8 @@ class ModalsEndpointTest < ActionDispatch::IntegrationTest
 
   # ---- engine-modals-fetch-hardening ----
 
-  def test_a_fragment_with_a_script_is_recorded_as_an_error_log
+  def test_a_fragment_with_a_script_is_recorded_once_as_an_error_log
+    Studio::ModalsController.forget_recorded_scripts!
     Studio.modals.register :scripted, partial: "e2e_lab/modals/remote_script"
     before = ErrorLog.count
     fetch_modal("scripted")
@@ -151,6 +152,10 @@ class ModalsEndpointTest < ActionDispatch::IntegrationTest
     assert_equal "scripted", response.headers["X-Studio-Modal"], "still sent: the browser refuses it"
     assert_equal before + 1, ErrorLog.count
     assert_includes ErrorLog.last.message, "renders a <script>"
+
+    fetch_modal("scripted")
+    assert_response :success
+    assert_equal before + 1, ErrorLog.count, "once per id per process, not per request"
   end
 
   def test_a_fragment_without_a_script_records_nothing

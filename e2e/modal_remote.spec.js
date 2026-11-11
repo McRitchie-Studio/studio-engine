@@ -171,8 +171,14 @@ test("a stalled fetch turns into the error card; Try again recovers, and Close w
   await expect(card).toBeVisible();
   stall = false;
   await card.getByRole("button", { name: "Try again" }).click();
+  // The button unmounted under focus; focus is back inside the dialog, not on body.
+  await expect.poll(() => page.evaluate(() => {
+    const dialog = document.querySelector('[role="dialog"]');
+    return !!dialog && dialog.contains(document.activeElement);
+  })).toBe(true);
   await expect(page.locator('[data-test="remote-rules"]')).toBeVisible({ timeout: 5000 });
   await expect(card).toHaveCount(0);
+  expect(await page.evaluate(() => document.querySelector('[role="dialog"]').contains(document.activeElement))).toBe(true);
   await page.locator('[data-test="remote-close"]').click();
   await expect(page.locator(DIALOG)).toHaveCount(0);
 
@@ -233,14 +239,21 @@ test("sign-in and sign-out by Turbo visit drop the cached fragments, so the next
   expect(fetched).toHaveLength(1);
 
   // Signed in, by Turbo (the session kept, a user id added): a fresh fetch.
+  const anonymous = await sessionMarker(page);
   await page.locator('[data-test="sign-in"]').click();
   await expect(page.locator('[data-test="remote-page"]')).toHaveText("Remote modals B");
+  await expect.poll(() => sessionMarker(page)).not.toBe(anonymous);
   await openAndClose();
   expect(fetched).toHaveLength(2);
 
-  // Same session, another Turbo visit: from the cache.
+  // Same session, another Turbo visit: from the cache. A was visited before,
+  // so Turbo first shows its cached snapshot (the OLD marker) as a preview;
+  // wait for the real render, not the heading, or the open lands on the preview.
+  const signedIn = await sessionMarker(page);
   await page.locator('[data-test="other-page"]').click();
   await expect(page.locator('[data-test="remote-page"]')).toHaveText("Remote modals A");
+  await expect.poll(() => page.evaluate(() => !document.documentElement.hasAttribute("data-turbo-preview"))).toBe(true);
+  await expect.poll(() => sessionMarker(page)).toBe(signedIn);
   await openAndClose();
   expect(fetched).toHaveLength(2);
 
@@ -287,5 +300,30 @@ test("an app with nothing registered: the host advertises nothing, fetches nothi
   // Idle passes (prefetch would have run): still no request.
   await page.waitForTimeout(2000);
   expect(fetched).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test("a session revalidation (first seating, stale -> authenticated) keeps an open fetched modal intact", async ({ page }) => {
+  const errors = watchPageErrors(page);
+  const fetched = countRequests(page, ENDPOINT);
+  await page.goto("/lab/modal_remote");
+  await page.locator('[data-test="open-rules-locked"]').click();
+  await expect(page.locator('[data-test="remote-rules"]')).toBeVisible();
+
+  // What studio/session sends when a hidden tab returns (session.js transition()).
+  await page.evaluate(() => {
+    const send = (previous, state) => document.dispatchEvent(new CustomEvent("session:changed", {
+      detail: { previous, state, snapshot: { state, identities: { user: "lab" } } }
+    }));
+    send(null, "authenticated");
+    send("authenticated", "stale");
+    send("stale", "authenticated");
+  });
+  await expect(page.locator('[data-test="remote-rules"]')).toBeVisible();
+  await page.locator('[data-test="remote-close"]').click();
+  await expect(page.locator(DIALOG)).toHaveCount(0);
+  await page.locator('[data-test="open-rules"]').click();
+  await expect(page.locator('[data-test="remote-rules"]')).toBeVisible();
+  expect(fetched).toHaveLength(1);
   expect(errors).toEqual([]);
 });

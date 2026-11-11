@@ -325,8 +325,11 @@ function focusTrap(env, held) {
 // digest of the session id and the signed-in user id (Studio::Modals.
 // session_marker), and every open and every turbo:load compares it: a change
 // drops every cached fragment, every fetch in flight, and every template
-// already inserted on this page. studio/session's session:changed event drops
-// them too. Why that signal: the session id is what
+// already inserted on this page, except the template of a modal open now,
+// which goes when it closes (a card is never emptied in place).
+// studio/session's session:changed drops them too, but only on a real
+// identity change (sessionIdentityChange), never on the first seating or a
+// stale -> authenticated revalidation. Why that signal: the session id is what
 // reset_session rotates, and the CSRF secret rotates with it, so a cached form
 // token goes stale exactly when it changes; the user id catches a sign-in
 // that keeps the session. The page's csrf-token meta would not do: it is
@@ -479,35 +482,105 @@ export function whenIdle(win, fn) {
   else win.setTimeout(fn, 1500)
 }
 
-// Removes every inserted registration from this page's cards: the session
-// changed, so what they carry is stale.
-function removeRemoteModals(doc) {
+// Removes the inserted registrations from this page's cards (the session
+// changed, so what they carry is stale), except those whose id is in keep:
+// the modals on the stack now, which must never be emptied in place. Answers
+// the ids it kept.
+function removeRemoteModals(doc, keep) {
+  keep = keep || []
+  var kept = []
   var cards = remoteCards(doc)
   for (var i = 0; i < cards.length; i++) {
     var kids = Array.prototype.slice.call(cards[i].children || [])
     for (var k = 0; k < kids.length; k++) {
-      if (kids[k].getAttribute && kids[k].getAttribute(REMOTE_MODAL_ATTR) !== null) {
+      var kidId = kids[k].getAttribute ? kids[k].getAttribute(REMOTE_MODAL_ATTR) : null
+      if (kidId !== null && keep.indexOf(kidId) !== -1) {
+        if (kept.indexOf(kidId) === -1) kept.push(kidId)
+        continue
+      }
+      if (kidId !== null) {
         if (typeof cards[i].removeChild === 'function') cards[i].removeChild(kids[k])
         else if (typeof kids[k].remove === 'function') kids[k].remove()
       }
     }
   }
+  return kept
 }
 
-// The loader one shared store keeps in its closure.
-export function createRemoteModals(env) {
+// THE SETTLED STATES of studio/session (docs/SESSION_DRIFT.md). Only a move
+// between these, or a change of the snapshot's identities, is an identity
+// change; stale and rehydrated are revalidation of the same viewer.
+var SETTLED_SESSION_STATES = ['anonymous', 'authenticated', 'signed_out', 'changed']
+
+// Is this session:changed detail a REAL change of who is viewing? studio/session
+// sends the event on every transition, including the first seating on page
+// load (previous null) and stale -> authenticated when a hidden tab returns,
+// and neither may throw the cache away. lastIdentity is the identity string
+// the previous settled event carried (null before the first). Answers
+// { real, identity }: identity is the string to remember.
+export function sessionIdentityChange(detail, lastIdentity) {
+  var d = detail || {}
+  var snap = d.snapshot || {}
+  var identity = snap.state === 'anonymous' || snap.state === 'signed_out' || d.state === 'anonymous' || d.state === 'signed_out'
+    ? 'anonymous'
+    : JSON.stringify(snap.identities || {})
+  // First seating, or the store has no state yet: remember, never drop.
+  if (d.previous === null || d.previous === undefined || !d.state) return { real: false, identity: identity }
+  // Someone else observed (changed) or the server reports nobody (signed_out).
+  if (d.state === 'changed' || (d.state === 'signed_out' && d.previous !== 'signed_out')) {
+    return { real: true, identity: identity }
+  }
+  // A settled state with a different identity than the last one seen.
+  if (SETTLED_SESSION_STATES.indexOf(d.state) !== -1 && lastIdentity !== null && identity !== lastIdentity) {
+    return { real: true, identity: identity }
+  }
+  // stale, rehydrated, or a return to the same identity: revalidation.
+  return { real: false, identity: SETTLED_SESSION_STATES.indexOf(d.state) !== -1 ? identity : lastIdentity }
+}
+
+// The loader one shared store keeps in its closure. openIds() answers the ids
+// on the store's stack now: their templates survive a drop until they close.
+export function createRemoteModals(env, openIds) {
   var doc = env.doc
   var win = env.win
+  var openNowIds = typeof openIds === 'function' ? openIds : function () { return [] }
+  var staleOpen = []  // ids whose stale template was kept because they were open
   var pending = {}   // id -> Promise<markup>, while in flight or resolved
   var ready = {}     // id -> markup, once resolved
   var session = null // the cfg.session the cache was filled under
   var generation = 0 // bumped by a drop, so a fetch from before it caches nothing
 
+  // Drops the cache at once. The templates go too, except those of modals on
+  // the stack now: a card is never emptied in place (a dismissible: false one
+  // would leave the viewer with no way out). Those go when they close (flush).
   function drop() {
     pending = {}
     ready = {}
     generation++
-    removeRemoteModals(doc)
+    staleOpen = removeRemoteModals(doc, openNowIds())
+  }
+
+  // Removes each kept stale template whose modal has left the stack. Called
+  // whenever the stack changes.
+  function flush() {
+    if (staleOpen.length === 0) return
+    var open = openNowIds()
+    var keep = staleOpen.filter(function (id) { return open.indexOf(id) !== -1 })
+    if (keep.length === staleOpen.length) return
+    // Only the kept ids are stale; every other inserted template is fresh.
+    var gone = staleOpen.filter(function (id) { return keep.indexOf(id) === -1 })
+    var cards = remoteCards(doc)
+    for (var i = 0; i < cards.length; i++) {
+      var kids = Array.prototype.slice.call(cards[i].children || [])
+      for (var k = 0; k < kids.length; k++) {
+        var kidId = kids[k].getAttribute ? kids[k].getAttribute(REMOTE_MODAL_ATTR) : null
+        if (kidId !== null && gone.indexOf(kidId) !== -1) {
+          if (typeof cards[i].removeChild === 'function') cards[i].removeChild(kids[k])
+          else if (typeof kids[k].remove === 'function') kids[k].remove()
+        }
+      }
+    }
+    staleOpen = keep
   }
 
   // Drops the cache when the advertised session differs from the one it was
@@ -520,13 +593,18 @@ export function createRemoteModals(env) {
     drop()
   }
 
-  // studio/session's session:changed (a real sign-out, identity change or
-  // rehydration, never a plain visit) drops the cache too, at once, for a
-  // change that happens without a page render to carry a new marker.
+  // studio/session's session:changed drops the cache too, for a change that
+  // happens without a page render to carry a new marker, but ONLY on a real
+  // identity change (sessionIdentityChange): the event also fires on the
+  // first seating at every load and on stale -> authenticated revalidation,
+  // which must keep a finished prefetch and an open card. The host's marker
+  // (sync, on every open and turbo:load) stays the primary signal.
+  var lastIdentity = null
   if (doc && typeof doc.addEventListener === 'function') {
-    doc.addEventListener('session:changed', function () {
-      session = null
-      drop()
+    doc.addEventListener('session:changed', function (event) {
+      var verdict = sessionIdentityChange(event && event.detail, lastIdentity)
+      lastIdentity = verdict.identity
+      if (verdict.real) drop()
     })
   }
 
@@ -561,6 +639,7 @@ export function createRemoteModals(env) {
       return ready[id] !== undefined && insertRemoteModal(doc, id, ready[id])
     },
     insert: function (id, markup) { return insertRemoteModal(doc, id, markup) },
+    flush: flush,
     prefetch: function () {
       var cfg = remoteConfig(doc)
       sync(cfg)
@@ -588,7 +667,16 @@ export function createModalStore(env) {
   // id -> the reason the last load failed, shown on the error card only when
   // the host advertises debug (development and test).
   store._remoteReason = {}
-  var remote = createRemoteModals(env)
+  var remote = createRemoteModals(env, function () {
+    return store.stack.map(function (entry) { return entry.id })
+  })
+  // Every stack change (open, close, swap, sweep) goes through _sync, so a
+  // stale template kept for an open card is removed once that card leaves.
+  var baseSync = store._sync
+  store._sync = function () {
+    baseSync.call(this)
+    remote.flush()
+  }
 
   // open(id, props, opts)
   //   opts.replace: swap the top entry. With a visible card, a directional
@@ -609,8 +697,11 @@ export function createModalStore(env) {
     if (!entry || this._remote[entry.id] !== 'error') return
     var cfg = remote.handles(entry.id)
     if (!cfg) return
-    if (remote.insertIfReady(entry.id)) { delete this._remote[entry.id]; return }
+    // Try again unmounts the focused button, so focus goes back to the
+    // backdrop each time the card's content changes (here and in openRemote).
+    if (remote.insertIfReady(entry.id)) { delete this._remote[entry.id]; this.refocus(); return }
     openRemote(this, cfg, entry.id, entry.props, null, true)
+    this.refocus()
   }
 
   // The error card's message: the generic line, or with cfg.debug the reason.
@@ -656,6 +747,7 @@ export function createModalStore(env) {
       if (cfg.debug && err && err.studioModal) self._remoteReason[id] = err.message
       self._remote[id] = 'error'
       if (!shown) openNow.call(self, id, props, opts)
+      else self.refocus()
     }
 
     remote.load(cfg, id).then(function (markup) {
@@ -666,7 +758,7 @@ export function createModalStore(env) {
       stopTimer()
       if (!shown) { openNow.call(self, id, props, opts); return }
       hold.then(function () {
-        if (self._remote[id] === 'loading') delete self._remote[id]
+        if (self._remote[id] === 'loading') { delete self._remote[id]; self.refocus() }
       })
     }).catch(fail)
   }

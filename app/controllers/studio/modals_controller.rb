@@ -51,9 +51,18 @@ module Studio
 
     SCRIPT_TAG = %r{<script[\s>/]}i
 
+    # Ids already recorded in this process: one row per bad modal, not one per
+    # request (a prefetched bad fragment would otherwise write a row on every
+    # page view).
+    RECORDED_SCRIPT_IDS = Set.new
+    RECORDED_SCRIPT_LOCK = Mutex.new
+
+    def self.forget_recorded_scripts! = RECORDED_SCRIPT_LOCK.synchronize { RECORDED_SCRIPT_IDS.clear }
+
     # A best-effort record: logging never breaks the answer.
     def record_script_fragment(entry)
       return unless defined?(::ErrorLog) && ::ErrorLog.respond_to?(:capture!)
+      return unless RECORDED_SCRIPT_LOCK.synchronize { RECORDED_SCRIPT_IDS.add?(entry.id) }
 
       error = RuntimeError.new("Studio.modals #{entry.id}: #{entry.partial} renders a <script>; " \
                                "studio/modal_host refuses it. Move the behaviour to a module or a Stimulus controller.")

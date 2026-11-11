@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs"
 const source = readFileSync(new URL("../../app/javascript/studio/modal_host.js", import.meta.url), "utf8")
 const {
   createModalStore, remoteConfig, remoteTemplate, insertRemoteModal, remoteModalUrl,
-  fragmentHasScript, REMOTE_MODAL_ATTR, LOAD_DELAY_MS, DEFAULT_FETCH_TIMEOUT_MS, REMOTE_ERROR_TEXT
+  fragmentHasScript, sessionIdentityChange, REMOTE_MODAL_ATTR, LOAD_DELAY_MS, DEFAULT_FETCH_TIMEOUT_MS, REMOTE_ERROR_TEXT
 } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -48,7 +48,7 @@ const fakeDocument = (page) => {
   const doc = {
     page,
     addEventListener(name, fn) { (listeners[name] ||= []).push(fn) },
-    dispatch(name) { (listeners[name] || []).forEach((fn) => fn({})) },
+    dispatch(name, detail) { (listeners[name] || []).forEach((fn) => fn({ detail })) },
     body: { classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c) } },
     activeElement: null,
     contains: () => false,
@@ -504,16 +504,126 @@ test("prefetch runs again after a Turbo visit", async () => {
   assert.equal(store.current().id, "auth")
 })
 
-test("studio/session's session:changed drops the cache at once", async () => {
-  const { store, fetches, doc, page } = setup()
-  store.open("rules")
-  fetches[0].ok(markup, "rules")
-  await sleep(5)
-  store.closeAll()
-  assert.equal(page.innerCard.children.length, 1)
+// studio/session's session:changed detail, as session.js:202 builds it.
+const sessionEvent = (previous, state, identities = {}) => ({
+  state, previous, snapshot: { state, identities }
+})
+const ALEX = { user: "alex" }
 
-  doc.dispatch("session:changed")
-  assert.equal(page.innerCard.children.length, 0, "the inserted template is removed")
+const loadedRules = async (extra = {}) => {
+  const ctx = setup(extra)
+  ctx.store.open("rules")
+  ctx.fetches[0].ok(markup, "rules")
+  await sleep(5)
+  return ctx
+}
+
+test("the first seating at page load (previous null) keeps a finished prefetch", async () => {
+  const { store, fetches, doc, idleCalls } = setup()
+  idleCalls[0]()
+  fetches[0].ok(markup, "auth")
+  await sleep(5)
+  doc.dispatch("session:changed", sessionEvent(null, "anonymous"))
+  doc.dispatch("session:changed", sessionEvent(null, "authenticated", ALEX))
+  store.open("auth")
+  assert.equal(store.current().id, "auth", "opened from the prefetch")
+  assert.equal(fetches.length, 1)
+})
+
+test("stale -> authenticated for the same viewer keeps an open modal intact", async () => {
+  const { store, fetches, doc, page } = await loadedRules()
+  doc.dispatch("session:changed", sessionEvent(null, "authenticated", ALEX))
+  doc.dispatch("session:changed", sessionEvent("authenticated", "stale", ALEX))
+  doc.dispatch("session:changed", sessionEvent("stale", "authenticated", ALEX))
+  doc.dispatch("session:changed", sessionEvent("stale", "rehydrated", ALEX))
+  assert.equal(store.current().id, "rules")
+  assert.equal(page.innerCard.children.length, 1, "the open card keeps its content")
+  store.closeAll()
+  store.open("rules")
+  assert.equal(fetches.length, 1, "the cache survived")
+})
+
+test("a real sign-out with nothing open drops the cache and the templates at once", async () => {
+  const { store, fetches, doc, page } = await loadedRules()
+  doc.dispatch("session:changed", sessionEvent(null, "authenticated", ALEX))
+  store.closeAll()
+  doc.dispatch("session:changed", sessionEvent("authenticated", "signed_out"))
+  assert.equal(page.innerCard.children.length, 0)
   store.open("rules")
   assert.equal(fetches.length, 2)
 })
+
+test("a real sign-out while the modal is open keeps its template until it closes", async () => {
+  const { store, fetches, doc, page } = await loadedRules()
+  doc.dispatch("session:changed", sessionEvent(null, "authenticated", ALEX))
+  doc.dispatch("session:changed", sessionEvent("authenticated", "signed_out"))
+  assert.equal(store.current().id, "rules")
+  assert.equal(page.innerCard.children.length, 1, "never emptied in place")
+
+  store.close()
+  await sleep(260)
+  assert.equal(store.current(), null)
+  assert.equal(page.innerCard.children.length, 0, "removed once it closed")
+  store.open("rules")
+  assert.equal(fetches.length, 2, "the next open refetches")
+})
+
+test("another identity observed (changed) drops the cache", async () => {
+  const { store, fetches, doc } = await loadedRules()
+  doc.dispatch("session:changed", sessionEvent(null, "authenticated", ALEX))
+  store.closeAll()
+  doc.dispatch("session:changed", sessionEvent("authenticated", "changed", { user: "sam" }))
+  store.open("rules")
+  assert.equal(fetches.length, 2)
+})
+
+test("sessionIdentityChange: only a settled move to another viewer is real", () => {
+  const first = sessionIdentityChange(sessionEvent(null, "authenticated", ALEX), null)
+  assert.equal(first.real, false)
+  const id = first.identity
+  assert.equal(sessionIdentityChange(sessionEvent("authenticated", "stale", ALEX), id).real, false)
+  assert.equal(sessionIdentityChange(sessionEvent("stale", "authenticated", ALEX), id).real, false)
+  assert.equal(sessionIdentityChange(sessionEvent("stale", "rehydrated", ALEX), id).real, false)
+  assert.equal(sessionIdentityChange(sessionEvent("authenticated", "signed_out"), id).real, true)
+  assert.equal(sessionIdentityChange(sessionEvent("authenticated", "changed", { user: "sam" }), id).real, true)
+  assert.equal(sessionIdentityChange(sessionEvent("anonymous", "authenticated", ALEX), "anonymous").real, true)
+  assert.equal(sessionIdentityChange(undefined, null).real, false)
+})
+
+test("a server-marker change while the modal is open keeps its template until it closes", async () => {
+  const page = withConfig({ session: "s1" })
+  const { store, fetches, doc } = setup({ page })
+  store.open("rules", { dismissible: false })
+  fetches[0].ok(markup, "rules")
+  await sleep(5)
+  // A dismissible: false card survives a Turbo visit onto a page whose host
+  // already carries its template (a snapshot), under a new marker.
+  const next = withConfig({ session: "s2" })
+  next.innerCard.appendChild(remoteTemplate(doc, "rules", markup))
+  doc.visit(next)
+  store.open("plain")
+  assert.equal(next.innerCard.children.length, 1, "the open card's template stays")
+  store.closeAll()
+  assert.equal(next.innerCard.children.length, 0)
+})
+
+test("Try again puts focus back on the backdrop, and again when the content lands", async () => {
+  const { store, fetches, doc } = setup()
+  doc.contains = () => true
+  let focused = 0
+  const backdrop = { focus: () => { focused++ } }
+  store.open("rules", { dismissible: false })
+  fetches[0].status(503)
+  await sleep(5)
+  store.captureFocus(backdrop)
+  focused = 0
+
+  store.retryRemote()
+  await sleep(5)
+  assert.equal(focused, 1, "refocused after the Try again button unmounted")
+  fetches[1].ok(markup, "rules")
+  await sleep(80)
+  assert.equal(store._remote.rules, undefined)
+  assert.equal(focused, 2, "refocused when the content replaced the loading card")
+})
+

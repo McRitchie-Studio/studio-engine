@@ -770,7 +770,7 @@ polite); the error card is `role="alert"`.
 **A fragment with a `<script>` is refused**, never inserted: it shows the error
 card. In development and test the card names the reason; in production it shows
 the generic line. Nothing is logged to the console either way; the endpoint
-records an `ErrorLog` row instead. Put behaviour in a module or a Stimulus
+records an `ErrorLog` row instead, once per modal id per process. Put behaviour in a module or a Stimulus
 controller.
 
 The fragment is held across Turbo visits: a later open inserts it from memory
@@ -782,9 +782,12 @@ form's CSRF token. The host advertises a session marker
 (`Studio::Modals.session_marker`: a digest of the session id and the user id
 under `Studio.session_key`). The browser compares it on every open and every
 `turbo:load`. When it changes (sign-out, a sign-in, a user switch, by Turbo
-visit, or studio/session's `session:changed`), the browser drops every cached
-fragment, every fetch in flight and every template already inserted, so the
-next open fetches fresh. The session id is
+visit, or a `session:changed` from studio/session that is a real identity
+change: `signed_out`, `changed`, or another viewer's identities, never the first
+seating at load or a `stale` → `authenticated` revalidation), the browser drops
+every cached fragment, every fetch in flight and every template already
+inserted, so the next open fetches fresh. A modal open at that moment keeps its
+template until it closes: a card is never emptied in place. The session id is
 what `reset_session` rotates, and the CSRF secret rotates with it; the user id
 catches a sign-in that keeps the session. The `csrf-token` meta is not used: it
 is masked anew on every render, so it would empty the cache on every visit.
