@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.143.2 — 2026-11-10
+
 ## 0.143.1 — 2026-11-10
 
 ## 0.143.0 — 2026-11-10

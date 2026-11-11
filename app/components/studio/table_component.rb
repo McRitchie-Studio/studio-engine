@@ -12,7 +12,8 @@ module Studio
   #       { key: :created_at, label: "Joined", align: :right, cell: ->(user) { l(user.created_at.to_date) } }
   #     ],
   #     sort: params[:sort], direction: params[:direction],
-  #     empty: "No users yet."
+  #     empty: "No users yet.",
+  #     caption: "Team members"
   #   )
   #
   # A column is a Hash: key: (required), label: (required), sortable: (false),
@@ -32,21 +33,36 @@ module Studio
   # (admin_model_table, the emails index): the table keeps its columns and its
   # wrapper scrolls. min_width: sets the width under which it scrolls.
   #
+  # A NAME AND A KEYBOARD SCROLL. The scroll wrapper takes tabindex="0", so a
+  # keyboard user can focus it and scroll it with the arrow keys (WCAG 2.1.1; axe's
+  # scrollable-region-focusable), and it shows a focus ring inside its edge, so a
+  # card's overflow-hidden cannot clip it.
+  # caption: renders a <caption> (visually hidden: the page's own heading is the
+  # visible title) and aria_label: labels the table without one. Either one also
+  # makes the wrapper a named role="region", so a screen reader announces what it
+  # entered. With neither, the wrapper stays focusable but takes no role: a
+  # region with no name is noise. Pass one.
+  #
   # Its public surface, which a release changes only with a Breaking line in the
   # changelog (docs/FRONT_END_STANDARD.md, "A primitive's public surface"):
   #   inputs   rows:, columns:, id:, sort:, direction:, sort_url:, sort_param:,
-  #            direction_param:, empty:, min_width:, sticky_header:
+  #            direction_param:, empty:, min_width:, sticky_header:,
+  #            caption:, aria_label:
   #   data-*   data-table on the wrapper; data-table-sort-key on a sortable
   #            header; data-table-empty on the empty row; data-sticky-table-header
   #            on the table when sticky_header: (studio/sticky_table_header)
-  #   aria-*   aria-sort on the sorted header
+  #   aria-*   aria-sort on the sorted header; aria-label on the table
+  #            (aria_label:) and on the wrapper, role="region" (caption: or
+  #            aria_label:)
+  #   tabindex tabindex="0" on the wrapper
   #
   # Every class string is written out whole: Tailwind finds utilities by scanning
   # source text, and engine.css adds app/components to every host's scan.
   class TableComponent < ViewComponent::Base
     strip_trailing_whitespace
 
-    WRAPPER = "overflow-x-auto"
+    WRAPPER = "overflow-x-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+    CAPTION = "sr-only"
     TABLE = "w-full type-body"
     HEAD = "bg-surface-alt text-muted type-fine uppercase tracking-wide"
     BODY = "divide-y divide-subtle"
@@ -71,7 +87,8 @@ module Studio
     attr_reader :rows, :columns, :empty
 
     def initialize(rows:, columns:, id: nil, sort: nil, direction: nil, sort_url: nil, sort_param: "sort",
-                   direction_param: "direction", empty: "Nothing here yet.", min_width: nil, sticky_header: false)
+                   direction_param: "direction", empty: "Nothing here yet.", min_width: nil, sticky_header: false,
+                   caption: nil, aria_label: nil)
       super()
       raise ArgumentError, "Studio::TableComponent needs at least one column" if columns.blank?
 
@@ -86,12 +103,29 @@ module Studio
       @empty = empty
       @min_width = min_width
       @sticky_header = sticky_header ? true : false
+      @caption = caption.presence
+      @aria_label = aria_label.presence
+    end
+
+    attr_reader :caption
+
+    # The name the wrapper's region announces: the caption, else aria_label:.
+    def accessible_name = @caption || @aria_label
+
+    def wrapper_attributes
+      attrs = { class: WRAPPER, tabindex: "0", data: { table: "" } }
+      if accessible_name
+        attrs[:role] = "region"
+        attrs[:aria] = { label: accessible_name }
+      end
+      attrs
     end
 
     def table_attributes
       attrs = { class: TABLE, id: @id }
       attrs[:style] = "min-width: #{@min_width.to_i}px" if @min_width
       attrs[:data] = { sticky_table_header: "" } if @sticky_header
+      attrs[:aria] = { label: @aria_label } if @aria_label && !@caption
       attrs.compact
     end
 

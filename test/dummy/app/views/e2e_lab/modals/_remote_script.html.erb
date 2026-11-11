@@ -1,0 +1,6 @@
+<%# An on-demand modal whose fragment carries a <script>, which studio/modal_host
+    refuses to insert (e2e/modal_remote.spec.js). %>
+<div class="p-2" data-test="remote-script">
+  <script>window.__labScriptRan = true</script>
+  Scripted
+</div>

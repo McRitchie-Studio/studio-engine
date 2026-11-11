@@ -404,12 +404,36 @@ class E2eLabController < ActionController::Base
   # /lab/birthday_gate drives the SCOPED host instead. Two separate partials with
   # two separate copies of the focus trap; this page is what lets a browser grade
   # the global one.
-  def modal_host = render(:modal_host)
+  #
+  # It renders with NOTHING registered in Studio.modals (e2e/boot.rb's
+  # LabModalRegistry), so the browser lane grades the host every app that
+  # registers none still gets (e2e/modal_remote.spec.js).
+  def modal_host
+    Thread.current[:lab_modals_hidden] = true
+    render(:modal_host)
+  ensure
+    Thread.current[:lab_modals_hidden] = nil
+  end
 
   # On-demand modals (Studio.modals; the lab-* ids are registered in
   # e2e/boot.rb) under Turbo, as two pages linked to each other.
   def modal_remote = modal_remote_lab("a", "/lab/modal_remote_b")
   def modal_remote_b = modal_remote_lab("b", "/lab/modal_remote")
+
+  # Sign-in and sign-out for the session-change spec, each a Turbo visit that
+  # renders the page itself (not a redirect: every lab GET answers 200, see
+  # e2e_lab_isolation_test.rb). Sign-in writes the user id and keeps the
+  # session, as an OAuth sign-in does, and lands on B; sign-out resets the
+  # session and lands on A.
+  def modal_remote_sign_in
+    session[Studio.session_key] = 4242
+    modal_remote_lab("b", "/lab/modal_remote")
+  end
+
+  def modal_remote_sign_out
+    reset_session
+    modal_remote_lab("a", "/lab/modal_remote_b")
+  end
 
   private def modal_remote_lab(name, other_path)
     @lab_page = name
@@ -877,9 +901,6 @@ class E2eLabController < ActionController::Base
     render(:chips)
   end
 
-  # The style guide's Tints and shades group (style/_scrims). `?palette=<name>`
-  # paints the page in one consumer palette through the resolver's own CSS, as
-  # #chips does, so a custom dark or light base reaches --color-shade/-tint.
   # The style guide's UI primitives (style/_primitives), for the screenshot check
   # (e2e/ui_primitives_screenshots.spec.js). No knobs: the spec flips the theme.
   #
@@ -895,6 +916,9 @@ class E2eLabController < ActionController::Base
     render(:ui_primitives)
   end
 
+  # The style guide's Tints and shades group (style/_scrims). `?palette=<name>`
+  # paints the page in one consumer palette through the resolver's own CSS, as
+  # #chips does, so a custom dark or light base reaches --color-shade/-tint.
   def scrims
     require_relative "../../../support/consumer_palettes"
     palette = ConsumerPalettes::ALL[params[:palette].to_s]

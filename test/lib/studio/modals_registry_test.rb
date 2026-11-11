@@ -76,7 +76,8 @@ class ModalsRegistryTest < Minitest::Test
     @registry.register :rules, partial: "x"
 
     out = @registry.client_config(url_template: "/_studio/modals/__id__", logged_in: false)
-    assert_equal({ url: "/_studio/modals/__id__", ids: %w[auth wallet rules], prefetch: %w[auth] }, out)
+    assert_equal({ url: "/_studio/modals/__id__", ids: %w[auth wallet rules], prefetch: %w[auth],
+                   timeout_ms: 8000, session: "", debug: false }, out)
     assert_equal %w[auth wallet], @registry.client_config(url_template: "/u", logged_in: true)[:prefetch]
   end
 
@@ -88,5 +89,52 @@ class ModalsRegistryTest < Minitest::Test
     @registry.clear!
     assert @registry.empty?
     refute @registry.any?
+  end
+
+  # ---- engine-modals-fetch-hardening ----
+
+  def test_client_config_carries_the_timeout_the_session_marker_and_debug
+    @registry.register :rules, partial: "modals/rules"
+    out = @registry.client_config(url_template: "/u", logged_in: false)
+    assert_equal 8000, out[:timeout_ms]
+    assert_equal "", out[:session]
+    assert_equal false, out[:debug]
+
+    @registry.fetch_timeout_ms = 12_000
+    out = @registry.client_config(url_template: "/u", logged_in: false, session: "abc", debug: true)
+    assert_equal 12_000, out[:timeout_ms]
+    assert_equal "abc", out[:session]
+    assert_equal true, out[:debug]
+  end
+
+  def test_fetch_timeout_ms_refuses_a_non_positive_value
+    assert_raises(ArgumentError) { @registry.fetch_timeout_ms = 0 }
+    assert_raises(ArgumentError) { @registry.fetch_timeout_ms = "soon" }
+    assert_equal 8000, @registry.fetch_timeout_ms
+  end
+
+  # A stand-in for ActionDispatch::Request::Session: an id and a hash.
+  FakeSession = Struct.new(:id, :data) do
+    def [](key) = data[key]
+  end
+
+  def test_session_marker_changes_with_the_session_id_and_with_the_user
+    key = Studio.session_key
+    base = Studio::Modals.session_marker(FakeSession.new("sid-1", {}))
+    assert_match(/\A\h{16}\z/, base)
+    assert_equal base, Studio::Modals.session_marker(FakeSession.new("sid-1", {})), "stable for one session"
+
+    reset = Studio::Modals.session_marker(FakeSession.new("sid-2", {}))
+    refute_equal base, reset, "reset_session (sign-out) changes it"
+
+    signed_in = Studio::Modals.session_marker(FakeSession.new("sid-1", { key => 7 }))
+    refute_equal base, signed_in, "a sign-in that keeps the session changes it"
+    refute_equal signed_in, Studio::Modals.session_marker(FakeSession.new("sid-1", { key => 8 })), "a user switch changes it"
+
+    refute_includes signed_in, "sid-1", "the raw session id never reaches the page"
+  end
+
+  def test_session_marker_without_a_session_is_a_constant
+    assert_equal Studio::Modals.session_marker(nil), Studio::Modals.session_marker(nil)
   end
 end
