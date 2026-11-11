@@ -11,7 +11,7 @@ tests.
 |----------------|--------------|-----|
 | `reset_window` (setup) | Resizes the window to `desktop_size` before every test. | The browser outlives the test, so a resize leaks into whichever test runs next (commercial-welding went red under one seed; tasks `system-tests-reset-window-size`, `apps-system-tests-reset-window`). |
 | `restore_script_timeout` (driver) | Gives back the script timeout after `evaluate_async_script`. | Capybara 3.40.0 sets it to `default_max_wait_time` (2s) and never restores it, so every later `execute_script` in the run has 2s, not 30s (voicebox `ContrastSystemTest`, task `ci-cause-voicebox-contrastsystemtest`). |
-| `clear_emulation` (teardown) | Clears the DevTools device-metrics override. | `phone_viewport!` sets it, and the browser outlives the test. |
+| `clear_emulation` (teardown) | Clears the DevTools device-metrics and emulated-media overrides. | `phone_viewport!` sets the first; a dark-mode or reduced-motion test sets the second (cyvasse clears both). The browser outlives the test. |
 | 180s read timeout (`driven_by`) | Every Selenium driver gets `options: { timeout: 180 }`. | Selenium's stock 60s read budget dies on a cold Chrome launch on a slow CI runner (hub PR #2494). |
 
 The base also gives every test three helpers: `phone_viewport!(width = phone_width,

@@ -52,12 +52,13 @@ class SystemTestCaseTest < Minitest::Test
   end
 
   RESET = [:resize_to, [1400, 1000]].freeze
-  CLEAR = [:execute_cdp, "Emulation.clearDeviceMetricsOverride", {}].freeze
+  CLEAR_METRICS = [:execute_cdp, "Emulation.clearDeviceMetricsOverride", {}].freeze
+  CLEAR_MEDIA = [:execute_cdp, "Emulation.setEmulatedMedia", { media: "", features: [] }].freeze
 
   def test_each_hook_runs_by_default
     calls = run_hooks(host_class)
 
-    assert_equal [RESET, CLEAR], calls
+    assert_equal [RESET, CLEAR_METRICS, CLEAR_MEDIA], calls
   end
 
   def test_skipping_reset_window_disables_only_that_hook
@@ -66,7 +67,7 @@ class SystemTestCaseTest < Minitest::Test
       klass = host_class { skip_harness_hook :reset_window, reason: "this suite sizes its own window" }
     end
 
-    assert_equal [CLEAR], run_hooks(klass)
+    assert_equal [CLEAR_METRICS, CLEAR_MEDIA], run_hooks(klass)
     assert_restores_script_timeout klass, true
   end
 
@@ -87,7 +88,7 @@ class SystemTestCaseTest < Minitest::Test
     end
 
     assert_restores_script_timeout klass, false
-    assert_equal [RESET, CLEAR], run_hooks(klass)
+    assert_equal [RESET, CLEAR_METRICS, CLEAR_MEDIA], run_hooks(klass)
   end
 
   def test_an_opt_out_stays_on_its_own_class
@@ -118,7 +119,7 @@ class SystemTestCaseTest < Minitest::Test
       teardown { calls << :app_teardown }
     end
 
-    assert_equal [RESET, :app_setup, :app_teardown, CLEAR], run_hooks(klass)
+    assert_equal [RESET, :app_setup, :app_teardown, CLEAR_METRICS, CLEAR_MEDIA], run_hooks(klass)
   end
 
   def test_app_helpers_mix_in_beside_the_base_helpers
@@ -127,14 +128,14 @@ class SystemTestCaseTest < Minitest::Test
 
     calls = run_hooks(klass) { |test| test.sign_in_as("pat") }
 
-    assert_equal [RESET, [:sign_in, "pat"], CLEAR], calls
+    assert_equal [RESET, [:sign_in, "pat"], CLEAR_METRICS, CLEAR_MEDIA], calls
   end
 
   def test_driven_by_sets_the_reset_size_and_the_read_timeout
     klass = host_class { driven_by :selenium, using: :headless_chrome, screen_size: [1280, 900] }
 
     assert_equal [1280, 900], klass.desktop_size
-    assert_equal [[:resize_to, [1280, 900]], CLEAR], run_hooks(klass)
+    assert_equal [[:resize_to, [1280, 900]], CLEAR_METRICS, CLEAR_MEDIA], run_hooks(klass)
     assert_equal({ timeout: 180 }, klass.driver.instance_variable_get(:@options))
     assert_equal [1400, 1000], Studio::SystemTestCase.desktop_size, "the base keeps its size"
   end

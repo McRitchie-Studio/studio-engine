@@ -44,12 +44,18 @@ class SystemTestCaseBrowserTest < Studio::SystemTestCase
 
   def test_1_dirty_the_browser
     assert_equal [1200, 900], @app_setup_saw, "the app's setup runs in the reset window"
+    assert_equal 180, page.driver.browser.send(:bridge).http.read_timeout,
+                 "driven_by gave this driver the cold-start read budget"
 
     visit "/"
     page.driver.browser.manage.window.resize_to(640, 480)
     phone_viewport!
+    # Print media, not a colour scheme: headless Chrome follows the host's own
+    # dark mode, so a laptop's baseline differs from CI's. Nothing prints.
+    page.driver.browser.execute_cdp("Emulation.setEmulatedMedia", media: "print")
     visit PHONE_PAGE
     assert_viewport_width 390
+    assert evaluate_script("matchMedia('print').matches")
 
     assert_equal 1, evaluate_async_script("arguments[0](1)")
     assert_equal 30, script_timeout, "evaluate_async_script gives the script timeout back"
@@ -61,6 +67,8 @@ class SystemTestCaseBrowserTest < Studio::SystemTestCase
     visit PHONE_PAGE
     assert_operator evaluate_script("document.documentElement.clientWidth"), :>, 390,
                     "clear_emulation removed the phone viewport"
+    refute evaluate_script("matchMedia('print').matches"),
+           "clear_emulation removed the emulated media"
     assert_equal 30, script_timeout
   end
 end

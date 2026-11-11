@@ -31,8 +31,9 @@ module Studio
       restore_script_timeout: "around evaluate_async_script: give back the script " \
                               "timeout. Capybara 3.40.0 sets it to default_max_wait_time " \
                               "(2s) and never restores it (voicebox ContrastSystemTest).",
-      clear_emulation: "teardown: clear the DevTools device-metrics override that " \
-                       "phone_viewport! sets, so a phone viewport does not leak."
+      clear_emulation: "teardown: clear the DevTools device-metrics and emulated-media " \
+                       "overrides (phone_viewport!, a dark-mode or reduced-motion test), " \
+                       "so neither leaks into the next test."
     }.freeze
 
     # Selenium's stock read budget is Net::HTTP's 60s. A cold Chrome launch on a
@@ -146,8 +147,11 @@ module Studio
       assert_equal width, evaluate_script("document.documentElement.clientWidth"), "the viewport is #{width}px"
     end
 
+    # Clears both DevTools overrides a test may set: the phone viewport and the
+    # emulated media (prefers-color-scheme, prefers-reduced-motion, print).
     def clear_emulation
       page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+      page.driver.browser.execute_cdp("Emulation.setEmulatedMedia", media: "", features: [])
     end
 
     private
