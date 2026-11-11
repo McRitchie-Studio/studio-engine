@@ -219,10 +219,19 @@
     fetches a registered id the first time it opens and inserts its
     <template x-if> into the card. See the README, "Modals on demand". %>
 <% studio_remote_modals = Studio.modals.any? %>
+<% if studio_remote_modals
+     studio_remote_session = respond_to?(:controller) && controller.respond_to?(:session) ? controller.session : nil
+     studio_remote_config = Studio.modals.client_config(
+       url_template: studio_modal_path(id: "0").delete_suffix("0") + "__id__",
+       logged_in: respond_to?(:logged_in?) && logged_in?,
+       session: Studio::Modals.session_marker(studio_remote_session),
+       debug: defined?(Rails) && Rails.respond_to?(:env) && (Rails.env.development? || Rails.env.test?)
+     )
+   end %>
 <template x-if="$store.modals.current()"
           data-studio-controller="modal-host"
           data-modal-host-store-value="modals"<% if studio_remote_modals %>
-          data-modal-host-remote-value="<%= Studio.modals.client_config(url_template: studio_modal_path(id: "0").delete_suffix("0") + "__id__", logged_in: respond_to?(:logged_in?) && logged_in?).to_json %>"<% end %>>
+          data-modal-host-remote-value="<%= studio_remote_config.to_json %>"<% end %>>
   <%# Backdrop + card use CSS keyframe animations (NOT Alpine
       x-transition), all shipped in the inline style block above. On
       mount, the .modal-backdrop-mount + card mount classes fire fade-in
@@ -312,22 +321,28 @@
       <%# The on-demand states, keyed on $store.modals._remote[id], which only
           studio/modal_host sets and only for a registered id: 'loading' while a
           slow first fetch runs (the processing card, held MIN_LOAD_MS so it
-          never flashes), 'error' when the fetch fails (the error card, whose
-          button closes). Fetched registrations are appended after these. %>
+          never flashes; role="status", so a screen reader hears it politely),
+          'error' when the fetch fails, times out (Studio.modals.fetch_timeout_ms)
+          or is refused (the error card: Try again re-runs the fetch in place,
+          Close closes). Close calls close() directly, so it works on a card
+          opened dismissible: false too, which Escape and the backdrop do not
+          close. Fetched registrations are appended after these. %>
       <% if studio_remote_modals %>
         <template x-if="$store.modals._remote && $store.modals._remote[$store.modals.current()?.id] === 'loading'">
-          <div data-modal-remote-state="loading">
+          <div data-modal-remote-state="loading" role="status" aria-live="polite">
             <%= render "studio/modals/blocks/processing_card", title: "Loading…" %>
           </div>
         </template>
         <template x-if="$store.modals._remote && $store.modals._remote[$store.modals.current()?.id] === 'error'">
-          <div data-modal-remote-state="error">
+          <div data-modal-remote-state="error" @studio-modal-retry="$store.modals.retryRemote()">
             <%= render "studio/modals/blocks/error_card",
                   title: "Couldn't open this",
-                  message: "Check your connection and try again.",
+                  message_key: "$store.modals.remoteErrorText()",
                   icon_emoji: "⚠️",
-                  cta_label: "Close",
-                  cta_close: true %>
+                  cta_label: "Try again",
+                  cta_event: "studio-modal-retry",
+                  secondary_label: "Close",
+                  secondary_close: true %>
           </div>
         </template>
       <% end %>

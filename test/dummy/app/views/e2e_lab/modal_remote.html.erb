@@ -19,7 +19,13 @@
             @click="$store.modals.open('lab-broken', {})">Open broken</button>
     <button type="button" data-test="open-member" class="btn btn-outline"
             @click="$store.modals.open('lab-member', {})">Open member</button>
+    <button type="button" data-test="open-script" class="btn btn-outline"
+            @click="$store.modals.open('lab-script', {})">Open script</button>
+    <button type="button" data-test="open-rules-locked" class="btn btn-outline"
+            @click="$store.modals.open('lab-rules', { title: 'Rules card', dismissible: false })">Open rules (not dismissible)</button>
     <a href="<%= @lab_other_url %>" data-test="other-page" class="btn btn-outline">Other page</a>
+    <a href="/lab/modal_remote/sign_in" data-turbo-prefetch="false" data-test="sign-in" class="btn btn-outline">Sign in</a>
+    <a href="/lab/modal_remote/sign_out" data-turbo-prefetch="false" data-test="sign-out" class="btn btn-outline">Sign out</a>
   </div>
 
   <%= render "studio/modals/host" do %>

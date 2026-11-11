@@ -22,7 +22,14 @@ module Studio
   # so it is private: Rails' default for a dynamic GET (max-age=0, private,
   # must-revalidate, with an ETag) is kept, and Vary: Cookie is added so no
   # cache answers one session with another's fragment. The browser holds the
-  # fragment for the page's lifetime anyway (studio/modal_host).
+  # fragment across Turbo visits and drops it when the host's session marker
+  # changes (Studio::Modals.session_marker, studio/modal_host).
+  #
+  # NO SCRIPT. studio/modal_host refuses a fragment that carries a <script>.
+  # The browser says nothing in production, so the refusal is recorded here,
+  # as an ErrorLog row, where it is seen. The fragment is still sent: the
+  # browser's refusal (with its reason on the card in development) is the
+  # behaviour; this is the record.
   class ModalsController < ::ApplicationController
     skip_before_action :require_authentication, raise: false
 
@@ -37,9 +44,33 @@ module Studio
       # the host's error page for the browser to mistake for a fragment.
       response.headers["X-Studio-Modal"] = entry.id
       response.headers["Vary"] = [response.headers["Vary"], "Cookie"].compact.join(", ")
+      record_script_fragment(entry) if response.body.to_s.match?(SCRIPT_TAG)
     end
 
     private
+
+    SCRIPT_TAG = %r{<script[\s>/]}i
+
+    # Ids already recorded in this process: one row per bad modal, not one per
+    # request (a prefetched bad fragment would otherwise write a row on every
+    # page view).
+    RECORDED_SCRIPT_IDS = Set.new
+    RECORDED_SCRIPT_LOCK = Mutex.new
+
+    def self.forget_recorded_scripts! = RECORDED_SCRIPT_LOCK.synchronize { RECORDED_SCRIPT_IDS.clear }
+
+    # A best-effort record: logging never breaks the answer.
+    def record_script_fragment(entry)
+      return unless defined?(::ErrorLog) && ::ErrorLog.respond_to?(:capture!)
+      return unless RECORDED_SCRIPT_LOCK.synchronize { RECORDED_SCRIPT_IDS.add?(entry.id) }
+
+      error = RuntimeError.new("Studio.modals #{entry.id}: #{entry.partial} renders a <script>; " \
+                               "studio/modal_host refuses it. Move the behaviour to a module or a Stimulus controller.")
+      error.set_backtrace(caller)
+      ::ErrorLog.capture!(error)
+    rescue StandardError
+      nil
+    end
 
     def studio_modal_viewer_signed_in?
       respond_to?(:logged_in?, true) && logged_in?

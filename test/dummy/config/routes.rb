@@ -70,6 +70,8 @@ Rails.application.routes.draw do
   get "lab/modal_blocks", to: "e2e_lab#modal_blocks"
   get "lab/modal_remote", to: "e2e_lab#modal_remote"
   get "lab/modal_remote_b", to: "e2e_lab#modal_remote_b"
+  get "lab/modal_remote/sign_in", to: "e2e_lab#modal_remote_sign_in"
+  get "lab/modal_remote/sign_out", to: "e2e_lab#modal_remote_sign_out"
   post "lab/modal_blocks/newsletter", to: "e2e_lab#modal_blocks_newsletter"
   post "lab/modal_blocks/newsletter/leave", to: "e2e_lab#modal_blocks_newsletter_leave"
   get "lab/newsletter_fetcher", to: "e2e_lab#newsletter_fetcher"
