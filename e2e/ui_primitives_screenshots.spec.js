@@ -23,6 +23,8 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 // CONTROLS, run against this file:
 //   - btn-danger's fill changed in engine.css: button-tones and button-sizes fail.
 //   - EmptyStateComponent's MESSAGE back on text-lg: both empty-state specimens fail.
+//   - the Montserrat @font-face dropped from layouts/studio/_head: every test fails
+//     in expectMontserrat, naming the font, before any screenshot is compared.
 
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
@@ -44,6 +46,34 @@ const SPECIMENS = [
 // a skip: the lane refuses any spec that leaves its executed set.
 const COMPARES = process.platform === "linux";
 
+// THE FONT, BEFORE THE PIXELS. Every specimen is set in Montserrat (theme.css
+// --font-sans; the face is vendored and declared in layouts/studio/_head). If it
+// fails to load, the fallback face redraws every glyph and every baseline fails as
+// a pixel diff that names no cause. So the font is asked for and checked first,
+// and a miss fails here, by name.
+//
+// document.fonts.check() alone is not enough: it answers true when NO face of the
+// family is declared at all (nothing to load). So the spec also requires a
+// declared Montserrat face that reached "loaded", at the regular and the bold
+// weight the buttons and headings use.
+async function expectMontserrat(page) {
+  const font = await page.evaluate(async () => {
+    const specs = ["16px Montserrat", "bold 16px Montserrat"];
+    await Promise.all(specs.map((spec) => document.fonts.load(spec).catch(() => [])));
+    const faces = [...document.fonts].filter((f) => f.family.replace(/["']/g, "") === "Montserrat");
+    return {
+      declared: faces.length,
+      loaded: faces.filter((f) => f.status === "loaded").length,
+      checks: specs.map((spec) => [spec, document.fonts.check(spec)]),
+    };
+  });
+  expect(font.declared, "no Montserrat @font-face is declared on /lab/ui_primitives").toBeGreaterThan(0);
+  expect(font.loaded, "the Montserrat font did not load, so the baselines would compare a fallback face").toBeGreaterThan(0);
+  for (const [spec, ok] of font.checks) {
+    expect(ok, `document.fonts.check('${spec}') is false: Montserrat is not ready`).toBe(true);
+  }
+}
+
 async function capture(page, viewport, theme) {
   await blockOffsiteRequests(page);
   const errors = watchPageErrors(page);
@@ -52,6 +82,7 @@ async function capture(page, viewport, theme) {
   // The lab layout is dark; light is the same page with the class off.
   await page.evaluate((dark) => document.documentElement.classList.toggle("dark", dark), theme === "dark");
   await page.evaluate(() => document.fonts.ready);
+  await expectMontserrat(page);
 
   const found = await page.locator("[data-specimen]").evaluateAll((nodes) => nodes.map((n) => n.dataset.specimen));
   expect(found, "style/_primitives and SPECIMENS disagree").toEqual(SPECIMENS);
