@@ -4,6 +4,22 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.144.0 — 2026-11-11
+
+### Added
+
+- **`Studio::SystemTestCase`, one shared system-test base.** The browser harness fixes that each app carried on its own now ship in the gem: the window resets to `desktop_size` before every test, `evaluate_async_script` gives back the script timeout Capybara 3.40.0 leaves at 2s, a phone viewport's DevTools emulation is cleared after every test, and Selenium gets a 180s read timeout. Helpers `phone_viewport!`, `assert_viewport_width` and `clear_emulation` come with it. An app adopts with `require "studio/system_test_case"` and `class ApplicationSystemTestCase < Studio::SystemTestCase`, keeps its own settings, setup, helpers and tests, and opts out of one hook by name with `skip_harness_hook :name, reason:`, which is logged. `lib/studio.rb` does not load it. See `docs/SYSTEM_TESTS.md`.
+- **`Studio::TableComponent` takes `caption:` and `aria_label:`, and its scroll wrapper is keyboard-scrollable.** The wrapper is always `tabindex="0"` with an inset focus ring, so a keyboard user can focus it and scroll a wide table with the arrow keys. `caption:` renders a visually hidden `<caption>`; `aria_label:` labels the table without one. Either one also makes the wrapper a labelled `role="region"`. Pass one on every table.
+- **`Studio::ButtonComponent` gains `tone: :outline`** (`btn-outline`: a primary border, unfilled until hover), drawn in light and dark on `/admin/style` and pinned by the screenshot baselines.
+
+### Changed
+
+- **`Studio::ButtonComponent`'s default `md` size puts its label on the type scale.** It now adds the new `btn-md` utility: body size (1x `--type-base`, 16px; 14px under `type-dense`) at a 1.25 line height, so the button grows no taller. A bare `.btn` keeps `text-sm`, so hand-built buttons do not move. A host that relied on the 14px component label sees it at 16px.
+
+### Fixed
+
+- **On-demand modals (`Studio.modals`) are hardened before Turf adopts them.** A fetch that does not answer within `Studio.modals.fetch_timeout_ms` (default 8000) is aborted and shows the error card, which now has Try again and a Close that works on a card opened `dismissible: false`. The fragment cache is dropped when the session changes by Turbo visit (sign-in, sign-out, a user switch), keyed on `Studio::Modals.session_marker`, so no cached fragment carries a dead CSRF token or the prior user's data. A fragment containing a `<script>` is refused, not inserted (the reason shows on the card in development and test). The loading card is `role="status"`. Prefetch also runs after each Turbo visit. No change for a consumer: `$store.modals.open(id, props, opts)` is unchanged; set `fetch_timeout_ms` in the initializer to change the wait.
+
 ## 0.143.2 — 2026-11-10
 
 ## 0.143.1 — 2026-11-10
