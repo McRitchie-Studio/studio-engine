@@ -420,17 +420,19 @@ class E2eLabController < ActionController::Base
   def modal_remote = modal_remote_lab("a", "/lab/modal_remote_b")
   def modal_remote_b = modal_remote_lab("b", "/lab/modal_remote")
 
-  # Sign-in and sign-out for the session-change spec, followed by Turbo (a
-  # redirect a Turbo link follows keeps the document). Sign-in writes the user
-  # id and keeps the session, as an OAuth sign-in does; sign-out resets it.
+  # Sign-in and sign-out for the session-change spec, each a Turbo visit that
+  # renders the page itself (not a redirect: every lab GET answers 200, see
+  # e2e_lab_isolation_test.rb). Sign-in writes the user id and keeps the
+  # session, as an OAuth sign-in does, and lands on B; sign-out resets the
+  # session and lands on A.
   def modal_remote_sign_in
     session[Studio.session_key] = 4242
-    redirect_to "/lab/modal_remote_b"
+    modal_remote_lab("b", "/lab/modal_remote")
   end
 
   def modal_remote_sign_out
     reset_session
-    redirect_to "/lab/modal_remote"
+    modal_remote_lab("a", "/lab/modal_remote_b")
   end
 
   private def modal_remote_lab(name, other_path)
