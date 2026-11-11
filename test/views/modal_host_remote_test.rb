@@ -70,6 +70,40 @@ class ModalHostRemoteTest < Minitest::Test
     refute_match(/<script/i, html)
   end
 
+  # ---- engine-modals-fetch-hardening ----
+
+  def test_the_loading_card_is_a_polite_status
+    Studio.modals.register :rules, partial: "modals/rules"
+    loading = render_host[/<div data-modal-remote-state="loading"[^>]*>/]
+    refute_nil loading
+    assert_includes loading, 'role="status"'
+    assert_includes loading, 'aria-live="polite"'
+  end
+
+  def test_the_error_card_offers_try_again_and_a_close_that_ignores_dismissible
+    Studio.modals.register :rules, partial: "modals/rules"
+    html = render_host
+    error_at = html.index('data-modal-remote-state="error"')
+    error_card = html[error_at, 3000]
+    assert_includes error_card, '@studio-modal-retry="$store.modals.retryRemote()"'
+    assert_includes error_card, "$dispatch('studio-modal-retry')"
+    assert_includes error_card, "Try again"
+    assert_includes error_card, 'x-text="$store.modals.remoteErrorText()"'
+    # Close calls close() itself, not the dismissible-gated Escape path.
+    assert_match(/@click="\$store\.modals\.close\(\)"[^>]*>\s*Close/m, error_card)
+  end
+
+  def test_the_advertisement_carries_the_timeout_session_marker_and_debug
+    Studio.modals.register :rules, partial: "modals/rules"
+    Studio.modals.fetch_timeout_ms = 9000
+    config = advertised(render_host)
+    assert_equal 9000, config["timeout_ms"]
+    assert_equal Studio::Modals.session_marker(nil), config["session"], "no controller: the constant marker"
+    assert_includes [true, false], config["debug"]
+  ensure
+    Studio.modals.fetch_timeout_ms = Studio::Modals::Registry::DEFAULT_FETCH_TIMEOUT_MS
+  end
+
   private
 
   def advertised(html)

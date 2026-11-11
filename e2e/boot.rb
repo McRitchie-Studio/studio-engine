@@ -381,11 +381,29 @@ end
 # e2e/modal_remote.spec.js, registered as a host's initializer would. Every
 # lab page that renders the shared host advertises them; only that page opens
 # them. lab-prefetch is the flagged one, so every such page fetches it on idle.
+#
+# /lab/modal_host is the one page with NOTHING registered, as most apps have:
+# LabModalRegistry answers empty while E2eLabController#modal_host renders
+# (a thread-local, so a concurrent request still sees the lab ids).
+# fetch_timeout_ms is short so the stalled-fetch spec need not wait 8s.
+class LabModalRegistry < Studio::Modals::Registry
+  def self.hidden = Thread.current[:lab_modals_hidden]
+
+  %i[ids entries].each { |m| define_method(m) { self.class.hidden ? [] : super() } }
+  def [](id) = self.class.hidden ? nil : super
+  def registered?(id) = self.class.hidden ? false : super
+  def any? = self.class.hidden ? false : super
+  def empty? = self.class.hidden ? true : super
+end
+Studio.instance_variable_set(:@modals, LabModalRegistry.new)
+Studio.modals.fetch_timeout_ms = 2500
+
 Studio.modals.register "lab-rules", partial: "e2e_lab/modals/remote_rules",
                        locals: ->(_view) { { greeting: "Hello from the registered locals" } }
 Studio.modals.register "lab-prefetch", partial: "e2e_lab/modals/remote_rules", prefetch: true
 Studio.modals.register "lab-member", partial: "e2e_lab/modals/remote_member", auth: :user
 Studio.modals.register "lab-broken", partial: "e2e_lab/modals/remote_broken"
+Studio.modals.register "lab-script", partial: "e2e_lab/modals/remote_script"
 
 class User < ApplicationRecord
   def admin? = role == "admin"

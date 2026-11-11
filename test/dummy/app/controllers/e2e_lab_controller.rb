@@ -404,12 +404,34 @@ class E2eLabController < ActionController::Base
   # /lab/birthday_gate drives the SCOPED host instead. Two separate partials with
   # two separate copies of the focus trap; this page is what lets a browser grade
   # the global one.
-  def modal_host = render(:modal_host)
+  #
+  # It renders with NOTHING registered in Studio.modals (e2e/boot.rb's
+  # LabModalRegistry), so the browser lane grades the host every app that
+  # registers none still gets (e2e/modal_remote.spec.js).
+  def modal_host
+    Thread.current[:lab_modals_hidden] = true
+    render(:modal_host)
+  ensure
+    Thread.current[:lab_modals_hidden] = nil
+  end
 
   # On-demand modals (Studio.modals; the lab-* ids are registered in
   # e2e/boot.rb) under Turbo, as two pages linked to each other.
   def modal_remote = modal_remote_lab("a", "/lab/modal_remote_b")
   def modal_remote_b = modal_remote_lab("b", "/lab/modal_remote")
+
+  # Sign-in and sign-out for the session-change spec, followed by Turbo (a
+  # redirect a Turbo link follows keeps the document). Sign-in writes the user
+  # id and keeps the session, as an OAuth sign-in does; sign-out resets it.
+  def modal_remote_sign_in
+    session[Studio.session_key] = 4242
+    redirect_to "/lab/modal_remote_b"
+  end
+
+  def modal_remote_sign_out
+    reset_session
+    redirect_to "/lab/modal_remote"
+  end
 
   private def modal_remote_lab(name, other_path)
     @lab_page = name
