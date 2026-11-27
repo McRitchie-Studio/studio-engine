@@ -19,6 +19,7 @@
 # not declare. The host requires it from its system-test base only.
 require "action_dispatch/system_test_case"
 require "capybara/selenium/driver"
+require "uri"
 
 module Studio
   class SystemTestCase < ActionDispatch::SystemTestCase
@@ -107,6 +108,71 @@ module Studio
       end
     end
     Capybara::Selenium::Driver.prepend(RestoresScriptTimeout)
+
+    # Capybara 3.40.0's Chrome and Edge reset! end with
+    #   execute_cdp("Storage.clearDataForOrigin", origin: "*", ...)
+    # Chrome 158 refuses "*" ("invalid argument: * is not a valid URL"), so every
+    # system test's teardown errors. This names the real origins instead: each
+    # http(s) origin the driver visited since the last reset, the page it is on
+    # at reset, and Capybara.app_host. Cookies are still cleared for every
+    # origin, as "*" did, through Network.clearBrowserCookies. A pure bug fix,
+    # so no opt-out (task engine-reset-fix-chrome-158).
+    module ClearsStorageByOrigin
+      ANY_ORIGIN = "*"
+      CLEAR_COMMAND = "Storage.clearDataForOrigin"
+
+      # The origin Chrome keys storage by ("http://127.0.0.1:4567"), or nil for
+      # a URL with none (about:blank, data:, a bare path).
+      def self.origin_of(url)
+        uri = URI.parse(url.to_s)
+        return unless %w[http https].include?(uri.scheme) && uri.host
+
+        port = uri.port == uri.default_port ? "" : ":#{uri.port}"
+        "#{uri.scheme}://#{uri.host}#{port}"
+      rescue URI::InvalidURIError
+        nil
+      end
+
+      def visit(url)
+        studio_note_origin { url }
+        super
+      end
+
+      def reset!
+        studio_note_origin { @browser.current_url } if @browser
+        super
+      ensure
+        @studio_storage_origins = nil
+      end
+
+      def studio_storage_origins
+        origins = (@studio_storage_origins || []).dup
+        app_origin = ClearsStorageByOrigin.origin_of(Capybara.app_host)
+        origins << app_origin if app_origin
+        origins.uniq
+      end
+
+      private
+
+      def execute_cdp(cmd, params = {})
+        return super unless cmd == CLEAR_COMMAND && params[:origin] == ANY_ORIGIN
+
+        super("Network.clearBrowserCookies") if params[:storageTypes].to_s.split(",").include?("cookies")
+        studio_storage_origins.each { |origin| super(cmd, params.merge(origin: origin)) }
+        nil
+      end
+
+      # Best effort: a read that fails (an open alert at reset) notes nothing,
+      # and never stops the reset.
+      def studio_note_origin
+        origin = ClearsStorageByOrigin.origin_of(yield)
+        (@studio_storage_origins ||= []) << origin if origin
+      rescue StandardError
+        nil
+      end
+    end
+    Capybara::Selenium::Driver::ChromeDriver.prepend(ClearsStorageByOrigin)
+    Capybara::Selenium::Driver::EdgeDriver.prepend(ClearsStorageByOrigin)
 
     driven_by :selenium, using: :headless_chrome, screen_size: DEFAULT_DESKTOP_SIZE
 
