@@ -4,6 +4,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.144.1 — 2026-11-27
+
+### Fixed
+
+- **`Studio::SystemTestCase` system tests pass on Chrome 158.** Capybara 3.40.0's Chrome and Edge `reset!` ends with `Storage.clearDataForOrigin` for origin `"*"`, which Chrome 158 refuses ("invalid argument: * is not a valid URL"), so every system test errored in teardown. A prepend on Capybara's Chrome and Edge specializations now names the real origins: each http(s) origin the driver visited since the last reset, the page it is on at reset, and `Capybara.app_host`. Cookies still clear for every origin, through `Network.clearBrowserCookies`. No change for a consumer that adopts the base: it loads with `require "studio/system_test_case"`. An app on Chrome 158 needs the base (or its own patch) before shared CI drops its `chrome-version: "157"` pin.
+
 ## 0.144.0 — 2026-11-11
 
 ### Added
