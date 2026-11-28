@@ -902,7 +902,7 @@ end
 ```
 
 `Studio::SystemTestCase` carries the browser harness fixes (window reset, script
-timeout, phone emulation, a 180s read timeout) and the app's own customizations
+timeout, phone emulation, a 180s read timeout, a reset! that Chrome 158 accepts) and the app's own customizations
 sit on top of it: [`SYSTEM_TESTS.md`](SYSTEM_TESTS.md).
 
 **The mechanic is in the generator:** on Rails 8, `test/system` and

@@ -2,8 +2,10 @@
 
 # [system] Studio::SystemTestCase in a real headless Chrome against the dummy
 # host: each test leaves the browser dirty the way a careless test would (a
-# small window, a phone viewport, a lowered script timeout), and the next test
-# finds it clean. Test order is pinned so the "dirty" test always runs first.
+# small window, a phone viewport, a lowered script timeout, a cookie and
+# localStorage), and the next test finds it clean. Every teardown also runs
+# Capybara's reset!, which Chrome 158 failed with "* is not a valid URL" until
+# the ClearsStorageByOrigin prepend (engine-reset-fix-chrome-158). Test order is pinned so the "dirty" test always runs first.
 #
 # Engine CI runs this on ubuntu-24.04, which ships Google Chrome; Selenium
 # Manager finds the matching chromedriver. Its own process, like every file in
@@ -70,5 +72,21 @@ class SystemTestCaseBrowserTest < Studio::SystemTestCase
     refute evaluate_script("matchMedia('print').matches"),
            "clear_emulation removed the emulated media"
     assert_equal 30, script_timeout
+  end
+
+  # Ends on a data: page, so reset! has no app page under it and must clear the
+  # app origin it visited, not the page it is on.
+  def test_3_dirty_the_app_storage
+    visit "/"
+    execute_script("document.cookie = 'studio_probe=1; path=/'; localStorage.setItem('studio_probe', '1')")
+    assert_equal "1", evaluate_script("localStorage.getItem('studio_probe')")
+    assert_includes evaluate_script("document.cookie"), "studio_probe=1"
+    visit PHONE_PAGE
+  end
+
+  def test_4_the_app_storage_starts_clean
+    visit "/"
+    assert_nil evaluate_script("localStorage.getItem('studio_probe')"), "reset! cleared the app's localStorage"
+    refute_includes evaluate_script("document.cookie"), "studio_probe", "reset! cleared the app's cookie"
   end
 end

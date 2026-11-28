@@ -11,6 +11,7 @@ tests.
 |----------------|--------------|-----|
 | `reset_window` (setup) | Resizes the window to `desktop_size` before every test. | The browser outlives the test, so a resize leaks into whichever test runs next (commercial-welding went red under one seed; tasks `system-tests-reset-window-size`, `apps-system-tests-reset-window`). |
 | `restore_script_timeout` (driver) | Gives back the script timeout after `evaluate_async_script`. | Capybara 3.40.0 sets it to `default_max_wait_time` (2s) and never restores it, so every later `execute_script` in the run has 2s, not 30s (voicebox `ContrastSystemTest`, task `ci-cause-voicebox-contrastsystemtest`). |
+| Storage clear by origin (driver) | Capybara's `reset!` clears storage for the origins the test visited, the page it is on, and `Capybara.app_host`, and clears every cookie. No opt-out: it is a pure bug fix. | Capybara 3.40.0 clears origin `"*"`, which Chrome 158 refuses ("* is not a valid URL"), so every teardown errored (task `engine-reset-fix-chrome-158`). |
 | `clear_emulation` (teardown) | Clears the DevTools device-metrics and emulated-media overrides. | `phone_viewport!` sets the first; a dark-mode or reduced-motion test sets the second (cyvasse clears both). The browser outlives the test. |
 | 180s read timeout (`driven_by`) | Every Selenium driver gets `options: { timeout: 180 }`. | Selenium's stock 60s read budget dies on a cold Chrome launch on a slow CI runner (hub PR #2494). |
 
@@ -113,7 +114,10 @@ stand down when there is no browser window.
 ## Tests
 
 - `test/lib/system_test_case_test.rb` [unit]: each hook runs, each opt-out disables
-  only its hook, the app's setup runs after the base's, and the settings.
+  only its hook, the app's setup runs after the base's, and the settings. A stub
+  Chrome checks that `reset!` names the app's origin in its storage clear, never `"*"`.
 - `test/system/system_test_case_browser_test.rb` [system]: a real headless Chrome
   against the dummy host. One test dirties the browser (a small window, a phone
-  viewport, an async script); the next finds it clean.
+  viewport, an async script, a cookie and localStorage); the next finds it clean.
+  Each teardown runs Capybara's `reset!` on the real Chrome, so on Chrome 158 a
+  storage clear by `"*"` errors here.

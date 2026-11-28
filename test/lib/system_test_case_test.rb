@@ -212,6 +212,114 @@ class SystemTestCaseTest < Minitest::Test
     assert_equal 30, driver.timeouts.script_timeout
   end
 
+  # The reset prepend: a real Capybara Selenium driver extended with Capybara's
+  # Chrome specialization, on a stub browser that records each CDP command.
+  # Capybara 3.40.0's reset! ends with clearDataForOrigin origin: "*", which
+  # Chrome 158 refuses; the prepend must name the app's origin instead.
+  class StubChrome
+    Navigate = Struct.new(:browser) do
+      def to(url) = browser.url = url
+    end
+
+    attr_accessor :url
+    attr_reader :cdp
+
+    def initialize = (@cdp = []) && (@url = "about:blank")
+    def navigate = Navigate.new(self)
+    def current_url = url
+    def window_handles = ["main"]
+    def window_handle = "main"
+    def switch_to = self
+    def window(_handle) = nil
+    def capabilities = { "chrome" => { "chromedriverVersion" => "158.0.8127.37 (x)" } }
+    def find_element(*) = Struct.new(:text).new("")
+    def execute_cdp(command, **params) = cdp << [command, params]
+    # The specialization's extended hook reads the bridge; this one already
+    # has both features it would patch in.
+    def bridge = self
+    def log(*) = []
+    def commands(*) = true
+  end
+
+  def chrome_driver(browser = StubChrome.new)
+    driver = Capybara::Selenium::Driver.new(nil, browser: :chrome)
+    driver.instance_variable_set(:@browser, browser)
+    driver.extend(Capybara::Selenium::Driver::ChromeDriver)
+    def driver.wait_for_empty_page(_timer) = nil
+    [driver, browser]
+  end
+
+  def storage_clears(browser)
+    browser.cdp.select { |command, _| command == "Storage.clearDataForOrigin" }.map { |_, params| params }
+  end
+
+  def test_the_reset_prepend_sits_on_the_chrome_and_edge_specializations
+    [Capybara::Selenium::Driver::ChromeDriver, Capybara::Selenium::Driver::EdgeDriver].each do |spec|
+      assert_includes spec.ancestors, Studio::SystemTestCase::ClearsStorageByOrigin
+    end
+  end
+
+  def test_reset_clears_storage_for_the_app_origin_never_star
+    driver, browser = chrome_driver
+    driver.visit("http://127.0.0.1:51427/")
+    browser.url = "data:text/html,<p>left the app</p>"
+
+    driver.reset!
+
+    clears = storage_clears(browser)
+    assert_equal [{ origin: "http://127.0.0.1:51427", storageTypes: "cookies,local_storage" }], clears
+    refute(clears.any? { |params| params[:origin] == "*" }, "Chrome 158 refuses origin '*'")
+    assert_includes browser.cdp, ["Network.clearBrowserCookies", {}], "cookies still clear for every origin"
+  end
+
+  def test_reset_names_each_origin_once_and_forgets_them_after
+    driver, browser = chrome_driver
+    driver.visit("http://127.0.0.1:51427/a")
+    driver.visit("http://127.0.0.1:51427/b")
+    driver.visit("https://pay.example.test/checkout")
+
+    driver.reset!
+    assert_equal %w[http://127.0.0.1:51427 https://pay.example.test], storage_clears(browser).map { |p| p[:origin] }
+
+    browser.cdp.clear
+    driver.reset!
+    assert_equal [], storage_clears(browser), "the next reset starts from no origins"
+  end
+
+  def test_reset_names_the_page_it_is_on_and_the_app_host
+    previous = Capybara.app_host
+    Capybara.app_host = "http://app.lvh.me:3100"
+    driver, browser = chrome_driver
+    browser.url = "http://127.0.0.1:60000/landed?after=redirect"
+
+    driver.reset!
+
+    assert_equal %w[http://127.0.0.1:60000 http://app.lvh.me:3100], storage_clears(browser).map { |p| p[:origin] }
+  ensure
+    Capybara.app_host = previous
+  end
+
+  def test_other_cdp_commands_pass_through_untouched
+    driver, browser = chrome_driver
+    driver.send(:execute_cdp, "Storage.clearDataForOrigin", origin: "http://x.test", storageTypes: "cookies")
+    driver.send(:execute_cdp, "Emulation.clearDeviceMetricsOverride")
+
+    assert_equal [["Storage.clearDataForOrigin", { origin: "http://x.test", storageTypes: "cookies" }],
+                  ["Emulation.clearDeviceMetricsOverride", {}]], browser.cdp
+  end
+
+  def test_origin_of_keeps_only_http_origins
+    origin_of = Studio::SystemTestCase::ClearsStorageByOrigin.method(:origin_of)
+
+    assert_equal "http://127.0.0.1:4567", origin_of.call("http://127.0.0.1:4567/path?q=1")
+    assert_equal "https://example.test", origin_of.call("https://example.test:443/")
+    assert_nil origin_of.call("about:blank")
+    assert_nil origin_of.call("data:text/html,<p>x</p>")
+    assert_nil origin_of.call("/relative")
+    assert_nil origin_of.call(nil)
+    assert_nil origin_of.call("http://bad host/")
+  end
+
   private
 
   # Runs setup, then an async script on the lowering driver, and reports
